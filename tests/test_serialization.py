@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
-from agent_devtools.serialization import action_to_dict, write_action_json
+from agent_devtools.serialization import (
+    action_from_dict,
+    action_to_dict,
+    read_action_json,
+    write_action_json,
+)
 
 
 def test_convert_successful_action_to_dict() -> None:
@@ -81,3 +86,55 @@ def test_reject_naive_start_time() -> None:
 
     with pytest.raises(ValueError, match="start_time must be timezone-aware"):
         action_to_dict(action)
+
+
+@pytest.mark.parametrize(
+    ("status", "failure_reason"),
+    [
+        (ActionStatus.SUCCESS, None),
+        (ActionStatus.FAILURE, "RuntimeError: target was not found"),
+    ],
+)
+def test_action_json_round_trip(
+    tmp_path: Path,
+    status: ActionStatus,
+    failure_reason: str | None,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#agent-action"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=status,
+        screenshot_before=Path("before.png"),
+        screenshot_after=Path("after.png"),
+        failure_reason=failure_reason,
+    )
+    output_path = tmp_path / "action.json"
+
+    write_action_json(action, output_path)
+
+    assert read_action_json(output_path) == action
+
+
+def test_reject_unsupported_schema_version() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+    )
+    data = action_to_dict(action)
+    data["schema_version"] = 2
+
+    with pytest.raises(ValueError, match="unsupported schema_version: 2"):
+        action_from_dict(data)
+
+
+def test_reject_non_object_action_json(tmp_path: Path) -> None:
+    input_path = tmp_path / "action.json"
+    input_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="action JSON must contain an object"):
+        read_action_json(input_path)

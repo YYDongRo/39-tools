@@ -12,6 +12,7 @@ written as versioned JSON traces.
 - Typed action records built with standard-library dataclasses and enums
 - Success and failure recording with duration measurement
 - JSON trace output with UTC timestamps and portable paths
+- Loading saved JSON traces back into typed action records
 - A static HTML report showing action details and screenshots
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -140,6 +141,26 @@ write_action_json(action, Path("trace/action.json"))
 
 `record_action()` converts operation exceptions into failed action records. It
 does not re-raise them, and the operation's return value is currently ignored.
+
+## Load an existing trace
+
+Load a saved JSON trace and regenerate its HTML report without running the
+original action again:
+
+```python
+from pathlib import Path
+
+from agent_devtools.report import write_action_html
+from agent_devtools.serialization import read_action_json
+
+
+trace_dir = Path("trace/browser-failure")
+action = read_action_json(trace_dir / "action.json")
+write_action_html(action, trace_dir / "report.html")
+```
+
+The loader validates schema version 1, required fields, field types, status, and
+timestamp format before returning an `ActionRecord`.
 
 ## Current limitations
 
