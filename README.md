@@ -12,6 +12,7 @@ written as versioned JSON traces.
 - Typed action records built with standard-library dataclasses and enums
 - Success and failure recording with duration measurement
 - JSON trace output with UTC timestamps and portable paths
+- A static HTML report showing action details and screenshots
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
 - Tests for the model, recorder, serialization, and end-to-end trace flow
@@ -71,10 +72,12 @@ creates:
 trace/browser-click/
 ├── action.json
 ├── before.png
-└── after.png
+├── after.png
+└── report.html
 ```
 
-Generated traces are ignored by Git.
+Open `report.html` to inspect the action details and before-and-after screenshots
+on one page. Generated traces are ignored by Git.
 
 ## JSON trace format
 
@@ -122,5 +125,6 @@ does not re-raise them, and the operation's return value is currently ignored.
 - Records one synchronous action at a time
 - No multi-action sessions or replay
 - No general desktop screenshot capture
-- No HTML report, CLI, dashboard, or recovery system
+- No CLI, dashboard, or recovery system
+- The HTML report displays one action at a time
 - The real browser example is the only current integration

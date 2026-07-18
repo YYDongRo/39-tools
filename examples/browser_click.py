@@ -3,6 +3,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 from agent_devtools.recorder import record_action
+from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
 
 
@@ -15,6 +16,7 @@ def main() -> None:
     before_path = TRACE_DIR / "before.png"
     after_path = TRACE_DIR / "after.png"
     trace_path = TRACE_DIR / "action.json"
+    report_path = TRACE_DIR / "report.html"
     TRACE_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as playwright:
@@ -33,6 +35,7 @@ def main() -> None:
 
         page.screenshot(path=str(after_path), full_page=True)
         write_action_json(action, trace_path)
+        write_action_html(action, report_path)
         browser.close()
 
     print(f"Browser action trace written to {TRACE_DIR}")
