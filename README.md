@@ -14,7 +14,7 @@ written as versioned JSON traces.
 - JSON trace output with UTC timestamps and portable paths
 - Loading saved JSON traces back into typed action records
 - Ordered multi-action sessions with JSON round-trip support
-- A static HTML report showing action details and screenshots
+- Static HTML reports for individual actions and multi-action timelines
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
 - Tests for the model, recorder, serialization, and end-to-end trace flow
@@ -171,6 +171,7 @@ An `ActionSession` keeps multiple action records in execution order:
 from pathlib import Path
 
 from agent_devtools.recorder import record_action
+from agent_devtools.report import write_session_html
 from agent_devtools.serialization import read_session_json, write_session_json
 from agent_devtools.session import ActionSession
 
@@ -183,17 +184,20 @@ session = ActionSession(actions=actions)
 write_session_json(session, Path("trace/session.json"))
 
 loaded_session = read_session_json(Path("trace/session.json"))
+write_session_html(loaded_session, Path("trace/session.html"))
 print(loaded_session.action_count)
 print(loaded_session.has_failures)
 ```
 
 The session JSON stores the ordered action records. Action count and failure
-state are derived from that list instead of being duplicated in the file.
+state are derived from that list instead of being duplicated in the file. The
+HTML timeline displays each action's status, timing, arguments, failure reason,
+and screenshots. Screenshot paths should be unique and relative to the report.
 
 ## Current limitations
 
 - Session collection is caller-managed and synchronous
-- No session HTML timeline or replay
+- No session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - The HTML report displays one action at a time

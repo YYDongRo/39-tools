@@ -2,8 +2,9 @@ import json
 from html import escape
 from pathlib import Path
 
-from agent_devtools.action import ActionRecord
-from agent_devtools.serialization import action_to_dict
+from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
+from agent_devtools.session import ActionSession
 
 
 def _screenshot_panel(title: str, screenshot_path: object) -> str:
@@ -98,6 +99,166 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
 {_screenshot_panel("Before", data["screenshot_before"])}
 {_screenshot_panel("After", data["screenshot_after"])}
       </section>
+    </main>
+  </body>
+</html>
+"""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(document, encoding="utf-8")
+
+
+def _session_action_card(index: int, action: ActionRecord) -> str:
+    data = action_to_dict(action)
+    status = escape(str(data["status"]))
+    arguments = escape(
+        json.dumps(data["arguments"], ensure_ascii=False, indent=2)
+    )
+    failure_reason = data["failure_reason"]
+    failure_section = ""
+    if failure_reason is not None:
+        failure_section = f"""
+            <div class="failure">
+              <strong>Failure reason</strong>
+              <p>{escape(str(failure_reason))}</p>
+            </div>"""
+
+    screenshots = []
+    for label, path in (
+        ("Before", data["screenshot_before"]),
+        ("After", data["screenshot_after"]),
+    ):
+        if path is not None:
+            safe_path = escape(str(path), quote=True)
+            screenshots.append(
+                f"""
+              <figure>
+                <figcaption>{label}</figcaption>
+                <a href="{safe_path}">
+                  <img src="{safe_path}" alt="{label} action {index} screenshot">
+                </a>
+              </figure>"""
+            )
+    screenshot_section = "".join(screenshots)
+    if not screenshot_section:
+        screenshot_section = '<p class="missing">No screenshots captured.</p>'
+
+    return f"""
+        <article class="timeline-item">
+          <div class="marker">{index}</div>
+          <div class="action-card">
+            <div class="action-heading">
+              <div>
+                <p class="eyebrow">Action {index}</p>
+                <h2>{escape(str(data["action_type"]))}</h2>
+              </div>
+              <span class="status status-{status}">{status}</span>
+            </div>
+            <dl>
+              <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
+              <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
+            </dl>
+            <h3>Arguments</h3>
+            <pre>{arguments}</pre>{failure_section}
+            <div class="action-screenshots">{screenshot_section}
+            </div>
+          </div>
+        </article>"""
+
+
+def write_session_html(session: ActionSession, output_path: Path) -> None:
+    failure_count = sum(
+        action.status is ActionStatus.FAILURE for action in session.actions
+    )
+    if session.action_count == 0:
+        overall_status = "empty"
+        overall_label = "empty"
+    elif session.has_failures:
+        overall_status = "failure"
+        overall_label = "contains failures"
+    else:
+        overall_status = "success"
+        overall_label = "all successful"
+
+    action_label = "action" if session.action_count == 1 else "actions"
+    failure_label = "failure" if failure_count == 1 else "failures"
+    cards = "\n".join(
+        _session_action_card(index, action)
+        for index, action in enumerate(session.actions, start=1)
+    )
+    if not cards:
+        cards = '<section class="empty-state">No actions recorded.</section>'
+
+    document = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent action session</title>
+    <style>
+      :root {{ color-scheme: light; font-family: system-ui, sans-serif; }}
+      body {{ background: #f3f4f6; color: #0f172a; margin: 0; }}
+      main {{ margin: 0 auto; max-width: 1200px; padding: 40px 24px; }}
+      header, .action-card, .empty-state {{ background: white; border-radius: 12px; }}
+      header {{ margin-bottom: 32px; padding: 28px; }}
+      h1, h2, h3, p {{ margin-top: 0; }}
+      .eyebrow {{ color: #64748b; font-size: 13px; font-weight: 700;
+                  letter-spacing: .04em; text-transform: uppercase; }}
+      .title-row, .action-heading {{ align-items: center; display: flex;
+                                    justify-content: space-between; gap: 16px; }}
+      .title-row h1, .action-heading h2 {{ margin-bottom: 0; }}
+      .summary {{ color: #475569; margin: 16px 0 0; }}
+      .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
+      .status-success {{ background: #dcfce7; color: #166534; }}
+      .status-failure {{ background: #fee2e2; color: #991b1b; }}
+      .status-empty {{ background: #e2e8f0; color: #475569; }}
+      .timeline {{ position: relative; }}
+      .timeline::before {{ background: #cbd5e1; bottom: 0; content: "";
+                           left: 19px; position: absolute; top: 0; width: 2px; }}
+      .timeline-item {{ align-items: flex-start; display: grid; gap: 20px;
+                        grid-template-columns: 40px minmax(0, 1fr);
+                        margin-bottom: 28px; position: relative; }}
+      .marker {{ align-items: center; background: #2563eb; border: 4px solid #f3f4f6;
+                 border-radius: 50%; color: white; display: flex; font-weight: 700;
+                 height: 32px; justify-content: center; width: 32px; z-index: 1; }}
+      .action-card {{ padding: 24px; }}
+      dl {{ display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }}
+      dt {{ color: #64748b; font-size: 13px; font-weight: 700; }}
+      dd {{ margin: 6px 0 0; overflow-wrap: anywhere; }}
+      pre {{ background: #0f172a; border-radius: 8px; color: #e2e8f0;
+             overflow-x: auto; padding: 16px; }}
+      .failure {{ background: #fff1f2; border: 1px solid #fecdd3;
+                  border-radius: 8px; margin-top: 20px; padding: 16px; }}
+      .failure p {{ margin: 8px 0 0; white-space: pre-wrap; }}
+      .action-screenshots {{ display: grid; gap: 16px;
+                             grid-template-columns: repeat(2, minmax(0, 1fr));
+                             margin-top: 20px; }}
+      figure {{ margin: 0; }}
+      figcaption {{ color: #64748b; font-size: 13px; font-weight: 700;
+                    margin-bottom: 8px; }}
+      figure img {{ border: 1px solid #e2e8f0; border-radius: 8px;
+                    display: block; height: auto; width: 100%; }}
+      .missing {{ color: #64748b; }}
+      .empty-state {{ padding: 32px; text-align: center; }}
+      @media (max-width: 800px) {{
+        dl, .action-screenshots {{ grid-template-columns: 1fr; }}
+        .title-row, .action-heading {{ align-items: flex-start; flex-direction: column; }}
+      }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Agent DevTools · Session schema {SESSION_SCHEMA_VERSION}</p>
+        <div class="title-row">
+          <h1>Action session</h1>
+          <span class="status status-{overall_status}">{overall_label}</span>
+        </div>
+        <p class="summary">{session.action_count} {action_label} · {failure_count} {failure_label}</p>
+      </header>
+      <div class="timeline">
+{cards}
+      </div>
     </main>
   </body>
 </html>
