@@ -1,0 +1,42 @@
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+from agent_devtools.recorder import record_action
+from agent_devtools.serialization import write_action_json
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TRACE_DIR = PROJECT_ROOT / "trace" / "browser-click"
+
+
+def main() -> None:
+    page_path = Path(__file__).with_suffix(".html").resolve()
+    before_path = TRACE_DIR / "before.png"
+    after_path = TRACE_DIR / "after.png"
+    trace_path = TRACE_DIR / "action.json"
+    TRACE_DIR.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1000, "height": 650})
+        page.goto(page_path.as_uri())
+        page.screenshot(path=str(before_path), full_page=True)
+
+        action = record_action(
+            action_type="click",
+            arguments={"selector": "#agent-action"},
+            operation=lambda: page.locator("#agent-action").click(),
+            screenshot_before=Path("before.png"),
+            screenshot_after=Path("after.png"),
+        )
+
+        page.screenshot(path=str(after_path), full_page=True)
+        write_action_json(action, trace_path)
+        browser.close()
+
+    print(f"Browser action trace written to {TRACE_DIR}")
+
+
+if __name__ == "__main__":
+    main()

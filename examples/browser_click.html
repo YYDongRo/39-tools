@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent DevTools Browser Demo</title>
+    <style>
+      body {
+        align-items: center;
+        background: #f3f4f6;
+        display: flex;
+        font-family: system-ui, sans-serif;
+        justify-content: center;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      main {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgb(15 23 42 / 12%);
+        padding: 48px;
+        text-align: center;
+        width: 420px;
+      }
+
+      button {
+        background: #2563eb;
+        border: 0;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 14px 24px;
+      }
+
+      #status {
+        color: #475569;
+        margin-top: 24px;
+      }
+
+      #status.complete {
+        color: #15803d;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Computer Action Demo</h1>
+      <button id="agent-action" type="button">Run action</button>
+      <p id="status">Waiting for the agent.</p>
+    </main>
+    <script>
+      const button = document.querySelector("#agent-action");
+      const status = document.querySelector("#status");
+
+      button.addEventListener("click", () => {
+        button.textContent = "Action complete";
+        button.disabled = true;
+        status.textContent = "The browser click succeeded.";
+        status.classList.add("complete");
+      });
+    </script>
+  </body>
+</html>

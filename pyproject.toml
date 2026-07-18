@@ -11,6 +11,11 @@ dependencies = []
 [project.scripts]
 agent-devtools = "agent_devtools:main"
 
+[project.optional-dependencies]
+browser = [
+    "playwright>=1.61.0",
+]
+
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
 build-backend = "uv_build"
