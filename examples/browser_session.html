@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent DevTools Session Demo</title>
+    <style>
+      body {
+        align-items: center;
+        background: #f3f4f6;
+        display: flex;
+        font-family: system-ui, sans-serif;
+        justify-content: center;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      main {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgb(15 23 42 / 12%);
+        padding: 40px;
+        width: 460px;
+      }
+
+      button {
+        background: #2563eb;
+        border: 0;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 12px 20px;
+      }
+
+      button:disabled {
+        background: #94a3b8;
+      }
+
+      form {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 24px;
+        padding-top: 24px;
+      }
+
+      form[hidden] {
+        display: none;
+      }
+
+      label {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      input {
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-sizing: border-box;
+        display: block;
+        font: inherit;
+        margin-bottom: 16px;
+        padding: 12px;
+        width: 100%;
+      }
+
+      #status {
+        color: #475569;
+        margin: 24px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Agent Workflow</h1>
+      <p>Complete the task form using a sequence of computer actions.</p>
+      <button id="open-panel" type="button">Open task form</button>
+      <form id="task-form" hidden>
+        <label for="task-name">Task name</label>
+        <input id="task-name" name="task-name" autocomplete="off">
+        <button id="confirm-action" type="submit">Confirm task</button>
+      </form>
+      <p id="status">Waiting for the first action.</p>
+    </main>
+    <script>
+      const openButton = document.querySelector("#open-panel");
+      const form = document.querySelector("#task-form");
+      const input = document.querySelector("#task-name");
+      const status = document.querySelector("#status");
+
+      openButton.addEventListener("click", () => {
+        form.hidden = false;
+        openButton.disabled = true;
+        status.textContent = "The form is ready for input.";
+      });
+
+      input.addEventListener("input", () => {
+        status.textContent = `Task name entered: ${input.value}`;
+      });
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        status.textContent = "Workflow completed.";
+      });
+    </script>
+  </body>
+</html>

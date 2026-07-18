@@ -102,6 +102,36 @@ trace/browser-failure/
 Open this `report.html` to inspect the failed selector, timeout, duration, failure
 reason, and unchanged browser state.
 
+### Record a continuous browser session
+
+Run three actions in one browser and preserve the page state between them:
+
+```bash
+uv run --extra browser python examples/browser_session.py
+```
+
+The session opens a form, enters a task name, and then deliberately uses the
+wrong selector for the confirmation button. It creates:
+
+```text
+trace/browser-session/
+├── session.json
+├── report.html
+└── actions/
+    ├── 001/
+    │   ├── before.png
+    │   └── after.png
+    ├── 002/
+    │   ├── before.png
+    │   └── after.png
+    └── 003/
+        ├── before.png
+        └── after.png
+```
+
+Each action runs in the same page and browser context, so every screenshot
+reflects the state produced by the preceding actions.
+
 ## JSON trace format
 
 ```json
@@ -200,5 +230,4 @@ and screenshots. Screenshot paths should be unique and relative to the report.
 - No session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
-- The HTML report displays one action at a time
 - The real browser examples are the only current integration
