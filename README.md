@@ -79,6 +79,27 @@ trace/browser-click/
 Open `report.html` to inspect the action details and before-and-after screenshots
 on one page. Generated traces are ignored by Git.
 
+### Inspect a controlled browser failure
+
+Run a second local demo that deliberately clicks a missing element:
+
+```bash
+uv run --extra browser python examples/browser_failure.py
+```
+
+It records the Playwright timeout instead of re-raising it and creates:
+
+```text
+trace/browser-failure/
+├── action.json
+├── before.png
+├── after.png
+└── report.html
+```
+
+Open this `report.html` to inspect the failed selector, timeout, duration, failure
+reason, and unchanged browser state.
+
 ## JSON trace format
 
 ```json
@@ -127,4 +148,4 @@ does not re-raise them, and the operation's return value is currently ignored.
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - The HTML report displays one action at a time
-- The real browser example is the only current integration
+- The real browser examples are the only current integration

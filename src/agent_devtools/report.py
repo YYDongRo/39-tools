@@ -60,6 +60,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       pre {{ background: #0f172a; border-radius: 8px; color: #e2e8f0;
              overflow-x: auto; padding: 16px; }}
       .failure {{ background: #fff1f2; border: 1px solid #fecdd3; }}
+      .failure p {{ white-space: pre-wrap; }}
       .screenshots {{ background: transparent; display: grid; gap: 24px;
                       grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }}
       .screenshot {{ padding: 20px; }}
