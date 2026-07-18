@@ -3,9 +3,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.session import ActionSession
 
 
 SCHEMA_VERSION = 1
+SESSION_SCHEMA_VERSION = 1
 
 
 def action_to_dict(action: ActionRecord) -> dict[str, object]:
@@ -115,3 +117,54 @@ def read_action_json(input_path: Path) -> ActionRecord:
         raise ValueError("action JSON must contain an object")
 
     return action_from_dict(data)
+
+
+def session_to_dict(session: ActionSession) -> dict[str, object]:
+    return {
+        "schema_version": SESSION_SCHEMA_VERSION,
+        "actions": [action_to_dict(action) for action in session.actions],
+    }
+
+
+def session_from_dict(data: dict[str, object]) -> ActionSession:
+    schema_version = data.get("schema_version")
+    if schema_version != SESSION_SCHEMA_VERSION:
+        raise ValueError(f"unsupported session schema_version: {schema_version!r}")
+
+    try:
+        actions_value = data["actions"]
+    except KeyError as error:
+        raise ValueError("missing required field: actions") from error
+    if not isinstance(actions_value, list):
+        raise ValueError("actions must be an array")
+
+    actions: list[ActionRecord] = []
+    for index, action_value in enumerate(actions_value):
+        if not isinstance(action_value, dict):
+            raise ValueError(f"action at index {index} must be an object")
+        try:
+            actions.append(action_from_dict(action_value))
+        except ValueError as error:
+            raise ValueError(f"invalid action at index {index}: {error}") from error
+
+    return ActionSession(actions=actions)
+
+
+def write_session_json(session: ActionSession, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(session_to_dict(session), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def read_session_json(input_path: Path) -> ActionSession:
+    try:
+        data = json.loads(input_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid session JSON: {error.msg}") from error
+
+    if not isinstance(data, dict):
+        raise ValueError("session JSON must contain an object")
+
+    return session_from_dict(data)
