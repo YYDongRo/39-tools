@@ -1,0 +1,83 @@
+import json
+from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.serialization import action_to_dict, write_action_json
+
+
+def test_convert_successful_action_to_dict() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"x": 100, "y": 200},
+        start_time=datetime(
+            2026, 7, 17, 20, 0, tzinfo=timezone(timedelta(hours=8))
+        ),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        screenshot_before=Path("screenshots/before.png"),
+        screenshot_after=Path("screenshots/after.png"),
+    )
+
+    assert action_to_dict(action) == {
+        "schema_version": 1,
+        "action_type": "click",
+        "arguments": {"x": 100, "y": 200},
+        "start_time": "2026-07-17T12:00:00+00:00",
+        "duration_ms": 125,
+        "status": "success",
+        "screenshot_before": "screenshots/before.png",
+        "screenshot_after": "screenshots/after.png",
+        "failure_reason": None,
+    }
+
+
+def test_convert_failed_action_to_dict() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+        duration_ms=250,
+        status=ActionStatus.FAILURE,
+        failure_reason="RuntimeError: target was not found",
+    )
+
+    data = action_to_dict(action)
+
+    assert data["status"] == "failure"
+    assert data["screenshot_before"] is None
+    assert data["screenshot_after"] is None
+    assert data["failure_reason"] == "RuntimeError: target was not found"
+
+
+def test_write_action_json(tmp_path: Path) -> None:
+    action = ActionRecord(
+        action_type="输入文本",
+        arguments={"text": "你好"},
+        start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+        duration_ms=50,
+        status=ActionStatus.SUCCESS,
+    )
+    output_path = tmp_path / "trace" / "action.json"
+
+    write_action_json(action, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert json.loads(content) == action_to_dict(action)
+    assert "输入文本" in content
+    assert content.endswith("\n")
+
+
+def test_reject_naive_start_time() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 17, 12, 0),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+    )
+
+    with pytest.raises(ValueError, match="start_time must be timezone-aware"):
+        action_to_dict(action)
