@@ -105,10 +105,12 @@ The repository currently includes:
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
 - static session summaries with success, failure, and failure-category counts;
+- controlled framework-independent replay for validated click actions, with
+  real-browser success and timeout coverage and a controlled failure demo;
 - unit tests for the foundational modules.
 
 Verification results are not yet stored in trace JSON or HTML reports.
-Replay is not implemented.
+Replay does not support complete sessions or action types other than click.
 General third-party agent integration is not implemented.
 
 # Near-Term Roadmap
@@ -136,7 +138,8 @@ A developer-friendly trace inspector or improved timeline. Complete for static
 session overviews and failure-category counts.
 
 Milestone 5:
-Controlled replay of supported browser actions.
+Controlled replay of supported browser actions. Complete for synchronous click
+actions with explicit selector and timeout validation.
 
 Milestone 6:
 One external agent integration adapter.

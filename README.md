@@ -19,6 +19,7 @@ written as versioned JSON traces.
 - Static HTML reports with action details and session failure-category summaries
 - Deterministic text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
+- Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
 - Tests for the model, recorder, serialization, and end-to-end trace flow
@@ -236,6 +237,57 @@ The loader accepts action schema versions 1 and 2. Version 1 failures load with
 the `unknown` category. It validates required fields, field types, status, and
 timestamp format before returning an `ActionRecord`.
 
+## Replay a saved click
+
+Replay uses a caller-provided click executor, so a saved trace cannot choose a
+URL or execute arbitrary code:
+
+```python
+from pathlib import Path
+
+from agent_devtools.replay import replay_click
+from agent_devtools.serialization import read_action_json
+
+
+source_action = read_action_json(Path("trace/browser-click/action.json"))
+
+
+def execute_click(selector: str, timeout_ms: int | None) -> None:
+    if timeout_ms is None:
+        page.locator(selector).click()
+    else:
+        page.locator(selector).click(timeout=timeout_ms)
+
+result = replay_click(
+    source_action,
+    execute_click=execute_click,
+)
+print(result.replayed_action.status)
+print(result.outcome_matches)
+```
+
+Only `click` actions with a non-empty `selector` and optional positive
+`timeout_ms` are accepted. The caller creates the page and chooses its URL.
+Unknown source failures are never reported as stable reproductions.
+
+Run the controlled browser failure replay example:
+
+```bash
+uv run --extra browser python examples/browser_replay.py
+```
+
+The example records a controlled timeout, saves and reloads it, and then replays
+it in a fresh page using the repository's fixed local HTML. It creates:
+
+```text
+trace/browser-replay/<run-id>/
+├── original.json
+├── replay.json
+├── before.png
+├── after.png
+└── report.html
+```
+
 ## Record actions in a session
 
 `SessionRecorder` records actions in execution order and updates the JSON and
@@ -277,7 +329,7 @@ interrupted update does not leave a partially written trace.
 ## Current limitations
 
 - Session recording is synchronous
-- No session replay
+- Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - The real browser examples are the only current integration
