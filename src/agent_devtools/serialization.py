@@ -9,8 +9,8 @@ from agent_devtools.failure import FailureCategory
 from agent_devtools.session import ActionSession
 
 
-SCHEMA_VERSION = 2
-SUPPORTED_SCHEMA_VERSIONS = {1, SCHEMA_VERSION}
+SCHEMA_VERSION = 3
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, SCHEMA_VERSION}
 SESSION_SCHEMA_VERSION = 1
 
 
@@ -67,6 +67,7 @@ def action_to_dict(action: ActionRecord) -> dict[str, object]:
             if action.failure_category is not None
             else None
         ),
+        "failure_evidence": action.failure_evidence,
     }
 
 
@@ -85,7 +86,10 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         screenshot_after = data["screenshot_after"]
         failure_reason = data["failure_reason"]
         failure_category_value = (
-            data["failure_category"] if schema_version == SCHEMA_VERSION else None
+            data["failure_category"] if schema_version in {2, SCHEMA_VERSION} else None
+        )
+        failure_evidence_value = (
+            data["failure_evidence"] if schema_version == SCHEMA_VERSION else {}
         )
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
@@ -112,6 +116,10 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         failure_category_value, str
     ):
         raise ValueError("failure_category must be a string or null")
+    if not isinstance(failure_evidence_value, dict) or not all(
+        isinstance(key, str) for key in failure_evidence_value
+    ):
+        raise ValueError("failure_evidence must be an object with string keys")
 
     try:
         start_time = datetime.fromisoformat(start_time_value)
@@ -150,6 +158,7 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         ),
         failure_reason=failure_reason,
         failure_category=failure_category,
+        failure_evidence=dict(failure_evidence_value),
     )
 
 

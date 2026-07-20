@@ -20,6 +20,7 @@ def replay_click(
     *,
     screenshot_before: Path | None = None,
     screenshot_after: Path | None = None,
+    diagnose_failure: Callable[[ActionRecord], ActionRecord] | None = None,
 ) -> ReplayResult:
     if source_action.action_type != "click":
         raise ValueError("only click actions can be replayed")
@@ -57,6 +58,11 @@ def replay_click(
         screenshot_before=screenshot_before,
         screenshot_after=screenshot_after,
     )
+    if (
+        replayed_action.status is ActionStatus.FAILURE
+        and diagnose_failure is not None
+    ):
+        replayed_action = diagnose_failure(replayed_action)
 
     return ReplayResult(
         source_action=source_action,

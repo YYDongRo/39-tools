@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent DevTools Failure Diagnostics</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 40px;
+      }
+
+      button {
+        display: block;
+        margin-bottom: 16px;
+      }
+
+      button[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Click diagnostics</h1>
+      <button id="visible-target" type="button">Visible target</button>
+      <button id="hidden-target" type="button" hidden>Hidden target</button>
+      <button id="disabled-target" type="button" disabled>Disabled target</button>
+    </main>
+  </body>
+</html>

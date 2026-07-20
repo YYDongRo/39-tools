@@ -17,12 +17,13 @@ def test_example_writes_successful_trace(
     runpy.run_path(str(example_path), run_name="__main__")
 
     data = json.loads((tmp_path / "trace/action.json").read_text(encoding="utf-8"))
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert data["action_type"] == "click"
     assert data["arguments"] == {"x": 100, "y": 200}
     assert data["status"] == "success"
     assert data["failure_reason"] is None
     assert data["failure_category"] is None
+    assert data["failure_evidence"] == {}
 
 
 def test_failed_action_is_written_to_trace(tmp_path: Path) -> None:
@@ -42,4 +43,5 @@ def test_failed_action_is_written_to_trace(tmp_path: Path) -> None:
     assert data["status"] == "failure"
     assert data["failure_reason"] == "RuntimeError: target was not found"
     assert data["failure_category"] == "operation_error"
+    assert data["failure_evidence"] == {}
     assert data["duration_ms"] >= 0

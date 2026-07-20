@@ -3,7 +3,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 from agent_devtools.action import ActionStatus
-from agent_devtools.recorder import record_action
+from agent_devtools.integrations.playwright import record_playwright_click
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
 
@@ -28,10 +28,10 @@ def main() -> None:
         page.goto(page_path.as_uri())
         page.screenshot(path=str(before_path), full_page=True)
 
-        action = record_action(
-            action_type="click",
-            arguments={"selector": selector, "timeout_ms": timeout_ms},
-            operation=lambda: page.locator(selector).click(timeout=timeout_ms),
+        action = record_playwright_click(
+            page,
+            selector,
+            timeout_ms=timeout_ms,
             screenshot_before=Path("before.png"),
             screenshot_after=Path("after.png"),
         )

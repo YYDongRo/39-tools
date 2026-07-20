@@ -28,7 +28,7 @@ def test_convert_successful_action_to_dict() -> None:
     )
 
     assert action_to_dict(action) == {
-        "schema_version": 2,
+        "schema_version": 3,
         "action_type": "click",
         "arguments": {"x": 100, "y": 200},
         "start_time": "2026-07-17T12:00:00+00:00",
@@ -38,6 +38,7 @@ def test_convert_successful_action_to_dict() -> None:
         "screenshot_after": "screenshots/after.png",
         "failure_reason": None,
         "failure_category": None,
+        "failure_evidence": {},
     }
 
 
@@ -58,6 +59,7 @@ def test_convert_failed_action_to_dict() -> None:
     assert data["screenshot_after"] is None
     assert data["failure_reason"] == "RuntimeError: target was not found"
     assert data["failure_category"] == "unknown"
+    assert data["failure_evidence"] == {}
 
 
 def test_write_action_json(tmp_path: Path) -> None:
@@ -129,9 +131,9 @@ def test_reject_unsupported_schema_version() -> None:
         status=ActionStatus.SUCCESS,
     )
     data = action_to_dict(action)
-    data["schema_version"] = 3
+    data["schema_version"] = 4
 
-    with pytest.raises(ValueError, match="unsupported schema_version: 3"):
+    with pytest.raises(ValueError, match="unsupported schema_version: 4"):
         action_from_dict(data)
 
 
@@ -147,10 +149,32 @@ def test_load_schema_version_1_failure_as_unknown_category() -> None:
     data = action_to_dict(action)
     data["schema_version"] = 1
     del data["failure_category"]
+    del data["failure_evidence"]
 
     loaded_action = action_from_dict(data)
 
     assert loaded_action.failure_category is FailureCategory.UNKNOWN
+    assert loaded_action.failure_evidence == {}
+
+
+def test_load_schema_version_2_failure_without_evidence() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.FAILURE,
+        failure_reason="target was not found",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    data = action_to_dict(action)
+    data["schema_version"] = 2
+    del data["failure_evidence"]
+
+    loaded_action = action_from_dict(data)
+
+    assert loaded_action.failure_category is FailureCategory.TARGET_NOT_FOUND
+    assert loaded_action.failure_evidence == {}
 
 
 def test_reject_invalid_failure_category() -> None:
@@ -168,6 +192,25 @@ def test_reject_invalid_failure_category() -> None:
     with pytest.raises(
         ValueError,
         match="invalid failure_category: 'wrong_target'",
+    ):
+        action_from_dict(data)
+
+
+def test_reject_invalid_failure_evidence() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.FAILURE,
+        failure_reason="target was not found",
+    )
+    data = action_to_dict(action)
+    data["failure_evidence"] = []
+
+    with pytest.raises(
+        ValueError,
+        match="failure_evidence must be an object with string keys",
     ):
         action_from_dict(data)
 

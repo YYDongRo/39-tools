@@ -5,6 +5,7 @@ import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
+from agent_devtools.integrations.playwright import diagnose_playwright_click_failure
 from agent_devtools.replay import replay_click
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import read_action_json, write_action_json
@@ -82,7 +83,13 @@ def test_replays_browser_timeout_failure() -> None:
         duration_ms=100,
         status=ActionStatus.FAILURE,
         failure_reason="TimeoutError: original action timed out",
-        failure_category=FailureCategory.TIMEOUT,
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+        failure_evidence={
+            "selector": "#missing",
+            "selector_count": 0,
+            "target_visible": None,
+            "target_enabled": None,
+        },
     )
 
     with playwright.sync_playwright() as browser_api:
@@ -93,10 +100,18 @@ def test_replays_browser_timeout_failure() -> None:
         def execute_click(selector: str, timeout_ms: int | None) -> None:
             page.locator(selector).click(timeout=timeout_ms)
 
-        result = replay_click(source_action, execute_click)
+        result = replay_click(
+            source_action,
+            execute_click,
+            diagnose_failure=lambda action: diagnose_playwright_click_failure(
+                page,
+                action,
+            ),
+        )
 
         browser.close()
 
     assert result.replayed_action.status is ActionStatus.FAILURE
-    assert result.replayed_action.failure_category is FailureCategory.TIMEOUT
+    assert result.replayed_action.failure_category is FailureCategory.TARGET_NOT_FOUND
+    assert result.replayed_action.failure_evidence["selector_count"] == 0
     assert result.outcome_matches

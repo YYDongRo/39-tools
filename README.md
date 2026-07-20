@@ -19,6 +19,7 @@ written as versioned JSON traces.
 - Static HTML reports with action details and session failure-category summaries
 - Deterministic text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
+- Playwright click diagnostics with minimal structured element-state evidence
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -104,8 +105,8 @@ trace/browser-failure/
 └── report.html
 ```
 
-Open this `report.html` to inspect the failed selector, timeout, duration, failure
-reason, and unchanged browser state.
+Open this `report.html` to inspect the failed selector, timeout, duration,
+`target_not_found` diagnosis, structured evidence, and unchanged browser state.
 
 ### Record a continuous browser session
 
@@ -146,7 +147,7 @@ browser or desktop automation framework.
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "action_type": "click",
   "arguments": {
     "selector": "#agent-action"
@@ -157,7 +158,8 @@ browser or desktop automation framework.
   "screenshot_before": "before.png",
   "screenshot_after": "after.png",
   "failure_reason": null,
-  "failure_category": null
+  "failure_category": null,
+  "failure_evidence": {}
 }
 ```
 
@@ -206,7 +208,7 @@ Verification results are currently independent from action and session JSON.
 
 ## Failure categories
 
-Failed actions use one of four conservative categories:
+Core recording uses four conservative categories:
 
 - `timeout` for exceptions whose type is `TimeoutError`;
 - `operation_error` for other operation exceptions;
@@ -215,6 +217,30 @@ Failed actions use one of four conservative categories:
 
 The original failure reason is always preserved. The classifier does not infer
 `wrong_target`, `blocked_target`, or `page_not_ready` from error-message text.
+
+The optional Playwright adapter can refine a failed click using direct element
+observations:
+
+- `target_not_found` when the selector matches no elements;
+- `target_not_visible` when exactly one target exists but is not visible;
+- `target_disabled` when exactly one target is visible but disabled.
+
+```python
+from agent_devtools.integrations.playwright import record_playwright_click
+
+
+action = record_playwright_click(
+    page,
+    "#confirm",
+    timeout_ms=500,
+)
+print(action.failure_category)
+print(action.failure_evidence)
+```
+
+Evidence contains only the selector, match count, visibility, enabled state, and
+diagnostic error type when inspection itself fails. It does not capture the full
+DOM or page text.
 
 ## Load an existing trace
 
@@ -233,9 +259,10 @@ action = read_action_json(trace_dir / "action.json")
 write_action_html(action, trace_dir / "report.html")
 ```
 
-The loader accepts action schema versions 1 and 2. Version 1 failures load with
-the `unknown` category. It validates required fields, field types, status, and
-timestamp format before returning an `ActionRecord`.
+The loader accepts action schema versions 1, 2, and 3. Version 1 failures load
+with the `unknown` category; versions 1 and 2 load with empty failure evidence.
+It validates required fields, field types, status, and timestamp format before
+returning an `ActionRecord`.
 
 ## Replay a saved click
 
@@ -332,4 +359,4 @@ interrupted update does not leave a partially written trace.
 - Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
-- The real browser examples are the only current integration
+- Playwright click recording and diagnostics are the only current runtime integration

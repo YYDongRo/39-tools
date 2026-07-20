@@ -107,11 +107,13 @@ The repository currently includes:
 - static session summaries with success, failure, and failure-category counts;
 - controlled framework-independent replay for validated click actions, with
   real-browser success and timeout coverage and a controlled failure demo;
+- a Playwright click adapter that records minimal element-state evidence and
+  diagnoses missing, hidden, and disabled targets;
 - unit tests for the foundational modules.
 
 Verification results are not yet stored in trace JSON or HTML reports.
 Replay does not support complete sessions or action types other than click.
-General third-party agent integration is not implemented.
+No third-party agent integration exists beyond the Playwright runtime adapter.
 
 # Near-Term Roadmap
 
@@ -142,7 +144,8 @@ Controlled replay of supported browser actions. Complete for synchronous click
 actions with explicit selector and timeout validation.
 
 Milestone 6:
-One external agent integration adapter.
+One external agent integration adapter. Complete for Playwright click recording
+and evidence-based failure diagnostics.
 
 Do not jump directly to dashboards, LLM integration, OpenClaw integration,
 desktop automation, or complex replay before the foundations are tested.

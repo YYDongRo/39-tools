@@ -37,6 +37,7 @@ def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
         duration_ms=250,
         status=ActionStatus.FAILURE,
         failure_reason="Element <button> was not found",
+        failure_evidence={"selector": "<button>", "selector_count": 0},
     )
     output_path = tmp_path / "report.html"
 
@@ -46,6 +47,9 @@ def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
     assert 'class="status status-failure"' in content
     assert "Element &lt;button&gt; was not found" in content
     assert "<strong>Category:</strong> unknown" in content
+    assert "Diagnostic evidence" in content
+    assert "&lt;button&gt;" in content
+    assert "&quot;selector_count&quot;: 0" in content
     assert content.count("Not captured") == 2
 
 
@@ -77,6 +81,12 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
                 status=ActionStatus.FAILURE,
                 failure_reason="TimeoutError: target did not appear",
                 failure_category=FailureCategory.TIMEOUT,
+                failure_evidence={
+                    "selector": "#slow-action",
+                    "selector_count": 1,
+                    "target_visible": True,
+                    "target_enabled": True,
+                },
             ),
         ]
     )
@@ -97,6 +107,8 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
     assert "Failure categories" in content
     assert "<span>timeout</span><strong>1</strong>" in content
     assert "<span>unknown</span><strong>1</strong>" in content
+    assert "Diagnostic evidence" in content
+    assert "&quot;target_visible&quot;: true" in content
     assert 'src="action-1/before.png"' in content
 
 

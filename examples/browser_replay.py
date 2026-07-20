@@ -3,7 +3,10 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from agent_devtools.recorder import record_action
+from agent_devtools.integrations.playwright import (
+    diagnose_playwright_click_failure,
+    record_playwright_click,
+)
 from agent_devtools.replay import replay_click
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import read_action_json, write_action_json
@@ -25,10 +28,10 @@ def main() -> None:
         browser = browser_api.chromium.launch(headless=True)
         source_page = browser.new_page()
         source_page.goto(page_path.as_uri())
-        source_action = record_action(
-            action_type="click",
-            arguments={"selector": "#missing", "timeout_ms": 500},
-            operation=lambda: source_page.locator("#missing").click(timeout=500),
+        source_action = record_playwright_click(
+            source_page,
+            "#missing",
+            timeout_ms=500,
         )
         source_page.close()
         write_action_json(source_action, trace_dir / "original.json")
@@ -49,6 +52,10 @@ def main() -> None:
             execute_click,
             screenshot_before=Path("before.png"),
             screenshot_after=Path("after.png"),
+            diagnose_failure=lambda action: diagnose_playwright_click_failure(
+                replay_page,
+                action,
+            ),
         )
 
         replay_page.screenshot(path=str(after_path), full_page=True)

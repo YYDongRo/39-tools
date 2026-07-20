@@ -30,6 +30,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
     )
     failure_reason = data["failure_reason"]
     failure_category = data["failure_category"]
+    failure_evidence = data["failure_evidence"]
     failure_section = ""
     if failure_reason is not None:
         category_section = ""
@@ -38,11 +39,18 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
                 "<p><strong>Category:</strong> "
                 f"{escape(str(failure_category))}</p>"
             )
+        evidence_section = ""
+        if failure_evidence:
+            evidence = escape(
+                json.dumps(failure_evidence, ensure_ascii=False, indent=2)
+            )
+            evidence_section = f"<h3>Diagnostic evidence</h3><pre>{evidence}</pre>"
         failure_section = f"""
       <section class="failure">
         <h2>Failure reason</h2>
         {category_section}
         <p>{escape(str(failure_reason))}</p>
+        {evidence_section}
       </section>"""
 
     document = f"""<!doctype html>
@@ -125,6 +133,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
     )
     failure_reason = data["failure_reason"]
     failure_category = data["failure_category"]
+    failure_evidence = data["failure_evidence"]
     failure_section = ""
     if failure_reason is not None:
         category_section = ""
@@ -133,11 +142,18 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
                 "<p><strong>Category:</strong> "
                 f"{escape(str(failure_category))}</p>"
             )
+        evidence_section = ""
+        if failure_evidence:
+            evidence = escape(
+                json.dumps(failure_evidence, ensure_ascii=False, indent=2)
+            )
+            evidence_section = f"<h3>Diagnostic evidence</h3><pre>{evidence}</pre>"
         failure_section = f"""
             <div class="failure">
               <strong>Failure reason</strong>
               {category_section}
               <p>{escape(str(failure_reason))}</p>
+              {evidence_section}
             </div>"""
 
     screenshots = []

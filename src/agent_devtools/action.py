@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
@@ -22,6 +22,7 @@ class ActionRecord:
     screenshot_after: Path | None = None
     failure_reason: str | None = None
     failure_category: FailureCategory | None = None
+    failure_evidence: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.duration_ms < 0:
@@ -32,3 +33,5 @@ class ActionRecord:
             self.failure_category = FailureCategory.UNKNOWN
         if self.status is ActionStatus.SUCCESS and self.failure_category is not None:
             raise ValueError("successful actions cannot have a failure category")
+        if self.status is ActionStatus.SUCCESS and self.failure_evidence:
+            raise ValueError("successful actions cannot have failure evidence")

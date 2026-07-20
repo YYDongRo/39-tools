@@ -20,6 +20,7 @@ def test_create_successful_action() -> None:
     assert action.arguments == {"x": 100, "y": 200}
     assert action.status is ActionStatus.SUCCESS
     assert action.failure_category is None
+    assert action.failure_evidence == {}
 
 
 def test_create_failed_action_with_reason() -> None:
@@ -35,6 +36,7 @@ def test_create_failed_action_with_reason() -> None:
     assert action.status is ActionStatus.FAILURE
     assert action.failure_reason == "Target was not found"
     assert action.failure_category is FailureCategory.UNKNOWN
+    assert action.failure_evidence == {}
 
 
 def test_screenshot_paths_are_optional() -> None:
@@ -84,4 +86,19 @@ def test_successful_action_rejects_failure_category() -> None:
             duration_ms=125,
             status=ActionStatus.SUCCESS,
             failure_category=FailureCategory.OPERATION_ERROR,
+        )
+
+
+def test_successful_action_rejects_failure_evidence() -> None:
+    with pytest.raises(
+        ValueError,
+        match="successful actions cannot have failure evidence",
+    ):
+        ActionRecord(
+            action_type="click",
+            arguments={},
+            start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+            duration_ms=125,
+            status=ActionStatus.SUCCESS,
+            failure_evidence={"selector_count": 0},
         )
