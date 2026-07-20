@@ -3,6 +3,7 @@ from html import escape
 from pathlib import Path
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
 from agent_devtools.session import ActionSession
 
@@ -186,6 +187,13 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     failure_count = sum(
         action.status is ActionStatus.FAILURE for action in session.actions
     )
+    success_count = session.action_count - failure_count
+    category_counts = {
+        category: sum(
+            action.failure_category is category for action in session.actions
+        )
+        for category in FailureCategory
+    }
     if session.action_count == 0:
         overall_status = "empty"
         overall_label = "empty"
@@ -197,7 +205,20 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
         overall_label = "all successful"
 
     action_label = "action" if session.action_count == 1 else "actions"
+    success_label = "success" if success_count == 1 else "successes"
     failure_label = "failure" if failure_count == 1 else "failures"
+    failure_summary = ""
+    if failure_count:
+        category_items = "\n".join(
+            f"<li><span>{escape(category.value)}</span><strong>{count}</strong></li>"
+            for category, count in category_counts.items()
+            if count
+        )
+        failure_summary = f"""
+        <section class="failure-summary">
+          <h2>Failure categories</h2>
+          <ul>{category_items}</ul>
+        </section>"""
     cards = "\n".join(
         _session_action_card(index, action)
         for index, action in enumerate(session.actions, start=1)
@@ -224,6 +245,13 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                                     justify-content: space-between; gap: 16px; }}
       .title-row h1, .action-heading h2 {{ margin-bottom: 0; }}
       .summary {{ color: #475569; margin: 16px 0 0; }}
+      .failure-summary {{ background: #fff1f2; border: 1px solid #fecdd3;
+                          border-radius: 8px; margin-top: 20px; padding: 16px; }}
+      .failure-summary h2 {{ font-size: 16px; margin-bottom: 12px; }}
+      .failure-summary ul {{ display: flex; flex-wrap: wrap; gap: 10px;
+                             list-style: none; margin: 0; padding: 0; }}
+      .failure-summary li {{ background: white; border-radius: 999px;
+                             display: flex; gap: 8px; padding: 6px 12px; }}
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
@@ -270,7 +298,8 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
           <h1>Action session</h1>
           <span class="status status-{overall_status}">{overall_label}</span>
         </div>
-        <p class="summary">{session.action_count} {action_label} · {failure_count} {failure_label}</p>
+        <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label}</p>
+{failure_summary}
       </header>
       <div class="timeline">
 {cards}

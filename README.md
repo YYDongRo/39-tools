@@ -16,7 +16,7 @@ written as versioned JSON traces.
 - Ordered multi-action sessions with JSON round-trip support
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
-- Static HTML reports for individual actions and multi-action timelines
+- Static HTML reports with action details and session failure-category summaries
 - Deterministic text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - A dependency-free simulated action example
@@ -259,8 +259,9 @@ print(loaded_session.has_failures)
 
 Pass a screenshot callback to `SessionRecorder` to capture before-and-after
 images automatically. Action count and failure state are derived from the saved
-action list. The HTML timeline displays each action's status, timing, arguments,
-failure reason, and screenshots.
+action list. The HTML timeline displays success and failure totals, a breakdown
+of failure categories, and each action's status, timing, arguments, failure
+reason, and screenshots.
 
 Starting a recorder in a non-empty directory raises `FileExistsError` instead
 of overwriting evidence. Resume an existing session explicitly:

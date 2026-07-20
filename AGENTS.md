@@ -104,6 +104,7 @@ The repository currently includes:
 - a minimal reusable contract for deterministic text-state verification;
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
+- static session summaries with success, failure, and failure-category counts;
 - unit tests for the foundational modules.
 
 Verification results are not yet stored in trace JSON or HTML reports.
@@ -131,7 +132,8 @@ Structured failure categories and failure summaries. Complete for categories
 supported by explicit exception and verification signals.
 
 Milestone 4:
-A developer-friendly trace inspector or improved timeline.
+A developer-friendly trace inspector or improved timeline. Complete for static
+session overviews and failure-category counts.
 
 Milestone 5:
 Controlled replay of supported browser actions.
