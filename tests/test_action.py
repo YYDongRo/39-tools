@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.failure import FailureCategory
 
 
 def test_create_successful_action() -> None:
@@ -18,6 +19,7 @@ def test_create_successful_action() -> None:
     assert action.action_type == "click"
     assert action.arguments == {"x": 100, "y": 200}
     assert action.status is ActionStatus.SUCCESS
+    assert action.failure_category is None
 
 
 def test_create_failed_action_with_reason() -> None:
@@ -32,6 +34,7 @@ def test_create_failed_action_with_reason() -> None:
 
     assert action.status is ActionStatus.FAILURE
     assert action.failure_reason == "Target was not found"
+    assert action.failure_category is FailureCategory.UNKNOWN
 
 
 def test_screenshot_paths_are_optional() -> None:
@@ -66,4 +69,19 @@ def test_failed_action_requires_reason() -> None:
             start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
             duration_ms=125,
             status=ActionStatus.FAILURE,
+        )
+
+
+def test_successful_action_rejects_failure_category() -> None:
+    with pytest.raises(
+        ValueError,
+        match="successful actions cannot have a failure category",
+    ):
+        ActionRecord(
+            action_type="click",
+            arguments={},
+            start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+            duration_ms=125,
+            status=ActionStatus.SUCCESS,
+            failure_category=FailureCategory.OPERATION_ERROR,
         )

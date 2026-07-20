@@ -18,6 +18,7 @@ written as versioned JSON traces.
 - Safe session resumption and atomic JSON persistence
 - Static HTML reports for individual actions and multi-action timelines
 - Deterministic text-state verification with evidence and mismatch reasons
+- Structured failure categories based on explicit exception and verification signals
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
 - Tests for the model, recorder, serialization, and end-to-end trace flow
@@ -144,7 +145,7 @@ browser or desktop automation framework.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "action_type": "click",
   "arguments": {
     "selector": "#agent-action"
@@ -154,7 +155,8 @@ browser or desktop automation framework.
   "status": "success",
   "screenshot_before": "before.png",
   "screenshot_after": "after.png",
-  "failure_reason": null
+  "failure_reason": null,
+  "failure_category": null
 }
 ```
 
@@ -196,9 +198,22 @@ verification = verify_text_state(
 )
 print(verification.passed)
 print(verification.failure_reason)
+print(verification.failure_category)
 ```
 
 Verification results are currently independent from action and session JSON.
+
+## Failure categories
+
+Failed actions use one of four conservative categories:
+
+- `timeout` for exceptions whose type is `TimeoutError`;
+- `operation_error` for other operation exceptions;
+- `verification_mismatch` when expected and observed text differ;
+- `unknown` when existing evidence does not support a more specific category.
+
+The original failure reason is always preserved. The classifier does not infer
+`wrong_target`, `blocked_target`, or `page_not_ready` from error-message text.
 
 ## Load an existing trace
 
@@ -217,7 +232,8 @@ action = read_action_json(trace_dir / "action.json")
 write_action_html(action, trace_dir / "report.html")
 ```
 
-The loader validates schema version 1, required fields, field types, status, and
+The loader accepts action schema versions 1 and 2. Version 1 failures load with
+the `unknown` category. It validates required fields, field types, status, and
 timestamp format before returning an `ActionRecord`.
 
 ## Record actions in a session

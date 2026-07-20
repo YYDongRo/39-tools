@@ -5,10 +5,12 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.failure import FailureCategory
 from agent_devtools.session import ActionSession
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = {1, SCHEMA_VERSION}
 SESSION_SCHEMA_VERSION = 1
 
 
@@ -60,12 +62,17 @@ def action_to_dict(action: ActionRecord) -> dict[str, object]:
             else None
         ),
         "failure_reason": action.failure_reason,
+        "failure_category": (
+            action.failure_category.value
+            if action.failure_category is not None
+            else None
+        ),
     }
 
 
 def action_from_dict(data: dict[str, object]) -> ActionRecord:
     schema_version = data.get("schema_version")
-    if schema_version != SCHEMA_VERSION:
+    if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"unsupported schema_version: {schema_version!r}")
 
     try:
@@ -77,6 +84,9 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         screenshot_before = data["screenshot_before"]
         screenshot_after = data["screenshot_after"]
         failure_reason = data["failure_reason"]
+        failure_category_value = (
+            data["failure_category"] if schema_version == SCHEMA_VERSION else None
+        )
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
 
@@ -98,6 +108,10 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         raise ValueError("screenshot_after must be a string or null")
     if failure_reason is not None and not isinstance(failure_reason, str):
         raise ValueError("failure_reason must be a string or null")
+    if failure_category_value is not None and not isinstance(
+        failure_category_value, str
+    ):
+        raise ValueError("failure_category must be a string or null")
 
     try:
         start_time = datetime.fromisoformat(start_time_value)
@@ -110,6 +124,17 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         status = ActionStatus(status_value)
     except ValueError as error:
         raise ValueError(f"invalid status: {status_value!r}") from error
+
+    try:
+        failure_category = (
+            FailureCategory(failure_category_value)
+            if failure_category_value is not None
+            else None
+        )
+    except ValueError as error:
+        raise ValueError(
+            f"invalid failure_category: {failure_category_value!r}"
+        ) from error
 
     return ActionRecord(
         action_type=action_type,
@@ -124,6 +149,7 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
             Path(screenshot_after) if screenshot_after is not None else None
         ),
         failure_reason=failure_reason,
+        failure_category=failure_category,
     )
 
 

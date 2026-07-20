@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import (
     action_from_dict,
     action_to_dict,
@@ -27,7 +28,7 @@ def test_convert_successful_action_to_dict() -> None:
     )
 
     assert action_to_dict(action) == {
-        "schema_version": 1,
+        "schema_version": 2,
         "action_type": "click",
         "arguments": {"x": 100, "y": 200},
         "start_time": "2026-07-17T12:00:00+00:00",
@@ -36,6 +37,7 @@ def test_convert_successful_action_to_dict() -> None:
         "screenshot_before": "screenshots/before.png",
         "screenshot_after": "screenshots/after.png",
         "failure_reason": None,
+        "failure_category": None,
     }
 
 
@@ -55,6 +57,7 @@ def test_convert_failed_action_to_dict() -> None:
     assert data["screenshot_before"] is None
     assert data["screenshot_after"] is None
     assert data["failure_reason"] == "RuntimeError: target was not found"
+    assert data["failure_category"] == "unknown"
 
 
 def test_write_action_json(tmp_path: Path) -> None:
@@ -126,9 +129,46 @@ def test_reject_unsupported_schema_version() -> None:
         status=ActionStatus.SUCCESS,
     )
     data = action_to_dict(action)
-    data["schema_version"] = 2
+    data["schema_version"] = 3
 
-    with pytest.raises(ValueError, match="unsupported schema_version: 2"):
+    with pytest.raises(ValueError, match="unsupported schema_version: 3"):
+        action_from_dict(data)
+
+
+def test_load_schema_version_1_failure_as_unknown_category() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.FAILURE,
+        failure_reason="target was not found",
+    )
+    data = action_to_dict(action)
+    data["schema_version"] = 1
+    del data["failure_category"]
+
+    loaded_action = action_from_dict(data)
+
+    assert loaded_action.failure_category is FailureCategory.UNKNOWN
+
+
+def test_reject_invalid_failure_category() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.FAILURE,
+        failure_reason="target was not found",
+    )
+    data = action_to_dict(action)
+    data["failure_category"] = "wrong_target"
+
+    with pytest.raises(
+        ValueError,
+        match="invalid failure_category: 'wrong_target'",
+    ):
         action_from_dict(data)
 
 

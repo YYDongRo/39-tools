@@ -102,6 +102,8 @@ The repository currently includes:
 - Playwright success, failure, and multi-action browser demonstrations;
 - automated real-browser integration coverage for a successful click action;
 - a minimal reusable contract for deterministic text-state verification;
+- conservative structured failure categories for timeouts, operation errors,
+  verification mismatches, and unknown failures;
 - unit tests for the foundational modules.
 
 Verification results are not yet stored in trace JSON or HTML reports.
@@ -125,7 +127,8 @@ A minimal verification contract. Complete for deterministic text-state compariso
 - failure reason.
 
 Milestone 3:
-Structured failure categories and failure summaries.
+Structured failure categories and failure summaries. Complete for categories
+supported by explicit exception and verification signals.
 
 Milestone 4:
 A developer-friendly trace inspector or improved timeline.

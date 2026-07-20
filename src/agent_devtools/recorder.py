@@ -4,6 +4,7 @@ from pathlib import Path
 from time import monotonic_ns
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.failure import classify_exception
 
 
 def record_action(
@@ -29,6 +30,7 @@ def record_action(
             screenshot_before=screenshot_before,
             screenshot_after=screenshot_after,
             failure_reason=f"{type(error).__name__}: {error}",
+            failure_category=classify_exception(error),
         )
 
     return ActionRecord(

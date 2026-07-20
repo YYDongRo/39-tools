@@ -28,11 +28,19 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
     failure_reason = data["failure_reason"]
+    failure_category = data["failure_category"]
     failure_section = ""
     if failure_reason is not None:
+        category_section = ""
+        if failure_category is not None:
+            category_section = (
+                "<p><strong>Category:</strong> "
+                f"{escape(str(failure_category))}</p>"
+            )
         failure_section = f"""
       <section class="failure">
         <h2>Failure reason</h2>
+        {category_section}
         <p>{escape(str(failure_reason))}</p>
       </section>"""
 
@@ -115,11 +123,19 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
     failure_reason = data["failure_reason"]
+    failure_category = data["failure_category"]
     failure_section = ""
     if failure_reason is not None:
+        category_section = ""
+        if failure_category is not None:
+            category_section = (
+                "<p><strong>Category:</strong> "
+                f"{escape(str(failure_category))}</p>"
+            )
         failure_section = f"""
             <div class="failure">
               <strong>Failure reason</strong>
+              {category_section}
               <p>{escape(str(failure_reason))}</p>
             </div>"""
 

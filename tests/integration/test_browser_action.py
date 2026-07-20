@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from agent_devtools.action import ActionStatus
+from agent_devtools.failure import FailureCategory
 from agent_devtools.recorder import record_action
 from agent_devtools.serialization import read_action_json, write_action_json
 from agent_devtools.verification import verify_text_state
@@ -57,3 +58,27 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
     assert after_path.stat().st_size > 0
     assert before_path.read_bytes() != after_path.read_bytes()
     assert read_action_json(trace_path) == action
+
+
+def test_classifies_real_browser_timeout() -> None:
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_click.html"
+    ).resolve()
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(page_path.as_uri())
+
+        action = record_action(
+            action_type="click",
+            arguments={"selector": "#missing", "timeout_ms": 100},
+            operation=lambda: page.locator("#missing").click(timeout=100),
+        )
+
+        browser.close()
+
+    assert action.status is ActionStatus.FAILURE
+    assert action.failure_category is FailureCategory.TIMEOUT
+    assert action.failure_reason is not None
+    assert action.failure_reason.startswith("TimeoutError:")

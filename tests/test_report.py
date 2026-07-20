@@ -44,6 +44,7 @@ def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
     content = output_path.read_text(encoding="utf-8")
     assert 'class="status status-failure"' in content
     assert "Element &lt;button&gt; was not found" in content
+    assert "<strong>Category:</strong> unknown" in content
     assert content.count("Not captured") == 2
 
 
@@ -81,6 +82,7 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
     assert 'class="status status-failure"' in content
     assert "&lt;click&gt;" in content
     assert "Element &lt;button&gt; was not found" in content
+    assert "<strong>Category:</strong> unknown" in content
     assert 'src="action-1/before.png"' in content
 
 
