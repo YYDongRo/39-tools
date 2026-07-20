@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -7,11 +8,13 @@ from agent_devtools.session_recorder import SessionRecorder
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TRACE_DIR = PROJECT_ROOT / "trace" / "browser-session"
+TRACE_ROOT = PROJECT_ROOT / "trace" / "browser-session"
 
 
 def main() -> None:
     page_path = Path(__file__).with_suffix(".html").resolve()
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    trace_dir = TRACE_ROOT / run_id
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
@@ -21,7 +24,7 @@ def main() -> None:
         def capture_screenshot(path: Path) -> None:
             page.screenshot(path=str(path), full_page=True)
 
-        recorder = SessionRecorder(TRACE_DIR, capture_screenshot)
+        recorder = SessionRecorder(trace_dir, capture_screenshot)
         recorder.record(
             action_type="click",
             arguments={"selector": "#open-panel"},
@@ -49,7 +52,7 @@ def main() -> None:
     if [action.status for action in recorder.session.actions] != expected_statuses:
         raise RuntimeError("the browser session did not produce the expected statuses")
 
-    print(f"Browser session trace written to {TRACE_DIR}")
+    print(f"Browser session trace written to {trace_dir}")
 
 
 if __name__ == "__main__":

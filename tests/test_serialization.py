@@ -138,3 +138,36 @@ def test_reject_non_object_action_json(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="action JSON must contain an object"):
         read_action_json(input_path)
+
+
+def test_atomic_json_write_preserves_existing_file_on_replace_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = ActionRecord(
+        action_type="click",
+        arguments={"step": 1},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+    )
+    updated = ActionRecord(
+        action_type="click",
+        arguments={"step": 2},
+        start_time=datetime(2026, 7, 18, 7, 1, tzinfo=UTC),
+        duration_ms=250,
+        status=ActionStatus.SUCCESS,
+    )
+    output_path = tmp_path / "action.json"
+    write_action_json(original, output_path)
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr("agent_devtools.serialization.os.replace", fail_replace)
+
+    with pytest.raises(OSError, match="simulated replace failure"):
+        write_action_json(updated, output_path)
+
+    assert read_action_json(output_path) == original
+    assert not any(path.suffix == ".tmp" for path in tmp_path.iterdir())

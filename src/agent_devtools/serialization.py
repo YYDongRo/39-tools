@@ -1,6 +1,8 @@
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.session import ActionSession
@@ -8,6 +10,32 @@ from agent_devtools.session import ActionSession
 
 SCHEMA_VERSION = 1
 SESSION_SCHEMA_VERSION = 1
+
+
+def _write_json(data: dict[str, object], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            temporary_file.write(
+                json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+            )
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+
+        os.replace(temporary_path, output_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def action_to_dict(action: ActionRecord) -> dict[str, object]:
@@ -100,11 +128,7 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
 
 
 def write_action_json(action: ActionRecord, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(action_to_dict(action), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    _write_json(action_to_dict(action), output_path)
 
 
 def read_action_json(input_path: Path) -> ActionRecord:
@@ -151,11 +175,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
 
 
 def write_session_json(session: ActionSession, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(session_to_dict(session), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    _write_json(session_to_dict(session), output_path)
 
 
 def read_session_json(input_path: Path) -> ActionSession:

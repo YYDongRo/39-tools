@@ -15,6 +15,7 @@ written as versioned JSON traces.
 - Loading saved JSON traces back into typed action records
 - Ordered multi-action sessions with JSON round-trip support
 - Framework-independent session recording with optional screenshot callbacks
+- Safe session resumption and atomic JSON persistence
 - Static HTML reports for individual actions and multi-action timelines
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -115,7 +116,7 @@ The session opens a form, enters a task name, and then deliberately uses the
 wrong selector for the confirmation button. It creates:
 
 ```text
-trace/browser-session/
+trace/browser-session/<run-id>/
 ├── session.json
 ├── report.html
 └── actions/
@@ -225,9 +226,20 @@ images automatically. Action count and failure state are derived from the saved
 action list. The HTML timeline displays each action's status, timing, arguments,
 failure reason, and screenshots.
 
+Starting a recorder in a non-empty directory raises `FileExistsError` instead
+of overwriting evidence. Resume an existing session explicitly:
+
+```python
+recorder = SessionRecorder.resume(Path("trace/my-session"))
+recorder.record("click", {"step": 3}, lambda: None)
+```
+
+Session JSON is written to a temporary file and atomically replaced, so an
+interrupted update does not leave a partially written trace.
+
 ## Current limitations
 
-- Session recording is synchronous and starts a new session per recorder
+- Session recording is synchronous
 - No session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system

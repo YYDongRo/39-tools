@@ -1,10 +1,11 @@
 from collections.abc import Callable
 from pathlib import Path
+from typing import Self
 
 from agent_devtools.action import ActionRecord
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_session_html
-from agent_devtools.serialization import write_session_json
+from agent_devtools.serialization import read_session_json, write_session_json
 from agent_devtools.session import ActionSession
 
 
@@ -17,7 +18,25 @@ class SessionRecorder:
         self.output_dir = output_dir
         self.capture_screenshot = capture_screenshot
         self.session = ActionSession()
+
+        if self.output_dir.exists() and any(self.output_dir.iterdir()):
+            raise FileExistsError(
+                f"session output directory is not empty: {self.output_dir}"
+            )
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def resume(
+        cls,
+        output_dir: Path,
+        capture_screenshot: Callable[[Path], None] | None = None,
+    ) -> Self:
+        session = read_session_json(output_dir / "session.json")
+        recorder = cls.__new__(cls)
+        recorder.output_dir = output_dir
+        recorder.capture_screenshot = capture_screenshot
+        recorder.session = session
+        return recorder
 
     def record(
         self,
@@ -30,7 +49,7 @@ class SessionRecorder:
 
         if self.capture_screenshot is not None:
             action_dir = Path("actions") / f"{self.session.action_count + 1:03d}"
-            (self.output_dir / action_dir).mkdir(parents=True, exist_ok=True)
+            (self.output_dir / action_dir).mkdir(parents=True, exist_ok=False)
             screenshot_before = action_dir / "before.png"
             screenshot_after = action_dir / "after.png"
             self.capture_screenshot(self.output_dir / screenshot_before)

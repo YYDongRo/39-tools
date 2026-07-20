@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from agent_devtools.action import ActionStatus
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder
@@ -54,3 +56,31 @@ def test_records_session_without_screenshots(tmp_path: Path) -> None:
     assert not (recorder.output_dir / "actions").exists()
     assert (recorder.output_dir / "session.json").is_file()
     assert (recorder.output_dir / "report.html").is_file()
+
+
+def test_refuses_to_overwrite_and_resumes_existing_session(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "trace"
+
+    def capture_screenshot(path: Path) -> None:
+        path.write_bytes(b"fake screenshot")
+
+    recorder = SessionRecorder(output_dir, capture_screenshot)
+
+    def failing_operation() -> None:
+        raise RuntimeError("target was not found")
+
+    recorder.record("click", {"step": 1}, failing_operation)
+
+    with pytest.raises(FileExistsError, match="output directory is not empty"):
+        SessionRecorder(output_dir, capture_screenshot)
+
+    resumed = SessionRecorder.resume(output_dir, capture_screenshot)
+    resumed.record("click", {"step": 2}, lambda: None)
+
+    loaded_session = read_session_json(output_dir / "session.json")
+    assert loaded_session.action_count == 2
+    assert loaded_session.has_failures
+    assert (output_dir / "actions/001/before.png").is_file()
+    assert (output_dir / "actions/002/before.png").is_file()
