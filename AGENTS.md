@@ -100,9 +100,9 @@ The repository currently includes:
 - static HTML action and session reports;
 - screenshot paths in action records and before-and-after capture through integration callbacks;
 - Playwright success, failure, and multi-action browser demonstrations;
+- automated real-browser integration coverage for a successful click action;
 - unit tests for the foundational modules.
 
-The Playwright demonstrations are not currently covered by automated real-browser tests.
 Verification is not yet a reusable subsystem.
 Replay is not implemented.
 General third-party agent integration is not implemented.
@@ -112,7 +112,7 @@ General third-party agent integration is not implemented.
 Follow this order unless the user explicitly changes direction:
 
 Milestone 1:
-Automated real-browser integration coverage.
+Automated real-browser integration coverage. Complete for a successful click action.
 
 Milestone 2:
 A minimal verification contract:
