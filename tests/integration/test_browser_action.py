@@ -5,6 +5,7 @@ import pytest
 from agent_devtools.action import ActionStatus
 from agent_devtools.recorder import record_action
 from agent_devtools.serialization import read_action_json, write_action_json
+from agent_devtools.verification import verify_text_state
 
 
 playwright = pytest.importorskip(
@@ -40,12 +41,18 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
         browser.close()
 
     write_action_json(action, trace_path)
+    verification = verify_text_state(
+        expected_state="The browser click succeeded.",
+        observed_state=status_text,
+        evidence={"selector": "#status", "screenshot": "after.png"},
+    )
 
     assert action.action_type == "click"
     assert action.arguments == {"selector": "#agent-action"}
     assert action.status is ActionStatus.SUCCESS
     assert action.duration_ms >= 0
-    assert status_text == "The browser click succeeded."
+    assert verification.passed
+    assert verification.failure_reason is None
     assert before_path.stat().st_size > 0
     assert after_path.stat().st_size > 0
     assert before_path.read_bytes() != after_path.read_bytes()

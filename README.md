@@ -17,6 +17,7 @@ written as versioned JSON traces.
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
 - Static HTML reports for individual actions and multi-action timelines
+- Deterministic text-state verification with evidence and mismatch reasons
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
 - Tests for the model, recorder, serialization, and end-to-end trace flow
@@ -179,6 +180,25 @@ write_action_json(action, Path("trace/action.json"))
 
 `record_action()` converts operation exceptions into failed action records. It
 does not re-raise them, and the operation's return value is currently ignored.
+
+## Verify observed text state
+
+Compare expected and observed UI text without depending on a browser framework:
+
+```python
+from agent_devtools.verification import verify_text_state
+
+
+verification = verify_text_state(
+    expected_state="Action complete",
+    observed_state="Waiting for the agent.",
+    evidence={"selector": "#status"},
+)
+print(verification.passed)
+print(verification.failure_reason)
+```
+
+Verification results are currently independent from action and session JSON.
 
 ## Load an existing trace
 

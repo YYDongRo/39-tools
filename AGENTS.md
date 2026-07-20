@@ -101,9 +101,10 @@ The repository currently includes:
 - screenshot paths in action records and before-and-after capture through integration callbacks;
 - Playwright success, failure, and multi-action browser demonstrations;
 - automated real-browser integration coverage for a successful click action;
+- a minimal reusable contract for deterministic text-state verification;
 - unit tests for the foundational modules.
 
-Verification is not yet a reusable subsystem.
+Verification results are not yet stored in trace JSON or HTML reports.
 Replay is not implemented.
 General third-party agent integration is not implemented.
 
@@ -115,7 +116,7 @@ Milestone 1:
 Automated real-browser integration coverage. Complete for a successful click action.
 
 Milestone 2:
-A minimal verification contract:
+A minimal verification contract. Complete for deterministic text-state comparisons:
 
 - expected state;
 - observed state;
