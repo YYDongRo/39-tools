@@ -14,6 +14,7 @@ written as versioned JSON traces.
 - JSON trace output with UTC timestamps and portable paths
 - Loading saved JSON traces back into typed action records
 - Ordered multi-action sessions with JSON round-trip support
+- Framework-independent session recording with optional screenshot callbacks
 - Static HTML reports for individual actions and multi-action timelines
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -132,6 +133,11 @@ trace/browser-session/
 Each action runs in the same page and browser context, so every screenshot
 reflects the state produced by the preceding actions.
 
+`SessionRecorder` handles screenshot paths, action numbering, session updates,
+JSON persistence, and HTML report generation after every action. The screenshot
+callback is integration-specific, so the core package does not depend on a
+browser or desktop automation framework.
+
 ## JSON trace format
 
 ```json
@@ -193,40 +199,35 @@ write_action_html(action, trace_dir / "report.html")
 The loader validates schema version 1, required fields, field types, status, and
 timestamp format before returning an `ActionRecord`.
 
-## Group actions into a session
+## Record actions in a session
 
-An `ActionSession` keeps multiple action records in execution order:
+`SessionRecorder` records actions in execution order and updates the JSON and
+HTML report after every action:
 
 ```python
 from pathlib import Path
 
-from agent_devtools.recorder import record_action
-from agent_devtools.report import write_session_html
-from agent_devtools.serialization import read_session_json, write_session_json
-from agent_devtools.session import ActionSession
+from agent_devtools.serialization import read_session_json
+from agent_devtools.session_recorder import SessionRecorder
 
 
-actions = [
-    record_action("click", {"step": 1}, lambda: None),
-    record_action("click", {"step": 2}, lambda: None),
-]
-session = ActionSession(actions=actions)
-write_session_json(session, Path("trace/session.json"))
+recorder = SessionRecorder(Path("trace/my-session"))
+recorder.record("click", {"step": 1}, lambda: None)
+recorder.record("click", {"step": 2}, lambda: None)
 
-loaded_session = read_session_json(Path("trace/session.json"))
-write_session_html(loaded_session, Path("trace/session.html"))
+loaded_session = read_session_json(Path("trace/my-session/session.json"))
 print(loaded_session.action_count)
 print(loaded_session.has_failures)
 ```
 
-The session JSON stores the ordered action records. Action count and failure
-state are derived from that list instead of being duplicated in the file. The
-HTML timeline displays each action's status, timing, arguments, failure reason,
-and screenshots. Screenshot paths should be unique and relative to the report.
+Pass a screenshot callback to `SessionRecorder` to capture before-and-after
+images automatically. Action count and failure state are derived from the saved
+action list. The HTML timeline displays each action's status, timing, arguments,
+failure reason, and screenshots.
 
 ## Current limitations
 
-- Session collection is caller-managed and synchronous
+- Session recording is synchronous and starts a new session per recorder
 - No session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
