@@ -12,6 +12,7 @@ from agent_devtools.serialization import (
     read_action_json,
     write_action_json,
 )
+from agent_devtools.verification import VerificationResult
 
 
 def test_convert_successful_action_to_dict() -> None:
@@ -28,7 +29,7 @@ def test_convert_successful_action_to_dict() -> None:
     )
 
     assert action_to_dict(action) == {
-        "schema_version": 3,
+        "schema_version": 4,
         "action_type": "click",
         "arguments": {"x": 100, "y": 200},
         "start_time": "2026-07-17T12:00:00+00:00",
@@ -39,6 +40,7 @@ def test_convert_successful_action_to_dict() -> None:
         "failure_reason": None,
         "failure_category": None,
         "failure_evidence": {},
+        "verification": None,
     }
 
 
@@ -60,6 +62,7 @@ def test_convert_failed_action_to_dict() -> None:
     assert data["failure_reason"] == "RuntimeError: target was not found"
     assert data["failure_category"] == "unknown"
     assert data["failure_evidence"] == {}
+    assert data["verification"] is None
 
 
 def test_write_action_json(tmp_path: Path) -> None:
@@ -131,9 +134,9 @@ def test_reject_unsupported_schema_version() -> None:
         status=ActionStatus.SUCCESS,
     )
     data = action_to_dict(action)
-    data["schema_version"] = 4
+    data["schema_version"] = 5
 
-    with pytest.raises(ValueError, match="unsupported schema_version: 4"):
+    with pytest.raises(ValueError, match="unsupported schema_version: 5"):
         action_from_dict(data)
 
 
@@ -150,11 +153,13 @@ def test_load_schema_version_1_failure_as_unknown_category() -> None:
     data["schema_version"] = 1
     del data["failure_category"]
     del data["failure_evidence"]
+    del data["verification"]
 
     loaded_action = action_from_dict(data)
 
     assert loaded_action.failure_category is FailureCategory.UNKNOWN
     assert loaded_action.failure_evidence == {}
+    assert loaded_action.verification is None
 
 
 def test_load_schema_version_2_failure_without_evidence() -> None:
@@ -170,11 +175,85 @@ def test_load_schema_version_2_failure_without_evidence() -> None:
     data = action_to_dict(action)
     data["schema_version"] = 2
     del data["failure_evidence"]
+    del data["verification"]
 
     loaded_action = action_from_dict(data)
 
     assert loaded_action.failure_category is FailureCategory.TARGET_NOT_FOUND
     assert loaded_action.failure_evidence == {}
+    assert loaded_action.verification is None
+
+
+def test_load_schema_version_3_without_verification() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.FAILURE,
+        failure_reason="target was not found",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+        failure_evidence={"selector_count": 0},
+    )
+    data = action_to_dict(action)
+    data["schema_version"] = 3
+    del data["verification"]
+
+    loaded_action = action_from_dict(data)
+
+    assert loaded_action.failure_category is FailureCategory.TARGET_NOT_FOUND
+    assert loaded_action.failure_evidence == {"selector_count": 0}
+    assert loaded_action.verification is None
+
+
+@pytest.mark.parametrize(
+    "verification",
+    [
+        VerificationResult(
+            expected_state="Saved",
+            observed_state="Saved",
+            passed=True,
+            evidence={"selector": "#status"},
+        ),
+        VerificationResult(
+            expected_state="Saved",
+            observed_state="Saving",
+            passed=False,
+            evidence={"selector": "#status", "text": "Saving"},
+            failure_reason="expected 'Saved', observed 'Saving'",
+        ),
+    ],
+)
+def test_action_verification_json_round_trip(
+    verification: VerificationResult,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#save"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        verification=verification,
+    )
+
+    data = action_to_dict(action)
+
+    assert action_from_dict(data) == action
+
+
+def test_reject_non_object_verification() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+    )
+    data = action_to_dict(action)
+    data["verification"] = []
+
+    with pytest.raises(ValueError, match="verification must be an object or null"):
+        action_from_dict(data)
 
 
 def test_reject_invalid_failure_category() -> None:

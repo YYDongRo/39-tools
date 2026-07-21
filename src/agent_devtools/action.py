@@ -4,6 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from agent_devtools.failure import FailureCategory
+from agent_devtools.verification import VerificationResult
 
 
 class ActionStatus(StrEnum):
@@ -23,6 +24,7 @@ class ActionRecord:
     failure_reason: str | None = None
     failure_category: FailureCategory | None = None
     failure_evidence: dict[str, object] = field(default_factory=dict)
+    verification: VerificationResult | None = None
 
     def __post_init__(self) -> None:
         if self.duration_ms < 0:

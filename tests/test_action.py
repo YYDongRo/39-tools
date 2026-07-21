@@ -5,6 +5,7 @@ import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
+from agent_devtools.verification import VerificationResult
 
 
 def test_create_successful_action() -> None:
@@ -21,6 +22,7 @@ def test_create_successful_action() -> None:
     assert action.status is ActionStatus.SUCCESS
     assert action.failure_category is None
     assert action.failure_evidence == {}
+    assert action.verification is None
 
 
 def test_create_failed_action_with_reason() -> None:
@@ -50,6 +52,27 @@ def test_screenshot_paths_are_optional() -> None:
 
     assert action.screenshot_before is None
     assert action.screenshot_after is None
+
+
+def test_action_can_store_verification_result() -> None:
+    verification = VerificationResult(
+        expected_state="Saved",
+        observed_state="Saving",
+        passed=False,
+        evidence={"selector": "#status"},
+        failure_reason="expected 'Saved', observed 'Saving'",
+    )
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#save"},
+        start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        verification=verification,
+    )
+
+    assert action.status is ActionStatus.SUCCESS
+    assert action.verification == verification
 
 
 def test_negative_duration_is_invalid() -> None:

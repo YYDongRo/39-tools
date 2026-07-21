@@ -17,7 +17,7 @@ written as versioned JSON traces.
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
 - Static HTML reports with action details and session failure-category summaries
-- Deterministic text-state verification with evidence and mismatch reasons
+- Persisted text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
 - Controlled replay for saved click actions with strict argument validation
@@ -147,7 +147,7 @@ browser or desktop automation framework.
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "action_type": "click",
   "arguments": {
     "selector": "#agent-action"
@@ -159,7 +159,8 @@ browser or desktop automation framework.
   "screenshot_after": "after.png",
   "failure_reason": null,
   "failure_category": null,
-  "failure_evidence": {}
+  "failure_evidence": {},
+  "verification": null
 }
 ```
 
@@ -204,7 +205,8 @@ print(verification.failure_reason)
 print(verification.failure_category)
 ```
 
-Verification results are currently independent from action and session JSON.
+Set `ActionRecord.verification` before writing an action or session to preserve
+the result in JSON. Execution status and verification status remain separate.
 
 ## Failure categories
 
@@ -259,10 +261,11 @@ action = read_action_json(trace_dir / "action.json")
 write_action_html(action, trace_dir / "report.html")
 ```
 
-The loader accepts action schema versions 1, 2, and 3. Version 1 failures load
-with the `unknown` category; versions 1 and 2 load with empty failure evidence.
-It validates required fields, field types, status, and timestamp format before
-returning an `ActionRecord`.
+The loader accepts action schema versions 1, 2, 3, and 4. Version 1 failures
+load with the `unknown` category; versions 1 and 2 load with empty failure
+evidence; versions 1 through 3 load without a verification result. It validates
+required fields, field types, status, verification data, and timestamp format
+before returning an `ActionRecord`.
 
 ## Replay a saved click
 
@@ -360,3 +363,4 @@ interrupted update does not leave a partially written trace.
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - Playwright click recording and diagnostics are the only current runtime integration
+- HTML reports and session outcomes do not yet use verification results

@@ -7,10 +7,11 @@ from tempfile import NamedTemporaryFile
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
-SCHEMA_VERSION = 3
-SUPPORTED_SCHEMA_VERSIONS = {1, 2, SCHEMA_VERSION}
+SCHEMA_VERSION = 4
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, SCHEMA_VERSION}
 SESSION_SCHEMA_VERSION = 1
 
 
@@ -38,6 +39,82 @@ def _write_json(data: dict[str, object], output_path: Path) -> None:
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+def _verification_to_dict(
+    verification: VerificationResult | None,
+) -> dict[str, object] | None:
+    if verification is None:
+        return None
+
+    return {
+        "expected_state": verification.expected_state,
+        "observed_state": verification.observed_state,
+        "passed": verification.passed,
+        "evidence": verification.evidence,
+        "failure_reason": verification.failure_reason,
+        "failure_category": (
+            verification.failure_category.value
+            if verification.failure_category is not None
+            else None
+        ),
+    }
+
+
+def _verification_from_dict(data: object) -> VerificationResult | None:
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("verification must be an object or null")
+
+    try:
+        expected_state = data["expected_state"]
+        observed_state = data["observed_state"]
+        passed = data["passed"]
+        evidence = data["evidence"]
+        failure_reason = data["failure_reason"]
+        failure_category_value = data["failure_category"]
+    except KeyError as error:
+        raise ValueError(
+            f"missing required verification field: {error.args[0]}"
+        ) from error
+
+    if not isinstance(expected_state, str):
+        raise ValueError("verification expected_state must be a string")
+    if not isinstance(observed_state, str):
+        raise ValueError("verification observed_state must be a string")
+    if not isinstance(passed, bool):
+        raise ValueError("verification passed must be a boolean")
+    if not isinstance(evidence, dict) or not all(
+        isinstance(key, str) for key in evidence
+    ):
+        raise ValueError("verification evidence must be an object with string keys")
+    if failure_reason is not None and not isinstance(failure_reason, str):
+        raise ValueError("verification failure_reason must be a string or null")
+    if failure_category_value is not None and not isinstance(
+        failure_category_value, str
+    ):
+        raise ValueError("verification failure_category must be a string or null")
+
+    try:
+        failure_category = (
+            FailureCategory(failure_category_value)
+            if failure_category_value is not None
+            else None
+        )
+    except ValueError as error:
+        raise ValueError(
+            f"invalid verification failure_category: {failure_category_value!r}"
+        ) from error
+
+    return VerificationResult(
+        expected_state=expected_state,
+        observed_state=observed_state,
+        passed=passed,
+        evidence=dict(evidence),
+        failure_reason=failure_reason,
+        failure_category=failure_category,
+    )
 
 
 def action_to_dict(action: ActionRecord) -> dict[str, object]:
@@ -68,6 +145,7 @@ def action_to_dict(action: ActionRecord) -> dict[str, object]:
             else None
         ),
         "failure_evidence": action.failure_evidence,
+        "verification": _verification_to_dict(action.verification),
     }
 
 
@@ -86,10 +164,17 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         screenshot_after = data["screenshot_after"]
         failure_reason = data["failure_reason"]
         failure_category_value = (
-            data["failure_category"] if schema_version in {2, SCHEMA_VERSION} else None
+            data["failure_category"]
+            if schema_version in {2, 3, SCHEMA_VERSION}
+            else None
         )
         failure_evidence_value = (
-            data["failure_evidence"] if schema_version == SCHEMA_VERSION else {}
+            data["failure_evidence"]
+            if schema_version in {3, SCHEMA_VERSION}
+            else {}
+        )
+        verification_value = (
+            data["verification"] if schema_version == SCHEMA_VERSION else None
         )
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
@@ -144,6 +229,8 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
             f"invalid failure_category: {failure_category_value!r}"
         ) from error
 
+    verification = _verification_from_dict(verification_value)
+
     return ActionRecord(
         action_type=action_type,
         arguments=dict(arguments),
@@ -159,6 +246,7 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         failure_reason=failure_reason,
         failure_category=failure_category,
         failure_evidence=dict(failure_evidence_value),
+        verification=verification,
     )
 
 

@@ -102,6 +102,7 @@ The repository currently includes:
 - Playwright success, failure, and multi-action browser demonstrations;
 - automated real-browser integration coverage for a successful click action;
 - a minimal reusable contract for deterministic text-state verification;
+- optional verification results persisted with action records;
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
 - static session summaries with success, failure, and failure-category counts;
@@ -111,7 +112,8 @@ The repository currently includes:
   diagnoses missing, hidden, and disabled targets;
 - unit tests for the foundational modules.
 
-Verification results are not yet stored in trace JSON or HTML reports.
+Verification results can be stored in action and session JSON, but are not yet
+displayed in HTML reports or included in session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.
 
