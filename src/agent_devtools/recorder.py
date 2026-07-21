@@ -5,6 +5,7 @@ from time import monotonic_ns
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import classify_exception
+from agent_devtools.verification import VerificationResult
 
 
 def record_action(
@@ -14,6 +15,7 @@ def record_action(
     *,
     screenshot_before: Path | None = None,
     screenshot_after: Path | None = None,
+    verification: Callable[[], VerificationResult] | None = None,
 ) -> ActionRecord:
     start_time = datetime.now(UTC)
     start_ns = monotonic_ns()
@@ -33,12 +35,20 @@ def record_action(
             failure_category=classify_exception(error),
         )
 
+    duration_ms = (monotonic_ns() - start_ns) // 1_000_000
+    verification_result = None
+    if verification is not None:
+        verification_result = verification()
+        if not isinstance(verification_result, VerificationResult):
+            raise TypeError("verification must return a VerificationResult")
+
     return ActionRecord(
         action_type=action_type,
         arguments=arguments,
         start_time=start_time,
-        duration_ms=(monotonic_ns() - start_ns) // 1_000_000,
+        duration_ms=duration_ms,
         status=ActionStatus.SUCCESS,
         screenshot_before=screenshot_before,
         screenshot_after=screenshot_after,
+        verification=verification_result,
     )

@@ -7,6 +7,7 @@ from agent_devtools.recorder import record_action
 from agent_devtools.report import write_session_html
 from agent_devtools.serialization import read_session_json, write_session_json
 from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
 class SessionRecorder:
@@ -43,6 +44,8 @@ class SessionRecorder:
         action_type: str,
         arguments: dict[str, object],
         operation: Callable[[], object],
+        *,
+        verification: Callable[[], VerificationResult] | None = None,
     ) -> ActionRecord:
         screenshot_before: Path | None = None
         screenshot_after: Path | None = None
@@ -60,6 +63,7 @@ class SessionRecorder:
             operation=operation,
             screenshot_before=screenshot_before,
             screenshot_after=screenshot_after,
+            verification=verification,
         )
 
         if self.capture_screenshot is not None and screenshot_after is not None:

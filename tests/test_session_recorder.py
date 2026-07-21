@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from agent_devtools.action import ActionStatus
+from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder
+from agent_devtools.verification import verify_text_state
 
 
 def test_records_session_with_screenshots_and_persists_each_action(
@@ -18,7 +19,12 @@ def test_records_session_with_screenshots_and_persists_each_action(
         path.write_bytes(b"fake screenshot")
 
     recorder = SessionRecorder(output_dir, capture_screenshot)
-    success = recorder.record("click", {"selector": "#open"}, lambda: None)
+    success = recorder.record(
+        "click",
+        {"selector": "#open"},
+        lambda: None,
+        verification=lambda: verify_text_state("Open", "Open"),
+    )
 
     assert read_session_json(output_dir / "session.json").action_count == 1
 
@@ -33,10 +39,12 @@ def test_records_session_with_screenshots_and_persists_each_action(
 
     loaded_session = read_session_json(output_dir / "session.json")
     assert success.status is ActionStatus.SUCCESS
+    assert success.outcome is ActionOutcome.SUCCESS
     assert failure.status is ActionStatus.FAILURE
     assert loaded_session == recorder.session
     assert loaded_session.action_count == 2
     assert loaded_session.has_failures
+    assert loaded_session.actions[0].verification == success.verification
     assert captured_paths == [
         Path("actions/001/before.png"),
         Path("actions/001/after.png"),
@@ -44,6 +52,29 @@ def test_records_session_with_screenshots_and_persists_each_action(
         Path("actions/002/after.png"),
     ]
     assert (output_dir / "report.html").is_file()
+    report = (output_dir / "report.html").read_text(encoding="utf-8")
+    assert "<dt>Verification status</dt><dd>passed</dd>" in report
+
+
+def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:
+    recorder = SessionRecorder(tmp_path / "trace")
+
+    action = recorder.record(
+        "click",
+        {"selector": "#save"},
+        lambda: None,
+        verification=lambda: verify_text_state("Saved", "Saving"),
+    )
+
+    loaded_action = read_session_json(
+        recorder.output_dir / "session.json"
+    ).actions[0]
+    assert action.outcome is ActionOutcome.FAILURE
+    assert loaded_action == action
+    assert loaded_action.verification is not None
+    assert not loaded_action.verification.passed
+    report = (recorder.output_dir / "report.html").read_text(encoding="utf-8")
+    assert "<dt>Verification status</dt><dd>failed</dd>" in report
 
 
 def test_records_session_without_screenshots(tmp_path: Path) -> None:

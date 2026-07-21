@@ -73,8 +73,8 @@ Run the local browser demo:
 uv run --extra browser python examples/browser_click.py
 ```
 
-The demo opens a local HTML page in headless Chromium, records a real click, and
-creates:
+The demo opens a local HTML page in headless Chromium, records a real click,
+verifies the resulting status text, and creates:
 
 ```text
 trace/browser-click/
@@ -84,8 +84,9 @@ trace/browser-click/
 └── report.html
 ```
 
-Open `report.html` to inspect the action details and before-and-after screenshots
-on one page. Generated traces are ignored by Git.
+Open `report.html` to inspect the verified final outcome, expected and observed
+status text, action details, and before-and-after screenshots on one page.
+Generated traces are ignored by Git.
 
 ### Inspect a controlled browser failure
 
@@ -174,18 +175,26 @@ from pathlib import Path
 
 from agent_devtools.recorder import record_action
 from agent_devtools.serialization import write_action_json
+from agent_devtools.verification import verify_text_state
 
 
 action = record_action(
     action_type="click",
     arguments={"x": 100, "y": 200},
     operation=lambda: None,
+    verification=lambda: verify_text_state(
+        expected_state="Action complete",
+        observed_state="Action complete",
+    ),
 )
 write_action_json(action, Path("trace/action.json"))
 ```
 
-`record_action()` converts operation exceptions into failed action records. It
-does not re-raise them, and the operation's return value is currently ignored.
+`record_action()` converts operation exceptions into failed action records and
+skips verification when execution fails. After successful execution, it runs an
+optional verification callback and attaches the returned `VerificationResult`.
+Verification callback errors are re-raised, and the operation's return value is
+currently ignored.
 
 ## Verify observed text state
 
@@ -205,8 +214,9 @@ print(verification.failure_reason)
 print(verification.failure_category)
 ```
 
-Set `ActionRecord.verification` before writing an action or session to preserve
-the result in JSON. Execution status and verification status remain separate.
+Pass a verification callback to `record_action()` or `SessionRecorder.record()`
+to run verification before JSON and HTML are written. Execution status and
+verification status remain separate.
 `ActionRecord.outcome` derives the final result: execution or verification
 failure means `failure`, a passed verification means `success`, and a successful
 action without verification means `unverified`.
@@ -331,10 +341,16 @@ from pathlib import Path
 
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder
+from agent_devtools.verification import verify_text_state
 
 
 recorder = SessionRecorder(Path("trace/my-session"))
-recorder.record("click", {"step": 1}, lambda: None)
+recorder.record(
+    "click",
+    {"step": 1},
+    lambda: None,
+    verification=lambda: verify_text_state("Open", "Open"),
+)
 recorder.record("click", {"step": 2}, lambda: None)
 
 loaded_session = read_session_json(Path("trace/my-session/session.json"))
@@ -367,3 +383,4 @@ interrupted update does not leave a partially written trace.
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - Playwright click recording and diagnostics are the only current runtime integration
+- Callers must provide expected and observed states; the tool does not infer intent
