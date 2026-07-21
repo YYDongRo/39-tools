@@ -16,7 +16,7 @@ written as versioned JSON traces.
 - Ordered multi-action sessions with JSON round-trip support
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
-- Static HTML reports with action details and session failure-category summaries
+- Static HTML reports with execution, verification, and final outcome details
 - Persisted text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
@@ -207,6 +207,9 @@ print(verification.failure_category)
 
 Set `ActionRecord.verification` before writing an action or session to preserve
 the result in JSON. Execution status and verification status remain separate.
+`ActionRecord.outcome` derives the final result: execution or verification
+failure means `failure`, a passed verification means `success`, and a successful
+action without verification means `unverified`.
 
 ## Failure categories
 
@@ -341,9 +344,10 @@ print(loaded_session.has_failures)
 
 Pass a screenshot callback to `SessionRecorder` to capture before-and-after
 images automatically. Action count and failure state are derived from the saved
-action list. The HTML timeline displays success and failure totals, a breakdown
-of failure categories, and each action's status, timing, arguments, failure
-reason, and screenshots.
+action list. The HTML timeline displays verified success, final failure, and
+unverified totals; failure categories include execution and verification
+failures. Each action shows its execution status, verification status, final
+outcome, timing, arguments, failure details, and screenshots.
 
 Starting a recorder in a non-empty directory raises `FileExistsError` instead
 of overwriting evidence. Resume an existing session explicitly:
@@ -363,4 +367,3 @@ interrupted update does not leave a partially written trace.
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - Playwright click recording and diagnostics are the only current runtime integration
-- HTML reports and session outcomes do not yet use verification results

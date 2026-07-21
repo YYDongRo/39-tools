@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.verification import VerificationResult
 
@@ -23,6 +23,7 @@ def test_create_successful_action() -> None:
     assert action.failure_category is None
     assert action.failure_evidence == {}
     assert action.verification is None
+    assert action.outcome is ActionOutcome.UNVERIFIED
 
 
 def test_create_failed_action_with_reason() -> None:
@@ -39,6 +40,7 @@ def test_create_failed_action_with_reason() -> None:
     assert action.failure_reason == "Target was not found"
     assert action.failure_category is FailureCategory.UNKNOWN
     assert action.failure_evidence == {}
+    assert action.outcome is ActionOutcome.FAILURE
 
 
 def test_screenshot_paths_are_optional() -> None:
@@ -73,6 +75,24 @@ def test_action_can_store_verification_result() -> None:
 
     assert action.status is ActionStatus.SUCCESS
     assert action.verification == verification
+    assert action.outcome is ActionOutcome.FAILURE
+
+
+def test_passed_verification_makes_action_outcome_successful() -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#save"},
+        start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        verification=VerificationResult(
+            expected_state="Saved",
+            observed_state="Saved",
+            passed=True,
+        ),
+    )
+
+    assert action.outcome is ActionOutcome.SUCCESS
 
 
 def test_negative_duration_is_invalid() -> None:

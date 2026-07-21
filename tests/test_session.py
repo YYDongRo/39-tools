@@ -12,6 +12,7 @@ from agent_devtools.serialization import (
     write_session_json,
 )
 from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
 def make_action(
@@ -45,6 +46,29 @@ def test_empty_session_has_no_failures() -> None:
 
     assert session.action_count == 0
     assert not session.has_failures
+
+
+def test_session_treats_verification_mismatch_as_failure() -> None:
+    action = make_action(ActionStatus.SUCCESS)
+    action.verification = VerificationResult(
+        expected_state="Saved",
+        observed_state="Saving",
+        passed=False,
+        failure_reason="expected 'Saved', observed 'Saving'",
+    )
+
+    assert ActionSession(actions=[action]).has_failures
+
+
+def test_session_with_passed_verification_has_no_failures() -> None:
+    action = make_action(ActionStatus.SUCCESS)
+    action.verification = VerificationResult(
+        expected_state="Saved",
+        observed_state="Saved",
+        passed=True,
+    )
+
+    assert not ActionSession(actions=[action]).has_failures
 
 
 def test_session_json_round_trip(tmp_path: Path) -> None:

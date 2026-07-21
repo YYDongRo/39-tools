@@ -2,7 +2,7 @@ import json
 from html import escape
 from pathlib import Path
 
-from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
 from agent_devtools.session import ActionSession
@@ -22,9 +22,64 @@ def _screenshot_panel(title: str, screenshot_path: object) -> str:
         </article>"""
 
 
+def _verification_label(action: ActionRecord) -> str:
+    if action.verification is None:
+        return "not run"
+    return "passed" if action.verification.passed else "failed"
+
+
+def _verification_section(action: ActionRecord) -> str:
+    verification = action.verification
+    if verification is None:
+        return ""
+
+    evidence_section = ""
+    if verification.evidence:
+        evidence = escape(
+            json.dumps(verification.evidence, ensure_ascii=False, indent=2)
+        )
+        evidence_section = f"<h3>Verification evidence</h3><pre>{evidence}</pre>"
+
+    failure_section = ""
+    if verification.failure_reason is not None:
+        category_section = ""
+        if verification.failure_category is not None:
+            category_section = (
+                "<p><strong>Category:</strong> "
+                f"{escape(verification.failure_category.value)}</p>"
+            )
+        failure_section = f"""
+        <div class="verification-failure">
+          {category_section}
+          <p>{escape(verification.failure_reason)}</p>
+        </div>"""
+
+    return f"""
+      <section class="verification">
+        <h2>Verification</h2>
+        <dl>
+          <div><dt>Status</dt><dd>{_verification_label(action)}</dd></div>
+          <div><dt>Expected state</dt><dd>{escape(verification.expected_state)}</dd></div>
+          <div><dt>Observed state</dt><dd>{escape(verification.observed_state)}</dd></div>
+        </dl>
+        {failure_section}
+        {evidence_section}
+      </section>"""
+
+
+def _outcome_failure_category(action: ActionRecord) -> FailureCategory | None:
+    if action.status is ActionStatus.FAILURE:
+        return action.failure_category
+    if action.verification is not None and not action.verification.passed:
+        return action.verification.failure_category
+    return None
+
+
 def write_action_html(action: ActionRecord, output_path: Path) -> None:
     data = action_to_dict(action)
-    status = escape(str(data["status"]))
+    execution_status = escape(str(data["status"]))
+    outcome = escape(action.outcome.value)
+    verification_status = _verification_label(action)
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
@@ -52,6 +107,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
         <p>{escape(str(failure_reason))}</p>
         {evidence_section}
       </section>"""
+    verification_section = _verification_section(action)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -72,6 +128,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
+      .status-unverified {{ background: #fef3c7; color: #92400e; }}
       dl {{ display: grid; gap: 20px; grid-template-columns: repeat(4, 1fr); }}
       dt {{ color: #64748b; font-size: 13px; font-weight: 700; }}
       dd {{ margin: 6px 0 0; overflow-wrap: anywhere; }}
@@ -79,6 +136,10 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
              overflow-x: auto; padding: 16px; }}
       .failure {{ background: #fff1f2; border: 1px solid #fecdd3; }}
       .failure p {{ white-space: pre-wrap; }}
+      .verification {{ border: 1px solid #cbd5e1; }}
+      .verification-failure {{ background: #fff1f2; border-radius: 8px;
+                               margin-top: 20px; padding: 16px; }}
+      .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
       .screenshots {{ background: transparent; display: grid; gap: 24px;
                       grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }}
       .screenshot {{ padding: 20px; }}
@@ -96,12 +157,15 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
         <p class="eyebrow">Agent DevTools · Schema {data["schema_version"]}</p>
         <div class="title-row">
           <h1>{escape(str(data["action_type"]))}</h1>
-          <span class="status status-{status}">{status}</span>
+          <span class="status status-{outcome}">{outcome}</span>
         </div>
       </header>
       <section>
         <h2>Action details</h2>
         <dl>
+          <div><dt>Final outcome</dt><dd>{outcome}</dd></div>
+          <div><dt>Execution status</dt><dd>{execution_status}</dd></div>
+          <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
           <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
           <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
           <div><dt>Before screenshot</dt><dd>{escape(str(data["screenshot_before"] or "—"))}</dd></div>
@@ -111,7 +175,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       <section>
         <h2>Arguments</h2>
         <pre>{arguments}</pre>
-      </section>{failure_section}
+      </section>{failure_section}{verification_section}
       <section class="screenshots">
 {_screenshot_panel("Before", data["screenshot_before"])}
 {_screenshot_panel("After", data["screenshot_after"])}
@@ -127,7 +191,9 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
 
 def _session_action_card(index: int, action: ActionRecord) -> str:
     data = action_to_dict(action)
-    status = escape(str(data["status"]))
+    execution_status = escape(str(data["status"]))
+    outcome = escape(action.outcome.value)
+    verification_status = _verification_label(action)
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
@@ -155,6 +221,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               <p>{escape(str(failure_reason))}</p>
               {evidence_section}
             </div>"""
+    verification_section = _verification_section(action)
 
     screenshots = []
     for label, path in (
@@ -185,14 +252,16 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
                 <p class="eyebrow">Action {index}</p>
                 <h2>{escape(str(data["action_type"]))}</h2>
               </div>
-              <span class="status status-{status}">{status}</span>
+              <span class="status status-{outcome}">{outcome}</span>
             </div>
             <dl>
+              <div><dt>Execution status</dt><dd>{execution_status}</dd></div>
+              <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
               <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
               <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
             </dl>
             <h3>Arguments</h3>
-            <pre>{arguments}</pre>{failure_section}
+            <pre>{arguments}</pre>{failure_section}{verification_section}
             <div class="action-screenshots">{screenshot_section}
             </div>
           </div>
@@ -201,12 +270,18 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
 
 def write_session_html(session: ActionSession, output_path: Path) -> None:
     failure_count = sum(
-        action.status is ActionStatus.FAILURE for action in session.actions
+        action.outcome is ActionOutcome.FAILURE for action in session.actions
     )
-    success_count = session.action_count - failure_count
+    success_count = sum(
+        action.outcome is ActionOutcome.SUCCESS for action in session.actions
+    )
+    unverified_count = sum(
+        action.outcome is ActionOutcome.UNVERIFIED for action in session.actions
+    )
     category_counts = {
         category: sum(
-            action.failure_category is category for action in session.actions
+            _outcome_failure_category(action) is category
+            for action in session.actions
         )
         for category in FailureCategory
     }
@@ -216,13 +291,21 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     elif session.has_failures:
         overall_status = "failure"
         overall_label = "contains failures"
+    elif unverified_count:
+        overall_status = "unverified"
+        overall_label = "contains unverified actions"
     else:
         overall_status = "success"
         overall_label = "all successful"
 
     action_label = "action" if session.action_count == 1 else "actions"
-    success_label = "success" if success_count == 1 else "successes"
+    success_label = (
+        "verified success" if success_count == 1 else "verified successes"
+    )
     failure_label = "failure" if failure_count == 1 else "failures"
+    unverified_label = (
+        "unverified action" if unverified_count == 1 else "unverified actions"
+    )
     failure_summary = ""
     if failure_count:
         category_items = "\n".join(
@@ -271,6 +354,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
+      .status-unverified {{ background: #fef3c7; color: #92400e; }}
       .status-empty {{ background: #e2e8f0; color: #475569; }}
       .timeline {{ position: relative; }}
       .timeline::before {{ background: #cbd5e1; bottom: 0; content: "";
@@ -290,6 +374,11 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .failure {{ background: #fff1f2; border: 1px solid #fecdd3;
                   border-radius: 8px; margin-top: 20px; padding: 16px; }}
       .failure p {{ margin: 8px 0 0; white-space: pre-wrap; }}
+      .verification {{ border: 1px solid #cbd5e1; border-radius: 8px;
+                       margin-top: 20px; padding: 16px; }}
+      .verification-failure {{ background: #fff1f2; border-radius: 8px;
+                               margin-top: 16px; padding: 16px; }}
+      .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
       .action-screenshots {{ display: grid; gap: 16px;
                              grid-template-columns: repeat(2, minmax(0, 1fr));
                              margin-top: 20px; }}
@@ -314,7 +403,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
           <h1>Action session</h1>
           <span class="status status-{overall_status}">{overall_label}</span>
         </div>
-        <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label}</p>
+        <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label} · {unverified_count} {unverified_label}</p>
 {failure_summary}
       </header>
       <div class="timeline">

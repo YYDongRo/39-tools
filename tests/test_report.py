@@ -5,6 +5,7 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.report import write_action_html, write_session_html
 from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
 def test_write_successful_action_report(tmp_path: Path) -> None:
@@ -24,7 +25,9 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     content = output_path.read_text(encoding="utf-8")
     assert "&lt;click&gt;" in content
     assert "&lt;button&gt;" in content
-    assert 'class="status status-success"' in content
+    assert 'class="status status-unverified"' in content
+    assert "<dt>Execution status</dt><dd>success</dd>" in content
+    assert "<dt>Verification status</dt><dd>not run</dd>" in content
     assert 'src="before.png"' in content
     assert 'src="after.png"' in content
 
@@ -64,6 +67,11 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
                 status=ActionStatus.SUCCESS,
                 screenshot_before=Path("action-1/before.png"),
                 screenshot_after=Path("action-1/after.png"),
+                verification=VerificationResult(
+                    expected_state="Clicked",
+                    observed_state="Clicked",
+                    passed=True,
+                ),
             ),
             ActionRecord(
                 action_type="<click>",
@@ -95,7 +103,10 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert "3 actions · 1 success · 2 failures" in content
+    assert (
+        "3 actions · 1 verified success · 2 failures · 0 unverified actions"
+        in content
+    )
     assert "Action 1" in content
     assert "Action 2" in content
     assert "Action 3" in content
@@ -121,6 +132,11 @@ def test_successful_session_omits_failure_summary(tmp_path: Path) -> None:
                 start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
                 duration_ms=32,
                 status=ActionStatus.SUCCESS,
+                verification=VerificationResult(
+                    expected_state="Ready",
+                    observed_state="Ready",
+                    passed=True,
+                ),
             )
         ]
     )
@@ -129,8 +145,38 @@ def test_successful_session_omits_failure_summary(tmp_path: Path) -> None:
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert "1 action · 1 success · 0 failures" in content
+    assert (
+        "1 action · 1 verified success · 0 failures · 0 unverified actions"
+        in content
+    )
     assert "Failure categories" not in content
+
+
+def test_session_report_marks_missing_verification_as_unverified(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        actions=[
+            ActionRecord(
+                action_type="click",
+                arguments={},
+                start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+                duration_ms=32,
+                status=ActionStatus.SUCCESS,
+            )
+        ]
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert (
+        "1 action · 0 verified successes · 0 failures · 1 unverified action"
+        in content
+    )
+    assert "contains unverified actions" in content
+    assert 'class="status status-unverified"' in content
 
 
 def test_write_empty_session_report(tmp_path: Path) -> None:
@@ -139,7 +185,52 @@ def test_write_empty_session_report(tmp_path: Path) -> None:
     write_session_html(ActionSession(), output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert "0 actions · 0 successes · 0 failures" in content
+    assert (
+        "0 actions · 0 verified successes · 0 failures · 0 unverified actions"
+        in content
+    )
     assert 'class="status status-empty"' in content
     assert "No actions recorded." in content
     assert "Failure categories" not in content
+
+
+def test_report_displays_verification_failure_as_final_failure(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#save"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        verification=VerificationResult(
+            expected_state="<Saved>",
+            observed_state="<Saving>",
+            passed=False,
+            evidence={"selector": "<status>"},
+            failure_reason="expected <Saved>, observed <Saving>",
+        ),
+    )
+    action_output = tmp_path / "action.html"
+    session_output = tmp_path / "session.html"
+
+    write_action_html(action, action_output)
+    write_session_html(ActionSession(actions=[action]), session_output)
+
+    action_content = action_output.read_text(encoding="utf-8")
+    assert 'class="status status-failure"' in action_content
+    assert "<dt>Execution status</dt><dd>success</dd>" in action_content
+    assert "<dt>Verification status</dt><dd>failed</dd>" in action_content
+    assert "&lt;Saved&gt;" in action_content
+    assert "&lt;Saving&gt;" in action_content
+    assert "expected &lt;Saved&gt;, observed &lt;Saving&gt;" in action_content
+    assert "Verification evidence" in action_content
+    assert "&lt;status&gt;" in action_content
+
+    session_content = session_output.read_text(encoding="utf-8")
+    assert (
+        "1 action · 0 verified successes · 1 failure · 0 unverified actions"
+        in session_content
+    )
+    assert "contains failures" in session_content
+    assert "<span>verification_mismatch</span><strong>1</strong>" in session_content

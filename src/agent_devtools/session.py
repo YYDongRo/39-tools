@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.action import ActionOutcome, ActionRecord
 
 
 @dataclass
@@ -13,4 +13,6 @@ class ActionSession:
 
     @property
     def has_failures(self) -> bool:
-        return any(action.status is ActionStatus.FAILURE for action in self.actions)
+        return any(
+            action.outcome is ActionOutcome.FAILURE for action in self.actions
+        )

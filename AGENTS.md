@@ -97,7 +97,7 @@ The repository currently includes:
 - atomic JSON persistence;
 - `ActionSession`;
 - `SessionRecorder` and session resumption;
-- static HTML action and session reports;
+- static HTML action and session reports with derived final outcomes;
 - screenshot paths in action records and before-and-after capture through integration callbacks;
 - Playwright success, failure, and multi-action browser demonstrations;
 - automated real-browser integration coverage for a successful click action;
@@ -105,15 +105,16 @@ The repository currently includes:
 - optional verification results persisted with action records;
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
-- static session summaries with success, failure, and failure-category counts;
+- static session summaries with verified success, final failure, unverified,
+  and failure-category counts;
 - controlled framework-independent replay for validated click actions, with
   real-browser success and timeout coverage and a controlled failure demo;
 - a Playwright click adapter that records minimal element-state evidence and
   diagnoses missing, hidden, and disabled targets;
 - unit tests for the foundational modules.
 
-Verification results can be stored in action and session JSON, but are not yet
-displayed in HTML reports or included in session outcomes.
+Verification results are stored in action and session JSON, displayed in HTML
+reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.
 

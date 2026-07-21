@@ -12,6 +12,12 @@ class ActionStatus(StrEnum):
     FAILURE = "failure"
 
 
+class ActionOutcome(StrEnum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    UNVERIFIED = "unverified"
+
+
 @dataclass
 class ActionRecord:
     action_type: str
@@ -37,3 +43,13 @@ class ActionRecord:
             raise ValueError("successful actions cannot have a failure category")
         if self.status is ActionStatus.SUCCESS and self.failure_evidence:
             raise ValueError("successful actions cannot have failure evidence")
+
+    @property
+    def outcome(self) -> ActionOutcome:
+        if self.status is ActionStatus.FAILURE:
+            return ActionOutcome.FAILURE
+        if self.verification is None:
+            return ActionOutcome.UNVERIFIED
+        if self.verification.passed:
+            return ActionOutcome.SUCCESS
+        return ActionOutcome.FAILURE
