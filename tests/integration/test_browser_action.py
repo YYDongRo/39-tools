@@ -4,10 +4,14 @@ import pytest
 
 from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.failure import FailureCategory
+from agent_devtools.integrations.playwright import (
+    TextExpectation,
+    expect_text,
+    record_playwright_click,
+)
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import read_action_json, write_action_json
-from agent_devtools.verification import verify_text_state
 
 
 playwright = pytest.importorskip(
@@ -31,16 +35,17 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
         page.goto(page_path.as_uri())
         page.screenshot(path=str(before_path), full_page=True)
 
-        action = record_action(
-            action_type="click",
-            arguments={"selector": "#agent-action"},
-            operation=lambda: page.locator("#agent-action").click(),
+        action = record_playwright_click(
+            page,
+            "#agent-action",
             screenshot_before=Path("before.png"),
             screenshot_after=Path("after.png"),
-            verification=lambda: verify_text_state(
-                expected_state="The browser click succeeded.",
-                observed_state=page.locator("#status").inner_text(),
-                evidence={"selector": "#status", "screenshot": "after.png"},
+            verification=expect_text(
+                page,
+                TextExpectation(
+                    selector="#status",
+                    expected="The browser click succeeded.",
+                ),
             ),
         )
 
@@ -65,6 +70,45 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
     assert 'class="status status-success"' in report
     assert "<dt>Verification status</dt><dd>passed</dd>" in report
     assert "The browser click succeeded." in report
+
+
+def test_structured_text_expectation_reports_mismatch() -> None:
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_click.html"
+    ).resolve()
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(page_path.as_uri())
+
+        action = record_playwright_click(
+            page,
+            "#agent-action",
+            verification=expect_text(
+                page,
+                TextExpectation(
+                    selector="#status",
+                    expected="The task was saved.",
+                    timeout_ms=100,
+                ),
+            ),
+        )
+
+        browser.close()
+
+    assert action.status is ActionStatus.SUCCESS
+    assert action.verification is not None
+    assert not action.verification.passed
+    assert action.verification.observed_state == "The browser click succeeded."
+    assert action.verification.evidence == {
+        "expectation_type": "text_equals",
+        "selector": "#status",
+        "selector_count": 1,
+        "timeout_ms": 100,
+    }
+    assert action.failure_reason is None
+    assert action.outcome is ActionOutcome.FAILURE
 
 
 def test_classifies_real_browser_timeout() -> None:

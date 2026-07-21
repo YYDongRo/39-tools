@@ -20,6 +20,7 @@ written as versioned JSON traces.
 - Persisted text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
+- Structured Playwright text expectations with automatic waiting and evidence
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -221,6 +222,34 @@ verification status remain separate.
 failure means `failure`, a passed verification means `success`, and a successful
 action without verification means `unverified`.
 
+For Playwright, declare an exact text expectation instead of manually reading
+the page and constructing a result:
+
+```python
+from agent_devtools.integrations.playwright import (
+    TextExpectation,
+    expect_text,
+    record_playwright_click,
+)
+
+
+expectation = TextExpectation(
+    selector="#status",
+    expected="Saved",
+    timeout_ms=2_000,
+)
+action = record_playwright_click(
+    page,
+    "#save",
+    verification=expect_text(page, expectation),
+)
+```
+
+`expect_text()` waits for exactly one matching element and the expected text.
+It records the selector, match count, timeout, expected text, and observed text
+as verification evidence. A missing element or different text is a verification
+failure; Playwright or page errors are still raised as verifier errors.
+
 ## Failure categories
 
 Core recording uses four conservative categories:
@@ -384,3 +413,4 @@ interrupted update does not leave a partially written trace.
 - No CLI, dashboard, or recovery system
 - Playwright click recording and diagnostics are the only current runtime integration
 - Callers must provide expected and observed states; the tool does not infer intent
+- Structured Playwright expectations currently support exact text only

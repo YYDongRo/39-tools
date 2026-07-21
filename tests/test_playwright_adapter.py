@@ -5,6 +5,7 @@ import pytest
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
+    TextExpectation,
     diagnose_playwright_click_failure,
     record_playwright_click,
 )
@@ -59,6 +60,27 @@ def test_record_playwright_click_rejects_invalid_timeout(
         record_playwright_click(
             object(),
             "#target",
+            timeout_ms=timeout_ms,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("selector", ["", "   ", None])
+def test_text_expectation_rejects_invalid_selector(selector: object) -> None:
+    with pytest.raises(ValueError, match="selector cannot be empty"):
+        TextExpectation(selector=selector, expected="Saved")  # type: ignore[arg-type]
+
+
+def test_text_expectation_rejects_non_string_expected_value() -> None:
+    with pytest.raises(ValueError, match="expected must be a string"):
+        TextExpectation(selector="#status", expected=True)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("timeout_ms", [0, -1, True])
+def test_text_expectation_rejects_invalid_timeout(timeout_ms: object) -> None:
+    with pytest.raises(ValueError, match="timeout_ms must be a positive integer"):
+        TextExpectation(
+            selector="#status",
+            expected="Saved",
             timeout_ms=timeout_ms,  # type: ignore[arg-type]
         )
 
