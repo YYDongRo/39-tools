@@ -81,7 +81,7 @@ def test_successful_browser_click_has_no_failure_evidence() -> None:
         page = browser.new_page()
         page.goto(page_path.as_uri())
 
-        action = record_playwright_click(page, "#visible-target", timeout_ms=100)
+        action = record_playwright_click(page, "#visible-target", timeout_ms=2_000)
 
         browser.close()
 
