@@ -457,19 +457,20 @@ from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.verification import verify_text_state
 
 
-recorder = SessionRecorder(
+with SessionRecorder(
     Path("trace/my-session"),
     goal="Open the requested item",
-)
-recorder.record(
-    "click",
-    {"step": 1},
-    lambda: None,
-)
-recorder.record("click", {"step": 2}, lambda: None)
-recorder.verify_task(
-    lambda: verify_text_state("Item open", "Item open")
-)
+    task_verification=lambda: verify_text_state(
+        "Item open",
+        "Item open",
+    ),
+) as recorder:
+    recorder.record(
+        "click",
+        {"step": 1},
+        lambda: None,
+    )
+    recorder.record("click", {"step": 2}, lambda: None)
 
 loaded_session = read_session_json(Path("trace/my-session/session.json"))
 print(loaded_session.action_count)
@@ -484,12 +485,17 @@ unverified totals; failure categories include execution and verification
 failures. Each action shows its execution status, verification status, final
 outcome, timing, arguments, failure details, and screenshots.
 
-Call `verify_task()` after the agent finishes to store the final observed task
-state. `ActionSession.outcome` is `success` or `failure` when task verification
-runs and `unverified` otherwise. Intermediate action failures remain visible,
-but a passed task verification can show that the agent recovered and completed
-the user goal. Session schema version 2 stores the goal and task verification;
-the loader remains compatible with schema version 1 sessions.
+When `task_verification` is configured, leaving the `with` block normally runs
+it automatically and writes the final report. If an unhandled agent exception
+escapes, completed actions remain persisted, task verification is skipped, and
+the task stays `unverified`. Integrations that need manual lifecycle control can
+omit `task_verification` and call the lower-level `verify_task()` method.
+
+`ActionSession.outcome` is `success` or `failure` when task verification runs
+and `unverified` otherwise. Intermediate action failures remain visible, but a
+passed task verification can show that the agent recovered and completed the
+user goal. Session schema version 2 stores the goal and task verification; the
+loader remains compatible with schema version 1 sessions.
 
 Starting a recorder in a non-empty directory raises `FileExistsError` instead
 of overwriting evidence. Resume an existing session explicitly:
@@ -531,12 +537,12 @@ trace/video-search-agent/<run-id>/
     └── 004/
 ```
 
-After all actions finish, `verify_task()` checks that the local player status
-is `Playing: Agent debugging`. The report shows the task goal, task verification,
-and final task outcome separately from the four action results. This example
-demonstrates the interception point an agent integration can use; it does not
-automatically connect to arbitrary third-party agents or the real YouTube
-website.
+After all actions finish, the recorder context automatically checks that the
+local player status is `Playing: Agent debugging`. The report shows the task
+goal, task verification, and final task outcome separately from the four action
+results. This example demonstrates the interception point an agent integration
+can use; it does not automatically connect to arbitrary third-party agents or
+the real YouTube website.
 
 ## Current limitations
 

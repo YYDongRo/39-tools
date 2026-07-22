@@ -5,7 +5,7 @@ import pytest
 from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder
-from agent_devtools.verification import verify_text_state
+from agent_devtools.verification import VerificationResult, verify_text_state
 
 
 def test_records_session_with_screenshots_and_persists_each_action(
@@ -111,6 +111,64 @@ def test_task_verification_requires_session_goal(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="requires a session goal"):
         recorder.verify_task(lambda: verify_text_state("Ready", "Ready"))
+
+
+def test_context_manager_automatically_verifies_task(tmp_path: Path) -> None:
+    verification_calls = 0
+
+    def verify_task() -> VerificationResult:
+        nonlocal verification_calls
+        verification_calls += 1
+        return verify_text_state("Playing", "Playing")
+
+    with SessionRecorder(
+        tmp_path / "trace",
+        goal="Play a video",
+        task_verification=verify_task,
+    ) as recorder:
+        recorder.record("click", {"selector": "#play"}, lambda: None)
+
+    loaded_session = read_session_json(recorder.output_dir / "session.json")
+    assert verification_calls == 1
+    assert loaded_session.verification is not None
+    assert loaded_session.verification.passed
+    assert loaded_session.outcome is ActionOutcome.SUCCESS
+
+
+def test_context_manager_skips_task_verification_on_exception(
+    tmp_path: Path,
+) -> None:
+    verification_calls = 0
+
+    def verify_task() -> VerificationResult:
+        nonlocal verification_calls
+        verification_calls += 1
+        return verify_text_state("Playing", "Playing")
+
+    recorder = SessionRecorder(
+        tmp_path / "trace",
+        goal="Play a video",
+        task_verification=verify_task,
+    )
+
+    with pytest.raises(RuntimeError, match="agent crashed"):
+        with recorder:
+            recorder.record("click", {"selector": "#play"}, lambda: None)
+            raise RuntimeError("agent crashed")
+
+    loaded_session = read_session_json(recorder.output_dir / "session.json")
+    assert verification_calls == 0
+    assert loaded_session.verification is None
+    assert loaded_session.outcome is ActionOutcome.UNVERIFIED
+    assert (recorder.output_dir / "report.html").is_file()
+
+
+def test_automatic_task_verification_requires_goal(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="automatic task verification requires"):
+        SessionRecorder(
+            tmp_path / "trace",
+            task_verification=lambda: verify_text_state("Ready", "Ready"),
+        )
 
 
 def test_records_session_without_screenshots(tmp_path: Path) -> None:

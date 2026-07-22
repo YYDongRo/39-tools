@@ -29,44 +29,43 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
         page = browser.new_page(viewport={"width": 1000, "height": 700})
         page.goto(page_path.as_uri())
 
-        recorder = SessionRecorder(
+        task_verification = expect_text(
+            page,
+            TextExpectation(
+                selector="#player-status",
+                expected="Playing: Agent debugging",
+            ),
+        )
+        with SessionRecorder(
             trace_dir,
             lambda path: page.screenshot(path=str(path), full_page=True),
             goal="Search for 'Agent debugging' and play the result",
-        )
-        record_playwright_action(
-            page,
-            recorder,
-            "fill",
-            {"selector": "#search", "text": "Agent debugging"},
-        )
-        record_playwright_action(
-            page,
-            recorder,
-            "click",
-            {"selector": "#search-button"},
-        )
-        record_playwright_action(
-            page,
-            recorder,
-            "click",
-            {"selector": "#video-result"},
-        )
-        record_playwright_action(
-            page,
-            recorder,
-            "click",
-            {"selector": "#play"},
-        )
-        recorder.verify_task(
-            expect_text(
+            task_verification=task_verification,
+        ) as recorder:
+            record_playwright_action(
                 page,
-                TextExpectation(
-                    selector="#player-status",
-                    expected="Playing: Agent debugging",
-                ),
-            ),
-        )
+                recorder,
+                "fill",
+                {"selector": "#search", "text": "Agent debugging"},
+            )
+            record_playwright_action(
+                page,
+                recorder,
+                "click",
+                {"selector": "#search-button"},
+            )
+            record_playwright_action(
+                page,
+                recorder,
+                "click",
+                {"selector": "#video-result"},
+            )
+            record_playwright_action(
+                page,
+                recorder,
+                "click",
+                {"selector": "#play"},
+            )
         session = recorder.session
 
         browser.close()

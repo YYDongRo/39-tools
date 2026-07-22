@@ -29,30 +29,29 @@ def run_agent_trajectory(page: Page, trace_dir: Path) -> ActionSession:
         ("click", {"selector": "#video-result"}),
         ("click", {"selector": "#play"}),
     ]
-    recorder = SessionRecorder(
+    task_verification = expect_text(
+        page,
+        TextExpectation(
+            selector="#player-status",
+            expected="Playing: Agent debugging",
+        ),
+    )
+
+    with SessionRecorder(
         trace_dir,
         capture_screenshot,
         goal=TASK_GOAL,
-    )
-    for action_type, arguments in actions:
-        action = record_playwright_action(
-            page,
-            recorder,
-            action_type,
-            arguments,
-        )
-        if action.status is ActionStatus.FAILURE:
-            break
-
-    recorder.verify_task(
-        expect_text(
-            page,
-            TextExpectation(
-                selector="#player-status",
-                expected="Playing: Agent debugging",
-            ),
-        )
-    )
+        task_verification=task_verification,
+    ) as recorder:
+        for action_type, arguments in actions:
+            action = record_playwright_action(
+                page,
+                recorder,
+                action_type,
+                arguments,
+            )
+            if action.status is ActionStatus.FAILURE:
+                break
 
     return recorder.session
 

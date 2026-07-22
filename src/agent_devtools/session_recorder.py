@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
+from types import TracebackType
 from typing import Self
 
 from agent_devtools.action import ActionRecord
@@ -17,10 +18,15 @@ class SessionRecorder:
         capture_screenshot: Callable[[Path], None] | None = None,
         *,
         goal: str | None = None,
+        task_verification: Callable[[], VerificationResult] | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.capture_screenshot = capture_screenshot
         self.session = ActionSession(goal=goal)
+        self.task_verification = task_verification
+
+        if task_verification is not None and goal is None:
+            raise ValueError("automatic task verification requires a goal")
 
         if self.output_dir.exists() and any(self.output_dir.iterdir()):
             raise FileExistsError(
@@ -33,13 +39,35 @@ class SessionRecorder:
         cls,
         output_dir: Path,
         capture_screenshot: Callable[[Path], None] | None = None,
+        *,
+        task_verification: Callable[[], VerificationResult] | None = None,
     ) -> Self:
         session = read_session_json(output_dir / "session.json")
+        if task_verification is not None and session.goal is None:
+            raise ValueError("automatic task verification requires a goal")
         recorder = cls.__new__(cls)
         recorder.output_dir = output_dir
         recorder.capture_screenshot = capture_screenshot
         recorder.session = session
+        recorder.task_verification = task_verification
         return recorder
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self._persist()
+        if (
+            exception_type is None
+            and self.task_verification is not None
+            and self.session.verification is None
+        ):
+            self.verify_task(self.task_verification)
 
     def record(
         self,

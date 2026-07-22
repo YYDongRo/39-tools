@@ -98,7 +98,8 @@ The repository currently includes:
 - atomic JSON persistence;
 - `ActionSession`;
 - persisted session goals, task-level verification, and final task outcomes;
-- `SessionRecorder` and session resumption;
+- `SessionRecorder`, session resumption, and automatic task verification on
+  successful context-manager exit;
 - static HTML action and session reports with derived final outcomes;
 - screenshot paths in action records and before-and-after capture through integration callbacks;
 - Playwright verified-success, failure, and multi-action browser demonstrations;
