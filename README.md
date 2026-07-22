@@ -488,6 +488,40 @@ recorder.record("click", {"step": 3}, lambda: None)
 Session JSON is written to a temporary file and atomically replaced, so an
 interrupted update does not leave a partially written trace.
 
+### Trace an agent-like browser trajectory
+
+Run a deterministic local task that searches for a video result and plays it:
+
+```bash
+uv run --extra browser python examples/video_search_agent.py
+```
+
+The simulated agent produces structured `fill` and `click` actions. Every
+action passes through `record_playwright_action()`, which sends it to
+`SessionRecorder`. The recorder captures before-and-after screenshots and
+updates `session.json` and `report.html` after every action. When the agent
+finishes, the final report is already complete.
+
+The task creates:
+
+```text
+trace/video-search-agent/<run-id>/
+├── session.json
+├── report.html
+└── actions/
+    ├── 001/
+    │   ├── before.png
+    │   └── after.png
+    ├── 002/
+    ├── 003/
+    └── 004/
+```
+
+The final click verifies that the local player status is
+`Playing: Agent debugging`. This example demonstrates the interception point
+an agent integration can use; it does not automatically connect to arbitrary
+third-party agents or the real YouTube website.
+
 ## Current limitations
 
 - Session recording is synchronous

@@ -8,6 +8,7 @@ from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
     TextExpectation,
     diagnose_playwright_click_failure,
+    record_playwright_action,
     record_playwright_click,
     record_playwright_click_trace,
 )
@@ -95,6 +96,48 @@ def test_click_trace_rejects_non_empty_output_directory(tmp_path: Path) -> None:
             object(),  # type: ignore[arg-type]
             "#target",
             tmp_path,
+        )
+
+
+@pytest.mark.parametrize("selector", ["", "   ", None])
+def test_playwright_action_rejects_invalid_selector(selector: object) -> None:
+    with pytest.raises(ValueError, match="require a non-empty selector"):
+        record_playwright_action(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "click",
+            {"selector": selector},
+        )
+
+
+@pytest.mark.parametrize("timeout_ms", [0, -1, True])
+def test_playwright_action_rejects_invalid_timeout(timeout_ms: object) -> None:
+    with pytest.raises(ValueError, match="timeout_ms must be a positive integer"):
+        record_playwright_action(
+            FakePage(FakeLocator(count=1)),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "click",
+            {"selector": "#target", "timeout_ms": timeout_ms},
+        )
+
+
+def test_playwright_fill_action_requires_text() -> None:
+    with pytest.raises(ValueError, match="fill actions require text"):
+        record_playwright_action(
+            FakePage(FakeLocator(count=1)),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "fill",
+            {"selector": "#target"},
+        )
+
+
+def test_playwright_action_rejects_unsupported_action_type() -> None:
+    with pytest.raises(ValueError, match="unsupported Playwright action"):
+        record_playwright_action(
+            FakePage(FakeLocator(count=1)),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "scroll",
+            {"selector": "#target"},
         )
 
 

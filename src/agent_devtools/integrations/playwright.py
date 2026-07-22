@@ -10,6 +10,7 @@ from agent_devtools.failure import FailureCategory
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
+from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.verification import VerificationResult, verify_text_state
 
 
@@ -172,6 +173,51 @@ def record_playwright_click_trace(
     write_action_json(action, action_path)
     write_action_html(action, report_path)
     return action
+
+
+def record_playwright_action(
+    page: Page,
+    recorder: SessionRecorder,
+    action_type: str,
+    arguments: dict[str, object],
+    *,
+    verification: Callable[[], VerificationResult] | None = None,
+) -> ActionRecord:
+    selector = arguments.get("selector")
+    if not isinstance(selector, str) or not selector.strip():
+        raise ValueError("Playwright actions require a non-empty selector")
+
+    timeout_ms = arguments.get("timeout_ms")
+    if timeout_ms is not None and (
+        not isinstance(timeout_ms, int)
+        or isinstance(timeout_ms, bool)
+        or timeout_ms <= 0
+    ):
+        raise ValueError("timeout_ms must be a positive integer")
+
+    locator = page.locator(selector)
+    if action_type == "click":
+        if timeout_ms is None:
+            operation = locator.click
+        else:
+            operation = lambda: locator.click(timeout=timeout_ms)
+    elif action_type == "fill":
+        text = arguments.get("text")
+        if not isinstance(text, str):
+            raise ValueError("fill actions require text")
+        if timeout_ms is None:
+            operation = lambda: locator.fill(text)
+        else:
+            operation = lambda: locator.fill(text, timeout=timeout_ms)
+    else:
+        raise ValueError(f"unsupported Playwright action: {action_type}")
+
+    return recorder.record(
+        action_type,
+        dict(arguments),
+        operation,
+        verification=verification,
+    )
 
 
 def diagnose_playwright_click_failure(

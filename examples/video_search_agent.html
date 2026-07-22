@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Local Video Search</title>
+    <style>
+      body {
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 0 24px;
+        font: 18px/1.5 system-ui, sans-serif;
+        color: #172033;
+      }
+
+      input, button {
+        padding: 10px 14px;
+        font: inherit;
+      }
+
+      input {
+        width: 65%;
+      }
+
+      section {
+        margin-top: 28px;
+        padding: 20px;
+        border: 1px solid #ccd3df;
+        border-radius: 10px;
+      }
+
+      #player-status {
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Local Video Search</h1>
+    <label for="search">Search videos</label>
+    <div>
+      <input id="search" autocomplete="off">
+      <button id="search-button" type="button">Search</button>
+    </div>
+
+    <section id="results" hidden>
+      <h2>Search result</h2>
+      <button id="video-result" type="button"></button>
+    </section>
+
+    <section id="player" hidden>
+      <h2 id="video-title"></h2>
+      <button id="play" type="button">Play</button>
+      <p id="player-status">Paused</p>
+    </section>
+
+    <script>
+      const search = document.querySelector("#search");
+      const results = document.querySelector("#results");
+      const videoResult = document.querySelector("#video-result");
+      const player = document.querySelector("#player");
+      const videoTitle = document.querySelector("#video-title");
+      const playerStatus = document.querySelector("#player-status");
+
+      document.querySelector("#search-button").addEventListener("click", () => {
+        const query = search.value.trim();
+        videoResult.textContent = `Result for: ${query}`;
+        results.hidden = false;
+      });
+
+      videoResult.addEventListener("click", () => {
+        videoTitle.textContent = videoResult.textContent;
+        player.hidden = false;
+      });
+
+      document.querySelector("#play").addEventListener("click", () => {
+        playerStatus.textContent = "Playing: Agent debugging";
+      });
+    </script>
+  </body>
+</html>
