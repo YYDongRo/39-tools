@@ -414,3 +414,7 @@ interrupted update does not leave a partially written trace.
 - Playwright click recording and diagnostics are the only current runtime integration
 - Callers must provide expected and observed states; the tool does not infer intent
 - Structured Playwright expectations currently support exact text only
+
+## License
+
+Agent DevTools is available under the [MIT License](LICENSE).

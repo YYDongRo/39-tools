@@ -1,15 +1,14 @@
 [project]
 name = "agent-devtools"
 version = "0.1.0"
-description = "One and the best tool to improve agent's performance"
+description = "Action-level observability and debugging for computer-use agents"
+readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Roy Dong", email = "roydong5@gmail.com" }
 ]
 requires-python = ">=3.14"
 dependencies = []
-
-[project.scripts]
-agent-devtools = "agent_devtools:main"
 
 [project.optional-dependencies]
 browser = [

@@ -114,6 +114,7 @@ The repository currently includes:
   diagnoses missing, hidden, and disabled targets;
 - structured Playwright exact-text expectations with automatic waiting;
 - unit tests for the foundational modules.
+- MIT-licensed packaging and automated GitHub Actions test coverage.
 
 Verification results are stored in action and session JSON, displayed in HTML
 reports, and included in derived action and session outcomes.
