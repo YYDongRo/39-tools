@@ -60,15 +60,28 @@ def expect_text(
             selector_count = 1
             observed = locator.inner_text()
 
+        evidence: dict[str, object] = {
+            "expectation_type": "text_equals",
+            "selector": expectation.selector,
+            "selector_count": selector_count,
+            "timeout_ms": expectation.timeout_ms,
+        }
+        if selector_count != 1:
+            return VerificationResult(
+                expected_state=expectation.expected,
+                observed_state=observed,
+                passed=False,
+                evidence=evidence,
+                failure_reason=(
+                    f"expected selector {expectation.selector!r} to match "
+                    f"exactly one element, observed {selector_count}"
+                ),
+            )
+
         return verify_text_state(
             expected_state=expectation.expected,
             observed_state=observed,
-            evidence={
-                "expectation_type": "text_equals",
-                "selector": expectation.selector,
-                "selector_count": selector_count,
-                "timeout_ms": expectation.timeout_ms,
-            },
+            evidence=evidence,
         )
 
     return verify

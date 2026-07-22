@@ -111,6 +111,34 @@ def test_structured_text_expectation_reports_mismatch() -> None:
     assert action.outcome is ActionOutcome.FAILURE
 
 
+def test_structured_text_expectation_rejects_ambiguous_selector() -> None:
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_content(
+            '<p class="status">Saved</p><p class="status">Saved</p>'
+        )
+
+        verification = expect_text(
+            page,
+            TextExpectation(
+                selector=".status",
+                expected="Saved",
+                timeout_ms=100,
+            ),
+        )()
+
+        browser.close()
+
+    assert not verification.passed
+    assert verification.observed_state == "Saved"
+    assert verification.evidence["selector_count"] == 2
+    assert verification.failure_reason == (
+        "expected selector '.status' to match exactly one element, observed 2"
+    )
+    assert verification.failure_category is FailureCategory.VERIFICATION_MISMATCH
+
+
 def test_classifies_real_browser_timeout() -> None:
     page_path = (
         Path(__file__).parents[2] / "examples" / "browser_click.html"
