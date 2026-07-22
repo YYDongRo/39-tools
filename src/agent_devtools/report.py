@@ -6,6 +6,7 @@ from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
 from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
 def _screenshot_panel(title: str, screenshot_path: object) -> str:
@@ -28,11 +29,11 @@ def _verification_label(action: ActionRecord) -> str:
     return "passed" if action.verification.passed else "failed"
 
 
-def _verification_section(action: ActionRecord) -> str:
-    verification = action.verification
-    if verification is None:
-        return ""
-
+def _verification_result_section(
+    verification: VerificationResult,
+    title: str,
+) -> str:
+    status = "passed" if verification.passed else "failed"
     evidence_section = ""
     if verification.evidence:
         evidence = escape(
@@ -56,15 +57,22 @@ def _verification_section(action: ActionRecord) -> str:
 
     return f"""
       <section class="verification">
-        <h2>Verification</h2>
+        <h2>{escape(title)}</h2>
         <dl>
-          <div><dt>Status</dt><dd>{_verification_label(action)}</dd></div>
+          <div><dt>Status</dt><dd>{status}</dd></div>
           <div><dt>Expected state</dt><dd>{escape(verification.expected_state)}</dd></div>
           <div><dt>Observed state</dt><dd>{escape(verification.observed_state)}</dd></div>
         </dl>
         {failure_section}
         {evidence_section}
       </section>"""
+
+
+def _verification_section(action: ActionRecord) -> str:
+    verification = action.verification
+    if verification is None:
+        return ""
+    return _verification_result_section(verification, "Verification")
 
 
 def _outcome_failure_category(action: ActionRecord) -> FailureCategory | None:
@@ -285,7 +293,17 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
         )
         for category in FailureCategory
     }
-    if session.action_count == 0:
+    if session.verification is not None:
+        overall_status = session.outcome.value
+        overall_label = (
+            "task successful"
+            if session.outcome is ActionOutcome.SUCCESS
+            else "task failed"
+        )
+    elif session.goal is not None:
+        overall_status = "unverified"
+        overall_label = "task unverified"
+    elif session.action_count == 0:
         overall_status = "empty"
         overall_label = "empty"
     elif session.has_failures:
@@ -324,6 +342,18 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     )
     if not cards:
         cards = '<section class="empty-state">No actions recorded.</section>'
+    goal_section = ""
+    if session.goal is not None:
+        goal_section = (
+            '<p class="goal"><strong>Goal:</strong> '
+            f"{escape(session.goal)}</p>"
+        )
+    task_verification_section = ""
+    if session.verification is not None:
+        task_verification_section = _verification_result_section(
+            session.verification,
+            "Task verification",
+        )
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -343,6 +373,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .title-row, .action-heading {{ align-items: center; display: flex;
                                     justify-content: space-between; gap: 16px; }}
       .title-row h1, .action-heading h2 {{ margin-bottom: 0; }}
+      .goal {{ font-size: 18px; margin: 20px 0 0; }}
       .summary {{ color: #475569; margin: 16px 0 0; }}
       .failure-summary {{ background: #fff1f2; border: 1px solid #fecdd3;
                           border-radius: 8px; margin-top: 20px; padding: 16px; }}
@@ -403,9 +434,11 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
           <h1>Action session</h1>
           <span class="status status-{overall_status}">{overall_label}</span>
         </div>
+        {goal_section}
         <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label} · {unverified_count} {unverified_label}</p>
 {failure_summary}
       </header>
+{task_verification_section}
       <div class="timeline">
 {cards}
       </div>

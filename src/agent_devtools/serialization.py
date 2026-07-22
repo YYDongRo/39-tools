@@ -12,7 +12,8 @@ from agent_devtools.verification import VerificationResult
 
 SCHEMA_VERSION = 4
 SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, SCHEMA_VERSION}
-SESSION_SCHEMA_VERSION = 1
+SESSION_SCHEMA_VERSION = 2
+SUPPORTED_SESSION_SCHEMA_VERSIONS = {1, SESSION_SCHEMA_VERSION}
 
 
 def _write_json(data: dict[str, object], output_path: Path) -> None:
@@ -269,21 +270,33 @@ def read_action_json(input_path: Path) -> ActionRecord:
 def session_to_dict(session: ActionSession) -> dict[str, object]:
     return {
         "schema_version": SESSION_SCHEMA_VERSION,
+        "goal": session.goal,
+        "verification": _verification_to_dict(session.verification),
         "actions": [action_to_dict(action) for action in session.actions],
     }
 
 
 def session_from_dict(data: dict[str, object]) -> ActionSession:
     schema_version = data.get("schema_version")
-    if schema_version != SESSION_SCHEMA_VERSION:
+    if schema_version not in SUPPORTED_SESSION_SCHEMA_VERSIONS:
         raise ValueError(f"unsupported session schema_version: {schema_version!r}")
 
     try:
         actions_value = data["actions"]
+        goal_value = (
+            data["goal"] if schema_version == SESSION_SCHEMA_VERSION else None
+        )
+        verification_value = (
+            data["verification"]
+            if schema_version == SESSION_SCHEMA_VERSION
+            else None
+        )
     except KeyError as error:
-        raise ValueError("missing required field: actions") from error
+        raise ValueError(f"missing required field: {error.args[0]}") from error
     if not isinstance(actions_value, list):
         raise ValueError("actions must be an array")
+    if goal_value is not None and not isinstance(goal_value, str):
+        raise ValueError("goal must be a string or null")
 
     actions: list[ActionRecord] = []
     for index, action_value in enumerate(actions_value):
@@ -294,7 +307,12 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         except ValueError as error:
             raise ValueError(f"invalid action at index {index}: {error}") from error
 
-    return ActionSession(actions=actions)
+    verification = _verification_from_dict(verification_value)
+    return ActionSession(
+        actions=actions,
+        goal=goal_value,
+        verification=verification,
+    )
 
 
 def write_session_json(session: ActionSession, output_path: Path) -> None:

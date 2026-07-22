@@ -15,10 +15,12 @@ class SessionRecorder:
         self,
         output_dir: Path,
         capture_screenshot: Callable[[Path], None] | None = None,
+        *,
+        goal: str | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.capture_screenshot = capture_screenshot
-        self.session = ActionSession()
+        self.session = ActionSession(goal=goal)
 
         if self.output_dir.exists() and any(self.output_dir.iterdir()):
             raise FileExistsError(
@@ -77,7 +79,26 @@ class SessionRecorder:
         self._append_and_persist(action)
         return action
 
+    def verify_task(
+        self,
+        verification: Callable[[], VerificationResult],
+    ) -> VerificationResult:
+        if self.session.goal is None:
+            raise ValueError("task verification requires a session goal")
+
+        result = verification()
+        if not isinstance(result, VerificationResult):
+            raise TypeError("verification must return a VerificationResult")
+
+        self.session.verification = result
+        self._persist()
+        return result
+
     def _append_and_persist(self, action: ActionRecord) -> None:
+        self.session.verification = None
         self.session.actions.append(action)
+        self._persist()
+
+    def _persist(self) -> None:
         write_session_json(self.session, self.output_dir / "session.json")
         write_session_html(self.session, self.output_dir / "report.html")

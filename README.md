@@ -14,6 +14,7 @@ written as versioned JSON traces.
 - JSON trace output with UTC timestamps and portable paths
 - Loading saved JSON traces back into typed action records
 - Ordered multi-action sessions with JSON round-trip support
+- Session goals with persisted task-level verification and final outcomes
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
 - Static HTML reports with execution, verification, and final outcome details
@@ -456,18 +457,24 @@ from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.verification import verify_text_state
 
 
-recorder = SessionRecorder(Path("trace/my-session"))
+recorder = SessionRecorder(
+    Path("trace/my-session"),
+    goal="Open the requested item",
+)
 recorder.record(
     "click",
     {"step": 1},
     lambda: None,
-    verification=lambda: verify_text_state("Open", "Open"),
 )
 recorder.record("click", {"step": 2}, lambda: None)
+recorder.verify_task(
+    lambda: verify_text_state("Item open", "Item open")
+)
 
 loaded_session = read_session_json(Path("trace/my-session/session.json"))
 print(loaded_session.action_count)
 print(loaded_session.has_failures)
+print(loaded_session.outcome)
 ```
 
 Pass a screenshot callback to `SessionRecorder` to capture before-and-after
@@ -476,6 +483,13 @@ action list. The HTML timeline displays verified success, final failure, and
 unverified totals; failure categories include execution and verification
 failures. Each action shows its execution status, verification status, final
 outcome, timing, arguments, failure details, and screenshots.
+
+Call `verify_task()` after the agent finishes to store the final observed task
+state. `ActionSession.outcome` is `success` or `failure` when task verification
+runs and `unverified` otherwise. Intermediate action failures remain visible,
+but a passed task verification can show that the agent recovered and completed
+the user goal. Session schema version 2 stores the goal and task verification;
+the loader remains compatible with schema version 1 sessions.
 
 Starting a recorder in a non-empty directory raises `FileExistsError` instead
 of overwriting evidence. Resume an existing session explicitly:
@@ -517,10 +531,12 @@ trace/video-search-agent/<run-id>/
     └── 004/
 ```
 
-The final click verifies that the local player status is
-`Playing: Agent debugging`. This example demonstrates the interception point
-an agent integration can use; it does not automatically connect to arbitrary
-third-party agents or the real YouTube website.
+After all actions finish, `verify_task()` checks that the local player status
+is `Playing: Agent debugging`. The report shows the task goal, task verification,
+and final task outcome separately from the four action results. This example
+demonstrates the interception point an agent integration can use; it does not
+automatically connect to arbitrary third-party agents or the real YouTube
+website.
 
 ## Current limitations
 
@@ -528,7 +544,8 @@ third-party agents or the real YouTube website.
 - Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
-- Playwright click recording and diagnostics are the only current runtime integration
+- Playwright click and fill recording are the only current runtime integration;
+  structured failure diagnostics remain limited to click
 - Callers must provide expected and observed states; the tool does not infer intent
 - Structured Playwright expectations currently support exact text only
 

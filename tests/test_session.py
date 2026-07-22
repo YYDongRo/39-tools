@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.serialization import (
     read_session_json,
     session_from_dict,
@@ -71,6 +71,63 @@ def test_session_with_passed_verification_has_no_failures() -> None:
     assert not ActionSession(actions=[action]).has_failures
 
 
+def test_passed_task_verification_sets_success_after_action_failure() -> None:
+    session = ActionSession(
+        actions=[make_action(ActionStatus.FAILURE, "first attempt failed")],
+        goal="Play a video",
+        verification=VerificationResult(
+            expected_state="Playing",
+            observed_state="Playing",
+            passed=True,
+        ),
+    )
+
+    assert session.outcome is ActionOutcome.SUCCESS
+    assert session.has_failures
+
+
+def test_failed_task_verification_sets_failure() -> None:
+    session = ActionSession(
+        actions=[make_action(ActionStatus.SUCCESS)],
+        goal="Play a video",
+        verification=VerificationResult(
+            expected_state="Playing",
+            observed_state="Paused",
+            passed=False,
+            failure_reason="expected 'Playing', observed 'Paused'",
+        ),
+    )
+
+    assert session.outcome is ActionOutcome.FAILURE
+    assert session.has_failures
+
+
+def test_session_without_task_verification_is_unverified() -> None:
+    session = ActionSession(
+        actions=[make_action(ActionStatus.SUCCESS)],
+        goal="Play a video",
+    )
+
+    assert session.outcome is ActionOutcome.UNVERIFIED
+
+
+@pytest.mark.parametrize("goal", ["", "   "])
+def test_session_rejects_empty_goal(goal: str) -> None:
+    with pytest.raises(ValueError, match="goal cannot be empty"):
+        ActionSession(goal=goal)
+
+
+def test_session_rejects_task_verification_without_goal() -> None:
+    with pytest.raises(ValueError, match="task verification requires a goal"):
+        ActionSession(
+            verification=VerificationResult(
+                expected_state="Playing",
+                observed_state="Playing",
+                passed=True,
+            )
+        )
+
+
 def test_session_json_round_trip(tmp_path: Path) -> None:
     session = ActionSession(
         actions=[
@@ -85,13 +142,49 @@ def test_session_json_round_trip(tmp_path: Path) -> None:
     loaded_session = read_session_json(output_path)
     data = json.loads(output_path.read_text(encoding="utf-8"))
     assert loaded_session == session
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
+    assert data["goal"] is None
+    assert data["verification"] is None
     assert len(data["actions"]) == 2
+
+
+def test_task_verification_json_round_trip(tmp_path: Path) -> None:
+    session = ActionSession(
+        actions=[make_action(ActionStatus.SUCCESS)],
+        goal="Play a video",
+        verification=VerificationResult(
+            expected_state="Playing",
+            observed_state="Playing",
+            passed=True,
+            evidence={"selector": "#player-status"},
+        ),
+    )
+    output_path = tmp_path / "session.json"
+
+    write_session_json(session, output_path)
+
+    assert read_session_json(output_path) == session
+
+
+def test_load_session_schema_version_1_without_task_verification() -> None:
+    data = session_to_dict(
+        ActionSession(actions=[make_action(ActionStatus.SUCCESS)])
+    )
+    data["schema_version"] = 1
+    del data["goal"]
+    del data["verification"]
+
+    session = session_from_dict(data)
+
+    assert session.action_count == 1
+    assert session.goal is None
+    assert session.verification is None
+    assert session.outcome is ActionOutcome.UNVERIFIED
 
 
 def test_reject_unsupported_session_schema_version() -> None:
     data = session_to_dict(ActionSession())
-    data["schema_version"] = 2
+    data["schema_version"] = 3
 
-    with pytest.raises(ValueError, match="unsupported session schema_version: 2"):
+    with pytest.raises(ValueError, match="unsupported session schema_version: 3"):
         session_from_dict(data)

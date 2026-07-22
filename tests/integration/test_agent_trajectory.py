@@ -32,6 +32,7 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
         recorder = SessionRecorder(
             trace_dir,
             lambda path: page.screenshot(path=str(path), full_page=True),
+            goal="Search for 'Agent debugging' and play the result",
         )
         record_playwright_action(
             page,
@@ -56,7 +57,9 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
             recorder,
             "click",
             {"selector": "#play"},
-            verification=expect_text(
+        )
+        recorder.verify_task(
+            expect_text(
                 page,
                 TextExpectation(
                     selector="#player-status",
@@ -78,9 +81,10 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert all(
         action.status is ActionStatus.SUCCESS for action in session.actions
     )
-    assert session.actions[-1].verification is not None
-    assert session.actions[-1].verification.passed
-    assert session.actions[-1].outcome is ActionOutcome.SUCCESS
+    assert all(action.verification is None for action in session.actions)
+    assert session.verification is not None
+    assert session.verification.passed
+    assert session.outcome is ActionOutcome.SUCCESS
     assert read_session_json(trace_dir / "session.json") == session
     assert (trace_dir / "report.html").is_file()
 
@@ -91,4 +95,7 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
 
     report = (trace_dir / "report.html").read_text(encoding="utf-8")
     assert "Playing: Agent debugging" in report
+    assert "Search for &#x27;Agent debugging&#x27; and play the result" in report
+    assert "Task verification" in report
+    assert "task successful" in report
     assert "4 actions" in report

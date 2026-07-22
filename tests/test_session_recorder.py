@@ -77,6 +77,42 @@ def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:
     assert "<dt>Verification status</dt><dd>failed</dd>" in report
 
 
+def test_persists_task_verification_and_invalidates_it_on_new_action(
+    tmp_path: Path,
+) -> None:
+    recorder = SessionRecorder(
+        tmp_path / "trace",
+        goal="Play a video",
+    )
+    recorder.record("click", {"selector": "#play"}, lambda: None)
+
+    result = recorder.verify_task(
+        lambda: verify_text_state("Playing", "Playing")
+    )
+
+    loaded_session = read_session_json(recorder.output_dir / "session.json")
+    assert result.passed
+    assert loaded_session.goal == "Play a video"
+    assert loaded_session.verification == result
+    assert loaded_session.outcome is ActionOutcome.SUCCESS
+    report = (recorder.output_dir / "report.html").read_text(encoding="utf-8")
+    assert "Task verification" in report
+    assert "task successful" in report
+
+    recorder.record("click", {"selector": "#next"}, lambda: None)
+
+    updated_session = read_session_json(recorder.output_dir / "session.json")
+    assert updated_session.verification is None
+    assert updated_session.outcome is ActionOutcome.UNVERIFIED
+
+
+def test_task_verification_requires_session_goal(tmp_path: Path) -> None:
+    recorder = SessionRecorder(tmp_path / "trace")
+
+    with pytest.raises(ValueError, match="requires a session goal"):
+        recorder.verify_task(lambda: verify_text_state("Ready", "Ready"))
+
+
 def test_records_session_without_screenshots(tmp_path: Path) -> None:
     recorder = SessionRecorder(tmp_path / "trace")
 

@@ -97,6 +97,7 @@ The repository currently includes:
 - versioned JSON serialization and loading;
 - atomic JSON persistence;
 - `ActionSession`;
+- persisted session goals, task-level verification, and final task outcomes;
 - `SessionRecorder` and session resumption;
 - static HTML action and session reports with derived final outcomes;
 - screenshot paths in action records and before-and-after capture through integration callbacks;
@@ -113,10 +114,12 @@ The repository currently includes:
 - a Playwright click adapter that records minimal element-state evidence and
   diagnoses missing, hidden, and disabled targets;
 - structured Playwright exact-text expectations with automatic waiting;
+- a Playwright action entry point for traced click and fill trajectories;
+- a deterministic local video-search agent trajectory demonstration;
 - unit tests for the foundational modules.
 - MIT-licensed packaging and automated GitHub Actions test coverage.
 
-Verification results are stored in action and session JSON, displayed in HTML
+Action and task verification results are stored in JSON, displayed in HTML
 reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.

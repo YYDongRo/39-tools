@@ -179,6 +179,60 @@ def test_session_report_marks_missing_verification_as_unverified(
     assert 'class="status status-unverified"' in content
 
 
+def test_session_report_displays_successful_task_verification(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        actions=[
+            ActionRecord(
+                action_type="click",
+                arguments={"selector": "#play"},
+                start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+                duration_ms=32,
+                status=ActionStatus.SUCCESS,
+            )
+        ],
+        goal="Play the <video>",
+        verification=VerificationResult(
+            expected_state="Playing",
+            observed_state="Playing",
+            passed=True,
+            evidence={"selector": "<player-status>"},
+        ),
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert 'class="status status-success">task successful</span>' in content
+    assert "<strong>Goal:</strong> Play the &lt;video&gt;" in content
+    assert "Task verification" in content
+    assert "<dt>Status</dt><dd>passed</dd>" in content
+    assert "&lt;player-status&gt;" in content
+
+
+def test_session_report_displays_failed_task_verification(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Play the video",
+        verification=VerificationResult(
+            expected_state="Playing",
+            observed_state="Paused",
+            passed=False,
+            failure_reason="expected 'Playing', observed 'Paused'",
+        ),
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert 'class="status status-failure">task failed</span>' in content
+    assert "Task verification" in content
+    assert "<dt>Status</dt><dd>failed</dd>" in content
+    assert "expected &#x27;Playing&#x27;, observed &#x27;Paused&#x27;" in content
+
+
 def test_write_empty_session_report(tmp_path: Path) -> None:
     output_path = tmp_path / "session.html"
 
