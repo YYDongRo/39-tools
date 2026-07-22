@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,7 @@ from agent_devtools.integrations.playwright import (
     TextExpectation,
     diagnose_playwright_click_failure,
     record_playwright_click,
+    record_playwright_click_trace,
 )
 
 
@@ -82,6 +84,17 @@ def test_text_expectation_rejects_invalid_timeout(timeout_ms: object) -> None:
             selector="#status",
             expected="Saved",
             timeout_ms=timeout_ms,  # type: ignore[arg-type]
+        )
+
+
+def test_click_trace_rejects_non_empty_output_directory(tmp_path: Path) -> None:
+    (tmp_path / "existing.txt").write_text("existing", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="directory is not empty"):
+        record_playwright_click_trace(
+            object(),  # type: ignore[arg-type]
+            "#target",
+            tmp_path,
         )
 
 

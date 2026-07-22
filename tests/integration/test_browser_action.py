@@ -8,10 +8,10 @@ from agent_devtools.integrations.playwright import (
     TextExpectation,
     expect_text,
     record_playwright_click,
+    record_playwright_click_trace,
 )
 from agent_devtools.recorder import record_action
-from agent_devtools.report import write_action_html
-from agent_devtools.serialization import read_action_json, write_action_json
+from agent_devtools.serialization import read_action_json
 
 
 playwright = pytest.importorskip(
@@ -33,13 +33,10 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
         browser = browser_api.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1000, "height": 650})
         page.goto(page_path.as_uri())
-        page.screenshot(path=str(before_path), full_page=True)
-
-        action = record_playwright_click(
+        action = record_playwright_click_trace(
             page,
             "#agent-action",
-            screenshot_before=Path("before.png"),
-            screenshot_after=Path("after.png"),
+            tmp_path,
             verification=expect_text(
                 page,
                 TextExpectation(
@@ -48,12 +45,7 @@ def test_records_real_browser_click(tmp_path: Path) -> None:
                 ),
             ),
         )
-
-        page.screenshot(path=str(after_path), full_page=True)
         browser.close()
-
-    write_action_json(action, trace_path)
-    write_action_html(action, report_path)
 
     assert action.action_type == "click"
     assert action.arguments == {"selector": "#agent-action"}

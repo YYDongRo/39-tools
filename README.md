@@ -21,6 +21,7 @@ written as versioned JSON traces.
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
 - Structured Playwright text expectations with automatic waiting and evidence
+- Single-call Playwright click traces with screenshots, JSON, and HTML output
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -68,6 +69,12 @@ uv sync --extra browser
 uv run --extra browser playwright install chromium
 ```
 
+On Ubuntu or WSL, install Chromium and its required system packages together:
+
+```bash
+uv run --extra browser playwright install --with-deps chromium
+```
+
 Run the local browser demo:
 
 ```bash
@@ -78,7 +85,7 @@ The demo opens a local HTML page in headless Chromium, records a real click,
 verifies the resulting status text, and creates:
 
 ```text
-trace/browser-click/
+trace/browser-click/<run-id>/
 ├── action.json
 ├── before.png
 ├── after.png
@@ -88,6 +95,82 @@ trace/browser-click/
 Open `report.html` to inspect the verified final outcome, expected and observed
 status text, action details, and before-and-after screenshots on one page.
 Generated traces are ignored by Git.
+
+## Try it from another project
+
+Before publishing a package release, install this repository as an editable
+dependency from a separate project. Replace `/path/to/agent-devtools` with the
+repository path visible inside WSL:
+
+```bash
+mkdir agent-devtools-consumer-test
+cd agent-devtools-consumer-test
+uv init --python 3.14
+uv add --editable --extra browser /path/to/agent-devtools
+uv run playwright install --with-deps chromium
+```
+
+Create `main.py`:
+
+```python
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+from agent_devtools.integrations.playwright import (
+    TextExpectation,
+    expect_text,
+    record_playwright_click_trace,
+)
+
+
+trace_dir = Path("trace/success")
+
+with sync_playwright() as playwright:
+    browser = playwright.chromium.launch(headless=True)
+    page = browser.new_page()
+    page.set_content(
+        """
+        <button id="save"
+                onclick="document.querySelector('#status').textContent = 'Saved'">
+          Save
+        </button>
+        <p id="status">Not saved</p>
+        """
+    )
+
+    action = record_playwright_click_trace(
+        page,
+        "#save",
+        trace_dir,
+        verification=expect_text(
+            page,
+            TextExpectation(selector="#status", expected="Saved"),
+        ),
+    )
+    browser.close()
+
+print(f"Final outcome: {action.outcome.value}")
+print(f"Report: {(trace_dir / 'report.html').resolve()}")
+```
+
+Run it:
+
+```bash
+uv run python main.py
+```
+
+The single `record_playwright_click_trace()` call captures both screenshots,
+records and verifies the click, and writes `action.json` and `report.html`.
+It refuses to overwrite a non-empty trace directory; use a new directory for
+each run. To exercise a verification failure, change `expected="Saved"` to
+`expected="Published"` and change the directory to `Path("trace/failure")`.
+
+From WSL, open the generated files in Windows Explorer:
+
+```bash
+explorer.exe "$(wslpath -w "$PWD/trace")"
+```
 
 ### Inspect a controlled browser failure
 

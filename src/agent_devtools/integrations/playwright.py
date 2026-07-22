@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.recorder import record_action
+from agent_devtools.report import write_action_html
+from agent_devtools.serialization import write_action_json
 from agent_devtools.verification import VerificationResult, verify_text_state
 
 
@@ -125,6 +127,50 @@ def record_playwright_click(
     )
     if action.status is ActionStatus.FAILURE:
         return diagnose_playwright_click_failure(page, action)
+    return action
+
+
+def record_playwright_click_trace(
+    page: Page,
+    selector: str,
+    output_dir: Path,
+    *,
+    timeout_ms: int | None = None,
+    verification: Callable[[], VerificationResult] | None = None,
+) -> ActionRecord:
+    if output_dir.exists() and (
+        not output_dir.is_dir() or any(output_dir.iterdir())
+    ):
+        raise FileExistsError(
+            f"trace output directory is not empty: {output_dir}"
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    before_path = output_dir / "before.png"
+    after_path = output_dir / "after.png"
+    action_path = output_dir / "action.json"
+    report_path = output_dir / "report.html"
+
+    page.screenshot(path=str(before_path), full_page=True)
+    action = record_playwright_click(
+        page,
+        selector,
+        timeout_ms=timeout_ms,
+        screenshot_before=Path("before.png"),
+        screenshot_after=Path("after.png"),
+        verification=verification,
+    )
+
+    try:
+        page.screenshot(path=str(after_path), full_page=True)
+    except Exception:
+        action.screenshot_after = None
+        write_action_json(action, action_path)
+        write_action_html(action, report_path)
+        raise
+
+    write_action_json(action, action_path)
+    write_action_html(action, report_path)
     return action
 
 
