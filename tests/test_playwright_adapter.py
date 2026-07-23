@@ -8,6 +8,7 @@ from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
     PlaywrightAction,
     TextExpectation,
+    VisibilityExpectation,
     diagnose_playwright_click_failure,
     record_playwright_action,
     record_playwright_click,
@@ -90,6 +91,25 @@ def test_text_expectation_rejects_invalid_timeout(timeout_ms: object) -> None:
         )
 
 
+@pytest.mark.parametrize("selector", ["", "   ", None])
+def test_visibility_expectation_rejects_invalid_selector(
+    selector: object,
+) -> None:
+    with pytest.raises(ValueError, match="selector cannot be empty"):
+        VisibilityExpectation(selector=selector)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("timeout_ms", [0, -1, True])
+def test_visibility_expectation_rejects_invalid_timeout(
+    timeout_ms: object,
+) -> None:
+    with pytest.raises(ValueError, match="timeout_ms must be a positive integer"):
+        VisibilityExpectation(
+            selector="#search",
+            timeout_ms=timeout_ms,  # type: ignore[arg-type]
+        )
+
+
 @pytest.mark.parametrize("action_type", ["", "   ", None])
 def test_playwright_action_model_rejects_invalid_type(
     action_type: object,
@@ -101,6 +121,15 @@ def test_playwright_action_model_rejects_invalid_type(
 def test_playwright_action_model_rejects_invalid_arguments() -> None:
     with pytest.raises(ValueError, match="arguments must be a dictionary"):
         PlaywrightAction("click", {1: "#target"})  # type: ignore[dict-item]
+
+
+def test_playwright_action_model_rejects_invalid_expectation() -> None:
+    with pytest.raises(ValueError, match="must be a VisibilityExpectation"):
+        PlaywrightAction(
+            "navigate",
+            {"url": "https://example.com"},
+            expectation="visible",  # type: ignore[arg-type]
+        )
 
 
 @pytest.mark.parametrize("max_steps", [0, -1, True])

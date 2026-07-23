@@ -21,7 +21,8 @@ written as versioned JSON traces.
 - Persisted text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
-- Structured Playwright text expectations with automatic waiting and evidence
+- Structured Playwright text and visibility expectations with automatic waiting
+  and evidence
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
 - Controlled replay for saved click actions with strict argument validation
@@ -338,6 +339,27 @@ It records the selector, match count, timeout, expected text, and observed text
 as verification evidence. A missing element or different text is a verification
 failure; Playwright or page errors are still raised as verifier errors.
 
+Dynamic actions can declare that an element must become visible after the
+action:
+
+```python
+from agent_devtools.integrations.playwright import (
+    PlaywrightAction,
+    VisibilityExpectation,
+)
+
+
+action = PlaywrightAction(
+    "navigate",
+    {"url": target_url},
+    expectation=VisibilityExpectation("#search"),
+)
+```
+
+`run_playwright_agent()` automatically runs the visibility check after the
+action executes. The final page URL is recorded as verification evidence rather
+than compared exactly, so redirects do not cause a false mismatch.
+
 ## Failure categories
 
 Core recording uses four conservative categories:
@@ -527,8 +549,9 @@ the page has already completed; it does not execute a fixed action list.
 `record_playwright_action()` and `SessionRecorder`. The recorder captures
 before-and-after screenshots and updates `session.json` and `report.html` after
 every action. The browser starts at `about:blank`, so navigation to the local
-site is the first recorded action. When the agent finishes, the final report is
-already complete.
+site is the first recorded action. That navigation is verified by waiting for
+the search field to become visible, and the final URL is retained as evidence.
+When the agent finishes, the final report is already complete.
 
 The task creates:
 
@@ -564,7 +587,8 @@ recording path.
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics remain limited to click
 - Callers must provide expected and observed states; the tool does not infer intent
-- Structured Playwright expectations currently support exact text only
+- Structured Playwright expectations currently support exact text and
+  single-element visibility only
 
 ## License
 

@@ -38,9 +38,26 @@ class TextExpectation:
 
 
 @dataclass(frozen=True)
+class VisibilityExpectation:
+    selector: str
+    timeout_ms: int = 2_000
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.selector, str) or not self.selector.strip():
+            raise ValueError("selector cannot be empty")
+        if (
+            not isinstance(self.timeout_ms, int)
+            or isinstance(self.timeout_ms, bool)
+            or self.timeout_ms <= 0
+        ):
+            raise ValueError("timeout_ms must be a positive integer")
+
+
+@dataclass(frozen=True)
 class PlaywrightAction:
     action_type: str
     arguments: dict[str, object]
+    expectation: VisibilityExpectation | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -52,6 +69,13 @@ class PlaywrightAction:
             isinstance(key, str) for key in self.arguments
         ):
             raise ValueError("arguments must be a dictionary with string keys")
+        if self.expectation is not None and not isinstance(
+            self.expectation,
+            VisibilityExpectation,
+        ):
+            raise ValueError(
+                "expectation must be a VisibilityExpectation or None"
+            )
 
 
 def expect_text(
@@ -101,6 +125,67 @@ def expect_text(
         return verify_text_state(
             expected_state=expectation.expected,
             observed_state=observed,
+            evidence=evidence,
+        )
+
+    return verify
+
+
+def expect_visible(
+    page: Page,
+    expectation: VisibilityExpectation,
+) -> Callable[[], VerificationResult]:
+    def verify() -> VerificationResult:
+        from playwright.sync_api import expect
+
+        locator = page.locator(expectation.selector)
+        try:
+            expect(locator).to_have_count(1, timeout=expectation.timeout_ms)
+            expect(locator).to_be_visible(timeout=expectation.timeout_ms)
+        except AssertionError:
+            selector_count = locator.count()
+            target_visible = (
+                locator.first.is_visible() if selector_count == 1 else None
+            )
+        else:
+            selector_count = 1
+            target_visible = True
+
+        expected_state = f"{expectation.selector!r} is visible"
+        evidence: dict[str, object] = {
+            "expectation_type": "element_visible",
+            "selector": expectation.selector,
+            "selector_count": selector_count,
+            "target_visible": target_visible,
+            "timeout_ms": expectation.timeout_ms,
+            "url": page.url,
+        }
+        if selector_count != 1:
+            return VerificationResult(
+                expected_state=expected_state,
+                observed_state=f"{selector_count} matching elements",
+                passed=False,
+                evidence=evidence,
+                failure_reason=(
+                    f"expected selector {expectation.selector!r} to match "
+                    f"exactly one element, observed {selector_count}"
+                ),
+            )
+        if not target_visible:
+            return VerificationResult(
+                expected_state=expected_state,
+                observed_state=f"{expectation.selector!r} is hidden",
+                passed=False,
+                evidence=evidence,
+                failure_reason=(
+                    f"expected selector {expectation.selector!r} to be visible"
+                ),
+            )
+
+        return VerificationResult(
+            expected_state=expected_state,
+            observed_state=expected_state,
+            passed=True,
             evidence=evidence,
         )
 
@@ -276,6 +361,11 @@ def run_playwright_agent(
             recorder,
             next_action.action_type,
             next_action.arguments,
+            verification=(
+                expect_visible(page, next_action.expectation)
+                if next_action.expectation is not None
+                else None
+            ),
         )
         recorded_actions.append(action)
         if action.status is ActionStatus.FAILURE:

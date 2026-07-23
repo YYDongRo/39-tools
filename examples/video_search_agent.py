@@ -7,6 +7,7 @@ from agent_devtools.action import ActionOutcome
 from agent_devtools.integrations.playwright import (
     PlaywrightAction,
     TextExpectation,
+    VisibilityExpectation,
     expect_text,
     run_playwright_agent,
 )
@@ -24,7 +25,11 @@ TARGET_URL = Path(__file__).with_suffix(".html").resolve().as_uri()
 
 def decide_next_action(page: Page) -> PlaywrightAction | None:
     if page.url != TARGET_URL:
-        return PlaywrightAction("navigate", {"url": TARGET_URL})
+        return PlaywrightAction(
+            "navigate",
+            {"url": TARGET_URL},
+            expectation=VisibilityExpectation("#search"),
+        )
 
     if page.locator("#search").input_value() != SEARCH_QUERY:
         return PlaywrightAction(

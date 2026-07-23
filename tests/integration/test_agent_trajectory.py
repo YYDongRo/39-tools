@@ -9,6 +9,7 @@ from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.integrations.playwright import (
     PlaywrightAction,
     TextExpectation,
+    VisibilityExpectation,
     expect_text,
     run_playwright_agent,
 )
@@ -34,7 +35,11 @@ TARGET_URL = (
 
 def decide_next_action(page: Page) -> PlaywrightAction | None:
     if page.url != TARGET_URL:
-        return PlaywrightAction("navigate", {"url": TARGET_URL})
+        return PlaywrightAction(
+            "navigate",
+            {"url": TARGET_URL},
+            expectation=VisibilityExpectation("#search"),
+        )
 
     if page.locator("#search").input_value() != SEARCH_QUERY:
         return PlaywrightAction(
@@ -101,7 +106,20 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert all(
         action.status is ActionStatus.SUCCESS for action in session.actions
     )
-    assert all(action.verification is None for action in session.actions)
+    navigation_verification = session.actions[0].verification
+    assert navigation_verification is not None
+    assert navigation_verification.passed
+    assert navigation_verification.evidence == {
+        "expectation_type": "element_visible",
+        "selector": "#search",
+        "selector_count": 1,
+        "target_visible": True,
+        "timeout_ms": 2_000,
+        "url": TARGET_URL,
+    }
+    assert all(
+        action.verification is None for action in session.actions[1:]
+    )
     assert session.verification is not None
     assert session.verification.passed
     assert session.outcome is ActionOutcome.SUCCESS
@@ -119,6 +137,54 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert "Task verification" in report
     assert "task successful" in report
     assert "5 actions" in report
+    assert "&#x27;#search&#x27; is visible" in report
+
+
+def test_navigation_visibility_expectation_reports_missing_element(
+    tmp_path: Path,
+) -> None:
+    trace_dir = tmp_path / "missing-navigation-marker"
+    decisions = iter(
+        [
+            PlaywrightAction(
+                "navigate",
+                {"url": TARGET_URL},
+                expectation=VisibilityExpectation(
+                    "#missing-page-marker",
+                    timeout_ms=100,
+                ),
+            ),
+            None,
+        ]
+    )
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        with SessionRecorder(
+            trace_dir,
+            lambda path: page.screenshot(path=str(path), full_page=True),
+        ) as recorder:
+            recorded_actions = run_playwright_agent(
+                page,
+                recorder,
+                lambda page: next(decisions),
+            )
+
+        browser.close()
+
+    action = recorded_actions[0]
+    assert action.status is ActionStatus.SUCCESS
+    assert action.outcome is ActionOutcome.FAILURE
+    assert action.verification is not None
+    assert not action.verification.passed
+    assert action.verification.observed_state == "0 matching elements"
+    assert action.verification.failure_reason == (
+        "expected selector '#missing-page-marker' to match exactly one "
+        "element, observed 0"
+    )
+    assert action.verification.evidence["url"] == TARGET_URL
 
 
 def test_agent_skips_steps_already_completed_in_page_state(

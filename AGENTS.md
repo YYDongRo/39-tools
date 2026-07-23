@@ -114,7 +114,8 @@ The repository currently includes:
   real-browser success and timeout coverage and a controlled failure demo;
 - a Playwright click adapter that records minimal element-state evidence and
   diagnoses missing, hidden, and disabled targets;
-- structured Playwright exact-text expectations with automatic waiting;
+- structured Playwright exact-text and element-visibility expectations with
+  automatic waiting;
 - a Playwright action entry point for traced navigate, click, and fill
   trajectories;
 - a bounded observe-decide-act Playwright loop with typed action decisions;
@@ -129,7 +130,8 @@ No third-party agent integration exists beyond the Playwright runtime adapter.
 Action and session recorders can run caller-provided verification callbacks
 before persistence. Integrations must still choose their expected and observed
 states; the core does not infer intent.
-Structured Playwright expectations currently support exact text only.
+Structured Playwright expectations currently support exact text and
+single-element visibility.
 
 # Near-Term Roadmap
 
