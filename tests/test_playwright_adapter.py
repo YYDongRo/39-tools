@@ -155,6 +155,17 @@ def test_playwright_action_rejects_invalid_selector(selector: object) -> None:
         )
 
 
+@pytest.mark.parametrize("url", ["", "   ", None])
+def test_playwright_navigate_action_rejects_invalid_url(url: object) -> None:
+    with pytest.raises(ValueError, match="require a non-empty URL"):
+        record_playwright_action(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "navigate",
+            {"url": url},
+        )
+
+
 @pytest.mark.parametrize("timeout_ms", [0, -1, True])
 def test_playwright_action_rejects_invalid_timeout(timeout_ms: object) -> None:
     with pytest.raises(ValueError, match="timeout_ms must be a positive integer"):

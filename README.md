@@ -526,7 +526,9 @@ the page has already completed; it does not execute a fixed action list.
 `run_playwright_agent()` sends every decision through
 `record_playwright_action()` and `SessionRecorder`. The recorder captures
 before-and-after screenshots and updates `session.json` and `report.html` after
-every action. When the agent finishes, the final report is already complete.
+every action. The browser starts at `about:blank`, so navigation to the local
+site is the first recorded action. When the agent finishes, the final report is
+already complete.
 
 The task creates:
 
@@ -540,12 +542,13 @@ trace/video-search-agent/<run-id>/
     │   └── after.png
     ├── 002/
     ├── 003/
-    └── 004/
+    ├── 004/
+    └── 005/
 ```
 
 After all actions finish, the recorder context automatically checks that the
 local player status is `Playing: Agent debugging`. The report shows the task
-goal, task verification, and final task outcome separately from the four action
+goal, task verification, and final task outcome separately from the five action
 results. This example demonstrates the interception point an agent integration
 can use; it does not automatically connect to arbitrary third-party agents or
 the real YouTube website. A future integration can replace the rule-based
@@ -558,8 +561,8 @@ recording path.
 - Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
-- Playwright click and fill recording are the only current runtime integration;
-  structured failure diagnostics remain limited to click
+- Playwright navigate, click, and fill recording are the only current runtime
+  integration; structured failure diagnostics remain limited to click
 - Callers must provide expected and observed states; the tool does not infer intent
 - Structured Playwright expectations currently support exact text only
 

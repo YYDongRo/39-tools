@@ -19,9 +19,13 @@ TRACE_ROOT = PROJECT_ROOT / "trace" / "video-search-agent"
 SEARCH_QUERY = "Agent debugging"
 TASK_GOAL = f"Search for {SEARCH_QUERY!r} and play the result"
 EXPECTED_PLAYER_STATUS = "Playing: Agent debugging"
+TARGET_URL = Path(__file__).with_suffix(".html").resolve().as_uri()
 
 
 def decide_next_action(page: Page) -> PlaywrightAction | None:
+    if page.url != TARGET_URL:
+        return PlaywrightAction("navigate", {"url": TARGET_URL})
+
     if page.locator("#search").input_value() != SEARCH_QUERY:
         return PlaywrightAction(
             "fill",
@@ -69,19 +73,17 @@ def run_agent_trajectory(page: Page, trace_dir: Path) -> ActionSession:
 
 
 def main() -> None:
-    page_path = Path(__file__).with_suffix(".html").resolve()
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     trace_dir = TRACE_ROOT / run_id
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1000, "height": 700})
-        page.goto(page_path.as_uri())
         session = run_agent_trajectory(page, trace_dir)
         browser.close()
 
     if (
-        session.action_count != 4
+        session.action_count != 5
         or session.outcome is not ActionOutcome.SUCCESS
     ):
         raise RuntimeError("the agent did not complete the video playback task")

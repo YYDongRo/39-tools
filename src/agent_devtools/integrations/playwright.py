@@ -200,10 +200,6 @@ def record_playwright_action(
     *,
     verification: Callable[[], VerificationResult] | None = None,
 ) -> ActionRecord:
-    selector = arguments.get("selector")
-    if not isinstance(selector, str) or not selector.strip():
-        raise ValueError("Playwright actions require a non-empty selector")
-
     timeout_ms = arguments.get("timeout_ms")
     if timeout_ms is not None and (
         not isinstance(timeout_ms, int)
@@ -212,20 +208,34 @@ def record_playwright_action(
     ):
         raise ValueError("timeout_ms must be a positive integer")
 
-    locator = page.locator(selector)
-    if action_type == "click":
+    if action_type == "navigate":
+        url = arguments.get("url")
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError("navigate actions require a non-empty URL")
         if timeout_ms is None:
-            operation = locator.click
+            operation = lambda: page.goto(url)
         else:
-            operation = lambda: locator.click(timeout=timeout_ms)
-    elif action_type == "fill":
-        text = arguments.get("text")
-        if not isinstance(text, str):
-            raise ValueError("fill actions require text")
-        if timeout_ms is None:
-            operation = lambda: locator.fill(text)
+            operation = lambda: page.goto(url, timeout=timeout_ms)
+    elif action_type in {"click", "fill"}:
+        selector = arguments.get("selector")
+        if not isinstance(selector, str) or not selector.strip():
+            raise ValueError(
+                "click and fill actions require a non-empty selector"
+            )
+        locator = page.locator(selector)
+        if action_type == "click":
+            if timeout_ms is None:
+                operation = locator.click
+            else:
+                operation = lambda: locator.click(timeout=timeout_ms)
         else:
-            operation = lambda: locator.fill(text, timeout=timeout_ms)
+            text = arguments.get("text")
+            if not isinstance(text, str):
+                raise ValueError("fill actions require text")
+            if timeout_ms is None:
+                operation = lambda: locator.fill(text)
+            else:
+                operation = lambda: locator.fill(text, timeout=timeout_ms)
     else:
         raise ValueError(f"unsupported Playwright action: {action_type}")
 
