@@ -37,6 +37,23 @@ class TextExpectation:
             raise ValueError("timeout_ms must be a positive integer")
 
 
+@dataclass(frozen=True)
+class PlaywrightAction:
+    action_type: str
+    arguments: dict[str, object]
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.action_type, str)
+            or not self.action_type.strip()
+        ):
+            raise ValueError("action_type cannot be empty")
+        if not isinstance(self.arguments, dict) or not all(
+            isinstance(key, str) for key in self.arguments
+        ):
+            raise ValueError("arguments must be a dictionary with string keys")
+
+
 def expect_text(
     page: Page,
     expectation: TextExpectation,
@@ -218,6 +235,43 @@ def record_playwright_action(
         operation,
         verification=verification,
     )
+
+
+def run_playwright_agent(
+    page: Page,
+    recorder: SessionRecorder,
+    decide_next_action: Callable[[Page], PlaywrightAction | None],
+    *,
+    max_steps: int = 100,
+) -> list[ActionRecord]:
+    if (
+        not isinstance(max_steps, int)
+        or isinstance(max_steps, bool)
+        or max_steps <= 0
+    ):
+        raise ValueError("max_steps must be a positive integer")
+
+    recorded_actions: list[ActionRecord] = []
+    for _ in range(max_steps):
+        next_action = decide_next_action(page)
+        if next_action is None:
+            return recorded_actions
+        if not isinstance(next_action, PlaywrightAction):
+            raise TypeError(
+                "decide_next_action must return a PlaywrightAction or None"
+            )
+
+        action = record_playwright_action(
+            page,
+            recorder,
+            next_action.action_type,
+            next_action.arguments,
+        )
+        recorded_actions.append(action)
+        if action.status is ActionStatus.FAILURE:
+            return recorded_actions
+
+    raise RuntimeError(f"agent did not finish within {max_steps} steps")
 
 
 def diagnose_playwright_click_failure(

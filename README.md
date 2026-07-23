@@ -23,6 +23,7 @@ written as versioned JSON traces.
 - Playwright click diagnostics with minimal structured element-state evidence
 - Structured Playwright text expectations with automatic waiting and evidence
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
+- A bounded Playwright agent loop that records dynamically selected actions
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -172,6 +173,9 @@ From WSL, open the generated files in Windows Explorer:
 ```bash
 explorer.exe "$(wslpath -w "$PWD/trace")"
 ```
+
+Add `trace/` to the consumer project's `.gitignore` when generated reports
+should remain local.
 
 ### Inspect a controlled browser failure
 
@@ -516,11 +520,13 @@ Run a deterministic local task that searches for a video result and plays it:
 uv run --extra browser python examples/video_search_agent.py
 ```
 
-The simulated agent produces structured `fill` and `click` actions. Every
-action passes through `record_playwright_action()`, which sends it to
-`SessionRecorder`. The recorder captures before-and-after screenshots and
-updates `session.json` and `report.html` after every action. When the agent
-finishes, the final report is already complete.
+The rule-based agent repeatedly observes the current page, then returns a
+`PlaywrightAction` or stops when the player is running. It can skip steps that
+the page has already completed; it does not execute a fixed action list.
+`run_playwright_agent()` sends every decision through
+`record_playwright_action()` and `SessionRecorder`. The recorder captures
+before-and-after screenshots and updates `session.json` and `report.html` after
+every action. When the agent finishes, the final report is already complete.
 
 The task creates:
 
@@ -542,7 +548,9 @@ local player status is `Playing: Agent debugging`. The report shows the task
 goal, task verification, and final task outcome separately from the four action
 results. This example demonstrates the interception point an agent integration
 can use; it does not automatically connect to arbitrary third-party agents or
-the real YouTube website.
+the real YouTube website. A future integration can replace the rule-based
+decision function with an LLM or framework callback without changing the
+recording path.
 
 ## Current limitations
 

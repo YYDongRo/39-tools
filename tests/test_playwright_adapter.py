@@ -6,11 +6,13 @@ import pytest
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
+    PlaywrightAction,
     TextExpectation,
     diagnose_playwright_click_failure,
     record_playwright_action,
     record_playwright_click,
     record_playwright_click_trace,
+    run_playwright_agent,
 )
 
 
@@ -86,6 +88,49 @@ def test_text_expectation_rejects_invalid_timeout(timeout_ms: object) -> None:
             expected="Saved",
             timeout_ms=timeout_ms,  # type: ignore[arg-type]
         )
+
+
+@pytest.mark.parametrize("action_type", ["", "   ", None])
+def test_playwright_action_model_rejects_invalid_type(
+    action_type: object,
+) -> None:
+    with pytest.raises(ValueError, match="action_type cannot be empty"):
+        PlaywrightAction(action_type, {})  # type: ignore[arg-type]
+
+
+def test_playwright_action_model_rejects_invalid_arguments() -> None:
+    with pytest.raises(ValueError, match="arguments must be a dictionary"):
+        PlaywrightAction("click", {1: "#target"})  # type: ignore[dict-item]
+
+
+@pytest.mark.parametrize("max_steps", [0, -1, True])
+def test_playwright_agent_rejects_invalid_max_steps(max_steps: object) -> None:
+    with pytest.raises(ValueError, match="max_steps must be a positive integer"):
+        run_playwright_agent(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            lambda page: None,
+            max_steps=max_steps,  # type: ignore[arg-type]
+        )
+
+
+def test_playwright_agent_rejects_invalid_decision() -> None:
+    with pytest.raises(TypeError, match="must return a PlaywrightAction or None"):
+        run_playwright_agent(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            lambda page: "click",  # type: ignore[return-value]
+        )
+
+
+def test_playwright_agent_finishes_without_actions() -> None:
+    actions = run_playwright_agent(
+        object(),  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
+        lambda page: None,
+    )
+
+    assert actions == []
 
 
 def test_click_trace_rejects_non_empty_output_directory(tmp_path: Path) -> None:

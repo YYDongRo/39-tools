@@ -116,6 +116,7 @@ The repository currently includes:
   diagnoses missing, hidden, and disabled targets;
 - structured Playwright exact-text expectations with automatic waiting;
 - a Playwright action entry point for traced click and fill trajectories;
+- a bounded observe-decide-act Playwright loop with typed action decisions;
 - a deterministic local video-search agent trajectory demonstration;
 - unit tests for the foundational modules.
 - MIT-licensed packaging and automated GitHub Actions test coverage.
