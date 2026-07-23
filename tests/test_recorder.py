@@ -107,6 +107,27 @@ def test_record_action_preserves_failed_verification() -> None:
     assert action.outcome is ActionOutcome.FAILURE
 
 
+def test_record_action_captures_observations_updated_by_operation() -> None:
+    observations: dict[str, object] = {}
+
+    def operation() -> None:
+        observations["input_value_after"] = "Agent debugging"
+
+    action = recorder.record_action(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "Agent debugging"},
+        operation=operation,
+        observations=observations,
+    )
+
+    observations["input_value_after"] = "changed later"
+
+    assert action.observations == {
+        "input_value_after": "Agent debugging"
+    }
+    assert action.outcome is ActionOutcome.UNVERIFIED
+
+
 def test_record_action_propagates_verification_error() -> None:
     def broken_verification() -> VerificationResult:
         raise RuntimeError("page was already closed")

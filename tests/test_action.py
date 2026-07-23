@@ -22,6 +22,7 @@ def test_create_successful_action() -> None:
     assert action.status is ActionStatus.SUCCESS
     assert action.failure_category is None
     assert action.failure_evidence == {}
+    assert action.observations == {}
     assert action.verification is None
     assert action.outcome is ActionOutcome.UNVERIFIED
 
@@ -76,6 +77,23 @@ def test_action_can_store_verification_result() -> None:
     assert action.status is ActionStatus.SUCCESS
     assert action.verification == verification
     assert action.outcome is ActionOutcome.FAILURE
+
+
+def test_action_can_store_observations_without_becoming_verified() -> None:
+    action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        observations={"input_value_after": "Agent debugging"},
+    )
+
+    assert action.observations == {
+        "input_value_after": "Agent debugging"
+    }
+    assert action.verification is None
+    assert action.outcome is ActionOutcome.UNVERIFIED
 
 
 def test_passed_verification_makes_action_outcome_successful() -> None:

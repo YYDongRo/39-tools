@@ -10,8 +10,8 @@ from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
 
 
-SCHEMA_VERSION = 4
-SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, SCHEMA_VERSION}
+SCHEMA_VERSION = 5
+SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, SCHEMA_VERSION}
 SESSION_SCHEMA_VERSION = 2
 SUPPORTED_SESSION_SCHEMA_VERSIONS = {1, SESSION_SCHEMA_VERSION}
 
@@ -146,6 +146,7 @@ def action_to_dict(action: ActionRecord) -> dict[str, object]:
             else None
         ),
         "failure_evidence": action.failure_evidence,
+        "observations": action.observations,
         "verification": _verification_to_dict(action.verification),
     }
 
@@ -166,16 +167,21 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         failure_reason = data["failure_reason"]
         failure_category_value = (
             data["failure_category"]
-            if schema_version in {2, 3, SCHEMA_VERSION}
+            if schema_version in {2, 3, 4, SCHEMA_VERSION}
             else None
         )
         failure_evidence_value = (
             data["failure_evidence"]
-            if schema_version in {3, SCHEMA_VERSION}
+            if schema_version in {3, 4, SCHEMA_VERSION}
             else {}
         )
         verification_value = (
-            data["verification"] if schema_version == SCHEMA_VERSION else None
+            data["verification"]
+            if schema_version in {4, SCHEMA_VERSION}
+            else None
+        )
+        observations_value = (
+            data["observations"] if schema_version == SCHEMA_VERSION else {}
         )
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
@@ -206,6 +212,10 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         isinstance(key, str) for key in failure_evidence_value
     ):
         raise ValueError("failure_evidence must be an object with string keys")
+    if not isinstance(observations_value, dict) or not all(
+        isinstance(key, str) for key in observations_value
+    ):
+        raise ValueError("observations must be an object with string keys")
 
     try:
         start_time = datetime.fromisoformat(start_time_value)
@@ -247,6 +257,7 @@ def action_from_dict(data: dict[str, object]) -> ActionRecord:
         failure_reason=failure_reason,
         failure_category=failure_category,
         failure_evidence=dict(failure_evidence_value),
+        observations=dict(observations_value),
         verification=verification,
     )
 

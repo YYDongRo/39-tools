@@ -15,6 +15,7 @@ def record_action(
     *,
     screenshot_before: Path | None = None,
     screenshot_after: Path | None = None,
+    observations: dict[str, object] | None = None,
     verification: Callable[[], VerificationResult] | None = None,
 ) -> ActionRecord:
     start_time = datetime.now(UTC)
@@ -33,6 +34,9 @@ def record_action(
             screenshot_after=screenshot_after,
             failure_reason=f"{type(error).__name__}: {error}",
             failure_category=classify_exception(error),
+            observations=(
+                dict(observations) if observations is not None else {}
+            ),
         )
 
     duration_ms = (monotonic_ns() - start_ns) // 1_000_000
@@ -50,5 +54,6 @@ def record_action(
         status=ActionStatus.SUCCESS,
         screenshot_before=screenshot_before,
         screenshot_after=screenshot_after,
+        observations=dict(observations) if observations is not None else {},
         verification=verification_result,
     )

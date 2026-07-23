@@ -29,7 +29,7 @@ def test_convert_successful_action_to_dict() -> None:
     )
 
     assert action_to_dict(action) == {
-        "schema_version": 4,
+        "schema_version": 5,
         "action_type": "click",
         "arguments": {"x": 100, "y": 200},
         "start_time": "2026-07-17T12:00:00+00:00",
@@ -40,6 +40,7 @@ def test_convert_successful_action_to_dict() -> None:
         "failure_reason": None,
         "failure_category": None,
         "failure_evidence": {},
+        "observations": {},
         "verification": None,
     }
 
@@ -62,6 +63,7 @@ def test_convert_failed_action_to_dict() -> None:
     assert data["failure_reason"] == "RuntimeError: target was not found"
     assert data["failure_category"] == "unknown"
     assert data["failure_evidence"] == {}
+    assert data["observations"] == {}
     assert data["verification"] is None
 
 
@@ -134,9 +136,9 @@ def test_reject_unsupported_schema_version() -> None:
         status=ActionStatus.SUCCESS,
     )
     data = action_to_dict(action)
-    data["schema_version"] = 5
+    data["schema_version"] = 6
 
-    with pytest.raises(ValueError, match="unsupported schema_version: 5"):
+    with pytest.raises(ValueError, match="unsupported schema_version: 6"):
         action_from_dict(data)
 
 
@@ -159,6 +161,7 @@ def test_load_schema_version_1_failure_as_unknown_category() -> None:
 
     assert loaded_action.failure_category is FailureCategory.UNKNOWN
     assert loaded_action.failure_evidence == {}
+    assert loaded_action.observations == {}
     assert loaded_action.verification is None
 
 
@@ -181,6 +184,7 @@ def test_load_schema_version_2_failure_without_evidence() -> None:
 
     assert loaded_action.failure_category is FailureCategory.TARGET_NOT_FOUND
     assert loaded_action.failure_evidence == {}
+    assert loaded_action.observations == {}
     assert loaded_action.verification is None
 
 
@@ -203,7 +207,47 @@ def test_load_schema_version_3_without_verification() -> None:
 
     assert loaded_action.failure_category is FailureCategory.TARGET_NOT_FOUND
     assert loaded_action.failure_evidence == {"selector_count": 0}
+    assert loaded_action.observations == {}
     assert loaded_action.verification is None
+
+
+def test_load_schema_version_4_without_observations() -> None:
+    action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        observations={"input_value_after": "Agent debugging"},
+        verification=VerificationResult(
+            expected_state="Agent debugging",
+            observed_state="Agent debugging",
+            passed=True,
+        ),
+    )
+    data = action_to_dict(action)
+    data["schema_version"] = 4
+    del data["observations"]
+
+    loaded_action = action_from_dict(data)
+
+    assert loaded_action.observations == {}
+    assert loaded_action.verification == action.verification
+
+
+def test_action_observations_json_round_trip() -> None:
+    action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+        observations={"input_value_after": "Agent debugging"},
+    )
+
+    data = action_to_dict(action)
+
+    assert action_from_dict(data) == action
 
 
 @pytest.mark.parametrize(
@@ -290,6 +334,24 @@ def test_reject_invalid_failure_evidence() -> None:
     with pytest.raises(
         ValueError,
         match="failure_evidence must be an object with string keys",
+    ):
+        action_from_dict(data)
+
+
+def test_reject_invalid_observations() -> None:
+    action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=125,
+        status=ActionStatus.SUCCESS,
+    )
+    data = action_to_dict(action)
+    data["observations"] = []
+
+    with pytest.raises(
+        ValueError,
+        match="observations must be an object with string keys",
     ):
         action_from_dict(data)
 

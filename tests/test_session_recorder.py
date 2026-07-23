@@ -23,6 +23,7 @@ def test_records_session_with_screenshots_and_persists_each_action(
         "click",
         {"selector": "#open"},
         lambda: None,
+        observations={"target_visible_after": True},
         verification=lambda: verify_text_state("Open", "Open"),
     )
 
@@ -45,6 +46,9 @@ def test_records_session_with_screenshots_and_persists_each_action(
     assert loaded_session.action_count == 2
     assert loaded_session.has_failures
     assert loaded_session.actions[0].verification == success.verification
+    assert loaded_session.actions[0].observations == {
+        "target_visible_after": True
+    }
     assert captured_paths == [
         Path("actions/001/before.png"),
         Path("actions/001/after.png"),
@@ -54,6 +58,8 @@ def test_records_session_with_screenshots_and_persists_each_action(
     assert (output_dir / "report.html").is_file()
     report = (output_dir / "report.html").read_text(encoding="utf-8")
     assert "<dt>Verification status</dt><dd>passed</dd>" in report
+    assert "Observations" in report
+    assert "&quot;target_visible_after&quot;: true" in report
 
 
 def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:

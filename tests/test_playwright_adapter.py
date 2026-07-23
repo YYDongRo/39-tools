@@ -6,6 +6,7 @@ import pytest
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
+    InputValueExpectation,
     PlaywrightAction,
     TextExpectation,
     VisibilityExpectation,
@@ -110,6 +111,16 @@ def test_visibility_expectation_rejects_invalid_timeout(
         )
 
 
+@pytest.mark.parametrize("timeout_ms", [0, -1, True])
+def test_input_value_expectation_rejects_invalid_timeout(
+    timeout_ms: object,
+) -> None:
+    with pytest.raises(ValueError, match="timeout_ms must be a positive integer"):
+        InputValueExpectation(
+            timeout_ms=timeout_ms,  # type: ignore[arg-type]
+        )
+
+
 @pytest.mark.parametrize("action_type", ["", "   ", None])
 def test_playwright_action_model_rejects_invalid_type(
     action_type: object,
@@ -129,6 +140,15 @@ def test_playwright_action_model_rejects_invalid_expectation() -> None:
             "navigate",
             {"url": "https://example.com"},
             expectation="visible",  # type: ignore[arg-type]
+        )
+
+
+def test_input_value_expectation_only_supports_fill_actions() -> None:
+    with pytest.raises(ValueError, match="can only verify fill actions"):
+        PlaywrightAction(
+            "click",
+            {"selector": "#search"},
+            expectation=InputValueExpectation(),
         )
 
 

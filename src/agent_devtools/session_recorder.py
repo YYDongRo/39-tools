@@ -75,6 +75,7 @@ class SessionRecorder:
         arguments: dict[str, object],
         operation: Callable[[], object],
         *,
+        observations: dict[str, object] | None = None,
         verification: Callable[[], VerificationResult] | None = None,
     ) -> ActionRecord:
         screenshot_before: Path | None = None
@@ -93,6 +94,7 @@ class SessionRecorder:
             operation=operation,
             screenshot_before=screenshot_before,
             screenshot_after=screenshot_after,
+            observations=observations,
             verification=verification,
         )
 

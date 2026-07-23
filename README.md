@@ -18,6 +18,7 @@ written as versioned JSON traces.
 - Framework-independent session recording with optional screenshot callbacks
 - Safe session resumption and atomic JSON persistence
 - Static HTML reports with execution, verification, and final outcome details
+- Persisted action observations that remain separate from verification results
 - Persisted text-state verification with evidence and mismatch reasons
 - Structured failure categories based on explicit exception and verification signals
 - Playwright click diagnostics with minimal structured element-state evidence
@@ -238,7 +239,7 @@ browser or desktop automation framework.
 
 ```json
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "action_type": "click",
   "arguments": {
     "selector": "#agent-action"
@@ -251,6 +252,7 @@ browser or desktop automation framework.
   "failure_reason": null,
   "failure_category": null,
   "failure_evidence": {},
+  "observations": {},
   "verification": null
 }
 ```
@@ -344,6 +346,7 @@ action:
 
 ```python
 from agent_devtools.integrations.playwright import (
+    InputValueExpectation,
     PlaywrightAction,
     TextExpectation,
     VisibilityExpectation,
@@ -364,12 +367,21 @@ search_action = PlaywrightAction(
         "Result for: Agent debugging",
     ),
 )
+
+fill_action = PlaywrightAction(
+    "fill",
+    {"selector": "#search", "text": "Agent debugging"},
+    expectation=InputValueExpectation(),
+)
 ```
 
-`run_playwright_agent()` automatically selects the text or visibility verifier
-after each action executes. The final page URL is recorded as visibility
-verification evidence rather than compared exactly, so redirects do not cause
-a false mismatch. Actions without an expectation remain unverified.
+`run_playwright_agent()` automatically selects the text, visibility, or input
+value verifier after each action executes. `InputValueExpectation()` derives
+the expected selector and value from the fill arguments, so they are not
+repeated. Every Playwright fill records `input_value_after` as an observation,
+even without an expectation; that action remains unverified. The final page URL
+is recorded as visibility verification evidence rather than compared exactly,
+so redirects do not cause a false mismatch.
 
 ## Failure categories
 
@@ -424,11 +436,12 @@ action = read_action_json(trace_dir / "action.json")
 write_action_html(action, trace_dir / "report.html")
 ```
 
-The loader accepts action schema versions 1, 2, 3, and 4. Version 1 failures
-load with the `unknown` category; versions 1 and 2 load with empty failure
-evidence; versions 1 through 3 load without a verification result. It validates
-required fields, field types, status, verification data, and timestamp format
-before returning an `ActionRecord`.
+The loader accepts action schema versions 1 through 5. Version 1 failures load
+with the `unknown` category; versions 1 and 2 load with empty failure evidence;
+versions 1 through 3 load without a verification result; versions 1 through 4
+load with empty observations. It validates required fields, field types, status,
+observations, verification data, and timestamp format before returning an
+`ActionRecord`.
 
 ## Replay a saved click
 
@@ -562,7 +575,8 @@ before-and-after screenshots and updates `session.json` and `report.html` after
 every action. The browser starts at `about:blank`, so navigation to the local
 site is the first recorded action. That navigation is verified by waiting for
 the search field to become visible, and the final URL is retained as evidence.
-When the agent finishes, the final report is already complete.
+The fill action records its actual input value as an observation. When the agent
+finishes, the final report is already complete.
 
 The task creates:
 
@@ -597,9 +611,9 @@ recording path.
 - No CLI, dashboard, or recovery system
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics remain limited to click
-- Callers must provide expected and observed states; the tool does not infer intent
+- Callers must provide expected states; the tool does not infer intent
 - Structured Playwright expectations currently support exact text and
-  single-element visibility only
+  input-value matching, plus single-element visibility
 
 ## License
 

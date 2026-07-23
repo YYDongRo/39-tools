@@ -17,6 +17,7 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
         status=ActionStatus.SUCCESS,
         screenshot_before=Path("before.png"),
         screenshot_after=Path("after.png"),
+        observations={"input_value_after": "<Agent debugging>"},
     )
     output_path = tmp_path / "trace" / "report.html"
 
@@ -28,6 +29,8 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     assert 'class="status status-unverified"' in content
     assert "<dt>Execution status</dt><dd>success</dd>" in content
     assert "<dt>Verification status</dt><dd>not run</dd>" in content
+    assert "Observations" in content
+    assert "&lt;Agent debugging&gt;" in content
     assert 'src="before.png"' in content
     assert 'src="after.png"' in content
 

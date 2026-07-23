@@ -54,10 +54,28 @@ class VisibilityExpectation:
 
 
 @dataclass(frozen=True)
+class InputValueExpectation:
+    timeout_ms: int = 2_000
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.timeout_ms, int)
+            or isinstance(self.timeout_ms, bool)
+            or self.timeout_ms <= 0
+        ):
+            raise ValueError("timeout_ms must be a positive integer")
+
+
+@dataclass(frozen=True)
 class PlaywrightAction:
     action_type: str
     arguments: dict[str, object]
-    expectation: TextExpectation | VisibilityExpectation | None = None
+    expectation: (
+        TextExpectation
+        | VisibilityExpectation
+        | InputValueExpectation
+        | None
+    ) = None
 
     def __post_init__(self) -> None:
         if (
@@ -71,11 +89,18 @@ class PlaywrightAction:
             raise ValueError("arguments must be a dictionary with string keys")
         if self.expectation is not None and not isinstance(
             self.expectation,
-            (TextExpectation, VisibilityExpectation),
+            (TextExpectation, VisibilityExpectation, InputValueExpectation),
         ):
             raise ValueError(
                 "expectation must be a TextExpectation, "
-                "VisibilityExpectation, or None"
+                "VisibilityExpectation, InputValueExpectation, or None"
+            )
+        if (
+            isinstance(self.expectation, InputValueExpectation)
+            and self.action_type != "fill"
+        ):
+            raise ValueError(
+                "InputValueExpectation can only verify fill actions"
             )
 
 
@@ -193,6 +218,60 @@ def expect_visible(
     return verify
 
 
+def expect_input_value(
+    page: Page,
+    selector: str,
+    expected: str,
+    expectation: InputValueExpectation,
+) -> Callable[[], VerificationResult]:
+    def verify() -> VerificationResult:
+        from playwright.sync_api import expect
+
+        locator = page.locator(selector)
+        try:
+            expect(locator).to_have_count(1, timeout=expectation.timeout_ms)
+            expect(locator).to_have_value(
+                expected,
+                timeout=expectation.timeout_ms,
+            )
+        except AssertionError:
+            selector_count = locator.count()
+            observed = (
+                locator.first.input_value()
+                if selector_count > 0
+                else "<element not found>"
+            )
+        else:
+            selector_count = 1
+            observed = locator.input_value()
+
+        evidence: dict[str, object] = {
+            "expectation_type": "input_value_equals",
+            "selector": selector,
+            "selector_count": selector_count,
+            "timeout_ms": expectation.timeout_ms,
+        }
+        if selector_count != 1:
+            return VerificationResult(
+                expected_state=expected,
+                observed_state=observed,
+                passed=False,
+                evidence=evidence,
+                failure_reason=(
+                    f"expected selector {selector!r} to match exactly one "
+                    f"element, observed {selector_count}"
+                ),
+            )
+
+        return verify_text_state(
+            expected_state=expected,
+            observed_state=observed,
+            evidence=evidence,
+        )
+
+    return verify
+
+
 def record_playwright_click(
     page: Page,
     selector: str,
@@ -286,6 +365,7 @@ def record_playwright_action(
     *,
     verification: Callable[[], VerificationResult] | None = None,
 ) -> ActionRecord:
+    observations: dict[str, object] = {}
     timeout_ms = arguments.get("timeout_ms")
     if timeout_ms is not None and (
         not isinstance(timeout_ms, int)
@@ -318,10 +398,31 @@ def record_playwright_action(
             text = arguments.get("text")
             if not isinstance(text, str):
                 raise ValueError("fill actions require text")
-            if timeout_ms is None:
-                operation = lambda: locator.fill(text)
-            else:
-                operation = lambda: locator.fill(text, timeout=timeout_ms)
+
+            def execute_fill() -> None:
+                try:
+                    if timeout_ms is None:
+                        locator.fill(text)
+                    else:
+                        locator.fill(text, timeout=timeout_ms)
+                finally:
+                    try:
+                        selector_count = locator.count()
+                        if selector_count == 1:
+                            observations["input_value_after"] = (
+                                locator.input_value(timeout=100)
+                            )
+                        else:
+                            observations["input_value_after"] = None
+                            observations["selector_count_after"] = (
+                                selector_count
+                            )
+                    except Exception as error:
+                        observations["input_value_error_type"] = type(
+                            error
+                        ).__name__
+
+            operation = execute_fill
     else:
         raise ValueError(f"unsupported Playwright action: {action_type}")
 
@@ -329,6 +430,7 @@ def record_playwright_action(
         action_type,
         dict(arguments),
         operation,
+        observations=observations,
         verification=verification,
     )
 
@@ -361,6 +463,21 @@ def run_playwright_agent(
             verification = expect_text(page, next_action.expectation)
         elif isinstance(next_action.expectation, VisibilityExpectation):
             verification = expect_visible(page, next_action.expectation)
+        elif isinstance(next_action.expectation, InputValueExpectation):
+            selector = next_action.arguments.get("selector")
+            text = next_action.arguments.get("text")
+            if not isinstance(selector, str) or not selector.strip():
+                raise ValueError(
+                    "fill actions require a non-empty selector"
+                )
+            if not isinstance(text, str):
+                raise ValueError("fill actions require text")
+            verification = expect_input_value(
+                page,
+                selector,
+                text,
+                next_action.expectation,
+            )
         else:
             verification = None
 

@@ -30,6 +30,7 @@ class ActionRecord:
     failure_reason: str | None = None
     failure_category: FailureCategory | None = None
     failure_evidence: dict[str, object] = field(default_factory=dict)
+    observations: dict[str, object] = field(default_factory=dict)
     verification: VerificationResult | None = None
 
     def __post_init__(self) -> None:

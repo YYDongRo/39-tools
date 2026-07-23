@@ -75,6 +75,19 @@ def _verification_section(action: ActionRecord) -> str:
     return _verification_result_section(verification, "Verification")
 
 
+def _observations_section(action: ActionRecord) -> str:
+    if not action.observations:
+        return ""
+    observations = escape(
+        json.dumps(action.observations, ensure_ascii=False, indent=2)
+    )
+    return f"""
+      <section class="observations">
+        <h2>Observations</h2>
+        <pre>{observations}</pre>
+      </section>"""
+
+
 def _outcome_failure_category(action: ActionRecord) -> FailureCategory | None:
     if action.status is ActionStatus.FAILURE:
         return action.failure_category
@@ -116,6 +129,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
         {evidence_section}
       </section>"""
     verification_section = _verification_section(action)
+    observations_section = _observations_section(action)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -183,7 +197,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       <section>
         <h2>Arguments</h2>
         <pre>{arguments}</pre>
-      </section>{failure_section}{verification_section}
+      </section>{observations_section}{failure_section}{verification_section}
       <section class="screenshots">
 {_screenshot_panel("Before", data["screenshot_before"])}
 {_screenshot_panel("After", data["screenshot_after"])}
@@ -230,6 +244,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               {evidence_section}
             </div>"""
     verification_section = _verification_section(action)
+    observations_section = _observations_section(action)
 
     screenshots = []
     for label, path in (
@@ -269,7 +284,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
             </dl>
             <h3>Arguments</h3>
-            <pre>{arguments}</pre>{failure_section}{verification_section}
+            <pre>{arguments}</pre>{observations_section}{failure_section}{verification_section}
             <div class="action-screenshots">{screenshot_section}
             </div>
           </div>

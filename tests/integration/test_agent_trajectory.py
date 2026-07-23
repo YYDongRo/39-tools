@@ -7,6 +7,7 @@ import pytest
 
 from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.integrations.playwright import (
+    InputValueExpectation,
     PlaywrightAction,
     TextExpectation,
     VisibilityExpectation,
@@ -133,6 +134,9 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
         "url": TARGET_URL,
     }
     assert session.actions[1].verification is None
+    assert session.actions[1].observations == {
+        "input_value_after": SEARCH_QUERY
+    }
     assert all(
         action.verification is not None
         and action.verification.passed
@@ -166,6 +170,8 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert "task successful" in report
     assert "5 actions" in report
     assert "&#x27;#search&#x27; is visible" in report
+    assert "Observations" in report
+    assert "&quot;input_value_after&quot;: &quot;Agent debugging&quot;" in report
 
 
 def test_navigation_visibility_expectation_reports_missing_element(
@@ -256,6 +262,88 @@ def test_dynamic_text_expectation_reports_mismatch(tmp_path: Path) -> None:
     assert action.verification.observed_state == (
         f"Result for: {SEARCH_QUERY}"
     )
+
+
+def test_fill_can_optionally_verify_exact_input_value(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "exact-input"
+    decisions = iter(
+        [
+            PlaywrightAction(
+                "fill",
+                {"selector": "#search", "text": SEARCH_QUERY},
+                expectation=InputValueExpectation(),
+            ),
+            None,
+        ]
+    )
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(TARGET_URL)
+
+        with SessionRecorder(trace_dir) as recorder:
+            recorded_actions = run_playwright_agent(
+                page,
+                recorder,
+                lambda page: next(decisions),
+            )
+
+        browser.close()
+
+    action = recorded_actions[0]
+    assert action.observations == {"input_value_after": SEARCH_QUERY}
+    assert action.verification is not None
+    assert action.verification.passed
+    assert action.outcome is ActionOutcome.SUCCESS
+
+
+def test_fill_exact_verification_reports_formatted_value(
+    tmp_path: Path,
+) -> None:
+    trace_dir = tmp_path / "formatted-input"
+    decisions = iter(
+        [
+            PlaywrightAction(
+                "fill",
+                {"selector": "#search", "text": SEARCH_QUERY},
+                expectation=InputValueExpectation(timeout_ms=100),
+            ),
+            None,
+        ]
+    )
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(TARGET_URL)
+        page.locator("#search").evaluate(
+            """
+            element => element.addEventListener(
+                "input",
+                () => { element.value = element.value.toUpperCase(); },
+            )
+            """
+        )
+
+        with SessionRecorder(trace_dir) as recorder:
+            recorded_actions = run_playwright_agent(
+                page,
+                recorder,
+                lambda page: next(decisions),
+            )
+
+        browser.close()
+
+    action = recorded_actions[0]
+    assert action.status is ActionStatus.SUCCESS
+    assert action.observations == {
+        "input_value_after": SEARCH_QUERY.upper()
+    }
+    assert action.verification is not None
+    assert not action.verification.passed
+    assert action.verification.expected_state == SEARCH_QUERY
+    assert action.verification.observed_state == SEARCH_QUERY.upper()
 
 
 def test_agent_skips_steps_already_completed_in_page_state(

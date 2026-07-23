@@ -106,6 +106,7 @@ The repository currently includes:
 - automated real-browser integration coverage for a successful click action;
 - a minimal reusable contract for deterministic text-state verification;
 - optional verification results persisted with action records;
+- general action observations persisted separately from verification results;
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
 - static session summaries with verified success, final failure, unverified,
@@ -116,6 +117,8 @@ The repository currently includes:
   diagnoses missing, hidden, and disabled targets;
 - structured Playwright exact-text and element-visibility expectations with
   automatic waiting;
+- automatic post-fill input-value observations and optional exact-value
+  expectations;
 - a Playwright action entry point for traced navigate, click, and fill
   trajectories;
 - a bounded observe-decide-act Playwright loop with typed action decisions and
@@ -129,10 +132,10 @@ reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.
 Action and session recorders can run caller-provided verification callbacks
-before persistence. Integrations must still choose their expected and observed
-states; the core does not infer intent.
-Structured Playwright expectations currently support exact text and
-single-element visibility.
+before persistence. Integrations must still choose expected states; the core
+does not infer intent.
+Structured Playwright expectations currently support exact text and input
+values, plus single-element visibility.
 
 # Near-Term Roadmap
 
