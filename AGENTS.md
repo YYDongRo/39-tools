@@ -118,7 +118,8 @@ The repository currently includes:
   automatic waiting;
 - a Playwright action entry point for traced navigate, click, and fill
   trajectories;
-- a bounded observe-decide-act Playwright loop with typed action decisions;
+- a bounded observe-decide-act Playwright loop with typed action decisions and
+  automatic structured expectation verification;
 - a deterministic local video-search agent trajectory demonstration;
 - unit tests for the foundational modules.
 - MIT-licensed packaging and automated GitHub Actions test coverage.

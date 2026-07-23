@@ -345,6 +345,7 @@ action:
 ```python
 from agent_devtools.integrations.playwright import (
     PlaywrightAction,
+    TextExpectation,
     VisibilityExpectation,
 )
 
@@ -354,11 +355,21 @@ action = PlaywrightAction(
     {"url": target_url},
     expectation=VisibilityExpectation("#search"),
 )
+
+search_action = PlaywrightAction(
+    "click",
+    {"selector": "#search-button"},
+    expectation=TextExpectation(
+        "#video-result",
+        "Result for: Agent debugging",
+    ),
+)
 ```
 
-`run_playwright_agent()` automatically runs the visibility check after the
-action executes. The final page URL is recorded as verification evidence rather
-than compared exactly, so redirects do not cause a false mismatch.
+`run_playwright_agent()` automatically selects the text or visibility verifier
+after each action executes. The final page URL is recorded as visibility
+verification evidence rather than compared exactly, so redirects do not cause
+a false mismatch. Actions without an expectation remain unverified.
 
 ## Failure categories
 

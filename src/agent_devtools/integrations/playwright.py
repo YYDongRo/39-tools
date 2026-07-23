@@ -57,7 +57,7 @@ class VisibilityExpectation:
 class PlaywrightAction:
     action_type: str
     arguments: dict[str, object]
-    expectation: VisibilityExpectation | None = None
+    expectation: TextExpectation | VisibilityExpectation | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -71,10 +71,11 @@ class PlaywrightAction:
             raise ValueError("arguments must be a dictionary with string keys")
         if self.expectation is not None and not isinstance(
             self.expectation,
-            VisibilityExpectation,
+            (TextExpectation, VisibilityExpectation),
         ):
             raise ValueError(
-                "expectation must be a VisibilityExpectation or None"
+                "expectation must be a TextExpectation, "
+                "VisibilityExpectation, or None"
             )
 
 
@@ -356,16 +357,19 @@ def run_playwright_agent(
                 "decide_next_action must return a PlaywrightAction or None"
             )
 
+        if isinstance(next_action.expectation, TextExpectation):
+            verification = expect_text(page, next_action.expectation)
+        elif isinstance(next_action.expectation, VisibilityExpectation):
+            verification = expect_visible(page, next_action.expectation)
+        else:
+            verification = None
+
         action = record_playwright_action(
             page,
             recorder,
             next_action.action_type,
             next_action.arguments,
-            verification=(
-                expect_visible(page, next_action.expectation)
-                if next_action.expectation is not None
-                else None
-            ),
+            verification=verification,
         )
         recorded_actions.append(action)
         if action.status is ActionStatus.FAILURE:

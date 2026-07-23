@@ -43,13 +43,28 @@ def decide_next_action(page: Page) -> PlaywrightAction | None:
         not page.locator("#results").is_visible()
         or result.inner_text() != expected_result
     ):
-        return PlaywrightAction("click", {"selector": "#search-button"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#search-button"},
+            expectation=TextExpectation("#video-result", expected_result),
+        )
 
     if not page.locator("#player").is_visible():
-        return PlaywrightAction("click", {"selector": "#video-result"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#video-result"},
+            expectation=VisibilityExpectation("#player"),
+        )
 
     if page.locator("#player-status").inner_text() != EXPECTED_PLAYER_STATUS:
-        return PlaywrightAction("click", {"selector": "#play"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#play"},
+            expectation=TextExpectation(
+                "#player-status",
+                EXPECTED_PLAYER_STATUS,
+            ),
+        )
 
     return None
 

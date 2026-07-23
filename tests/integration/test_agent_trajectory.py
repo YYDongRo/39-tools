@@ -53,13 +53,28 @@ def decide_next_action(page: Page) -> PlaywrightAction | None:
         not page.locator("#results").is_visible()
         or result.inner_text() != expected_result
     ):
-        return PlaywrightAction("click", {"selector": "#search-button"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#search-button"},
+            expectation=TextExpectation("#video-result", expected_result),
+        )
 
     if not page.locator("#player").is_visible():
-        return PlaywrightAction("click", {"selector": "#video-result"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#video-result"},
+            expectation=VisibilityExpectation("#player"),
+        )
 
     if page.locator("#player-status").inner_text() != EXPECTED_PLAYER_STATUS:
-        return PlaywrightAction("click", {"selector": "#play"})
+        return PlaywrightAction(
+            "click",
+            {"selector": "#play"},
+            expectation=TextExpectation(
+                "#player-status",
+                EXPECTED_PLAYER_STATUS,
+            ),
+        )
 
     return None
 
@@ -117,9 +132,22 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
         "timeout_ms": 2_000,
         "url": TARGET_URL,
     }
+    assert session.actions[1].verification is None
     assert all(
-        action.verification is None for action in session.actions[1:]
+        action.verification is not None
+        and action.verification.passed
+        for action in session.actions[2:]
     )
+    assert [
+        action.verification.evidence["expectation_type"]
+        for action in session.actions
+        if action.verification is not None
+    ] == [
+        "element_visible",
+        "text_equals",
+        "element_visible",
+        "text_equals",
+    ]
     assert session.verification is not None
     assert session.verification.passed
     assert session.outcome is ActionOutcome.SUCCESS
@@ -185,6 +213,49 @@ def test_navigation_visibility_expectation_reports_missing_element(
         "element, observed 0"
     )
     assert action.verification.evidence["url"] == TARGET_URL
+
+
+def test_dynamic_text_expectation_reports_mismatch(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "text-mismatch"
+    decisions = iter(
+        [
+            PlaywrightAction(
+                "click",
+                {"selector": "#search-button"},
+                expectation=TextExpectation(
+                    "#video-result",
+                    "Unexpected result",
+                    timeout_ms=100,
+                ),
+            ),
+            None,
+        ]
+    )
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(TARGET_URL)
+        page.locator("#search").fill(SEARCH_QUERY)
+
+        with SessionRecorder(trace_dir) as recorder:
+            recorded_actions = run_playwright_agent(
+                page,
+                recorder,
+                lambda page: next(decisions),
+            )
+
+        browser.close()
+
+    action = recorded_actions[0]
+    assert action.status is ActionStatus.SUCCESS
+    assert action.outcome is ActionOutcome.FAILURE
+    assert action.verification is not None
+    assert not action.verification.passed
+    assert action.verification.expected_state == "Unexpected result"
+    assert action.verification.observed_state == (
+        f"Result for: {SEARCH_QUERY}"
+    )
 
 
 def test_agent_skips_steps_already_completed_in_page_state(

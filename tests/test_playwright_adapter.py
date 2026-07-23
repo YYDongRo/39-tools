@@ -124,7 +124,7 @@ def test_playwright_action_model_rejects_invalid_arguments() -> None:
 
 
 def test_playwright_action_model_rejects_invalid_expectation() -> None:
-    with pytest.raises(ValueError, match="must be a VisibilityExpectation"):
+    with pytest.raises(ValueError, match="must be a TextExpectation"):
         PlaywrightAction(
             "navigate",
             {"url": "https://example.com"},
