@@ -246,13 +246,13 @@ def test_playwright_action_rejects_unsupported_action_type() -> None:
         )
 
 
-def test_ambiguous_selector_preserves_original_category() -> None:
+def test_diagnoses_ambiguous_selector() -> None:
     action = diagnose_playwright_click_failure(
         FakePage(FakeLocator(count=2)),  # type: ignore[arg-type]
         make_failed_click(),
     )
 
-    assert action.failure_category is FailureCategory.TIMEOUT
+    assert action.failure_category is FailureCategory.TARGET_AMBIGUOUS
     assert action.failure_evidence == {
         "selector": ".target",
         "selector_count": 2,

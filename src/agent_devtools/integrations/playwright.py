@@ -434,6 +434,11 @@ def record_playwright_action(
         operation,
         observations=observations,
         verification=verification,
+        failure_diagnosis=(
+            lambda action: diagnose_playwright_click_failure(page, action)
+        )
+        if action_type == "click"
+        else None,
     )
 
 
@@ -657,6 +662,8 @@ def diagnose_playwright_click_failure(
 
         if selector_count == 0:
             category = FailureCategory.TARGET_NOT_FOUND
+        elif selector_count > 1:
+            category = FailureCategory.TARGET_AMBIGUOUS
         elif selector_count == 1:
             target = locator.first
             target_visible = target.is_visible()

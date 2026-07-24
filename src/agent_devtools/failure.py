@@ -6,6 +6,7 @@ class FailureCategory(StrEnum):
     OPERATION_ERROR = "operation_error"
     VERIFICATION_MISMATCH = "verification_mismatch"
     TARGET_NOT_FOUND = "target_not_found"
+    TARGET_AMBIGUOUS = "target_ambiguous"
     TARGET_NOT_VISIBLE = "target_not_visible"
     TARGET_DISABLED = "target_disabled"
     UNKNOWN = "unknown"

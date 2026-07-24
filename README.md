@@ -445,6 +445,7 @@ The optional Playwright adapter can refine a failed click using direct element
 observations:
 
 - `target_not_found` when the selector matches no elements;
+- `target_ambiguous` when the selector matches multiple elements;
 - `target_not_visible` when exactly one target exists but is not visible;
 - `target_disabled` when exactly one target is visible but disabled.
 

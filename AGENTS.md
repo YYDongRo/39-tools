@@ -114,7 +114,7 @@ The repository currently includes:
 - controlled framework-independent replay for validated click actions, with
   real-browser success and timeout coverage and a controlled failure demo;
 - a Playwright click adapter that records minimal element-state evidence and
-  diagnoses missing, hidden, and disabled targets;
+  diagnoses missing, ambiguous, hidden, and disabled targets;
 - structured Playwright exact-text and element-visibility expectations with
   automatic waiting;
 - automatic post-fill input-value observations and optional exact-value

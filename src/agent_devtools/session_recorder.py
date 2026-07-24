@@ -3,7 +3,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
-from agent_devtools.action import ActionRecord
+from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_session_html
 from agent_devtools.serialization import read_session_json, write_session_json
@@ -77,6 +77,7 @@ class SessionRecorder:
         *,
         observations: dict[str, object] | None = None,
         verification: Callable[[], VerificationResult] | None = None,
+        failure_diagnosis: Callable[[ActionRecord], ActionRecord] | None = None,
     ) -> ActionRecord:
         screenshot_before: Path | None = None
         screenshot_after: Path | None = None
@@ -97,6 +98,15 @@ class SessionRecorder:
             observations=observations,
             verification=verification,
         )
+        if (
+            action.status is ActionStatus.FAILURE
+            and failure_diagnosis is not None
+        ):
+            action = failure_diagnosis(action)
+            if not isinstance(action, ActionRecord):
+                raise TypeError(
+                    "failure_diagnosis must return an ActionRecord"
+                )
 
         if self.capture_screenshot is not None and screenshot_after is not None:
             try:

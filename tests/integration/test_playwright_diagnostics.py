@@ -4,7 +4,11 @@ import pytest
 
 from agent_devtools.action import ActionStatus
 from agent_devtools.failure import FailureCategory
-from agent_devtools.integrations.playwright import record_playwright_click
+from agent_devtools.integrations.playwright import (
+    RecordedPlaywrightExecutor,
+    record_playwright_click,
+)
+from agent_devtools.serialization import read_session_json
 
 
 playwright = pytest.importorskip(
@@ -34,6 +38,16 @@ playwright = pytest.importorskip(
                 "selector_count": 1,
                 "target_visible": False,
                 "target_enabled": True,
+            },
+        ),
+        (
+            ".ambiguous-target",
+            FailureCategory.TARGET_AMBIGUOUS,
+            {
+                "selector": ".ambiguous-target",
+                "selector_count": 2,
+                "target_visible": None,
+                "target_enabled": None,
             },
         ),
         (
@@ -88,3 +102,43 @@ def test_successful_browser_click_has_no_failure_evidence() -> None:
     assert action.status is ActionStatus.SUCCESS
     assert action.failure_category is None
     assert action.failure_evidence == {}
+
+
+@pytest.mark.parametrize(
+    ("selector", "category"),
+    [
+        ("#missing-target", FailureCategory.TARGET_NOT_FOUND),
+        (".ambiguous-target", FailureCategory.TARGET_AMBIGUOUS),
+        ("#hidden-target", FailureCategory.TARGET_NOT_VISIBLE),
+        ("#disabled-target", FailureCategory.TARGET_DISABLED),
+    ],
+)
+def test_executor_persists_click_failure_diagnosis(
+    tmp_path: Path,
+    selector: str,
+    category: FailureCategory,
+) -> None:
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve()
+    trace_dir = tmp_path / category.value
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(page_path.as_uri())
+
+        with RecordedPlaywrightExecutor(page, trace_dir) as executor:
+            action = executor.click(selector, timeout_ms=100)
+
+        browser.close()
+
+    loaded_action = read_session_json(
+        trace_dir / "session.json"
+    ).actions[0]
+    report = (trace_dir / "report.html").read_text(encoding="utf-8")
+
+    assert action.status is ActionStatus.FAILURE
+    assert action.failure_category is category
+    assert loaded_action == action
+    assert category.value in report
