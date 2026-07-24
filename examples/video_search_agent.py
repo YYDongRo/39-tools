@@ -6,13 +6,12 @@ from playwright.sync_api import Page, sync_playwright
 from agent_devtools.action import ActionOutcome
 from agent_devtools.integrations.playwright import (
     PlaywrightAction,
+    RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
     expect_text,
-    run_playwright_agent,
 )
 from agent_devtools.session import ActionSession
-from agent_devtools.session_recorder import SessionRecorder
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -70,9 +69,6 @@ def decide_next_action(page: Page) -> PlaywrightAction | None:
 
 
 def run_agent_trajectory(page: Page, trace_dir: Path) -> ActionSession:
-    def capture_screenshot(path: Path) -> None:
-        page.screenshot(path=str(path), full_page=True)
-
     task_verification = expect_text(
         page,
         TextExpectation(
@@ -81,15 +77,15 @@ def run_agent_trajectory(page: Page, trace_dir: Path) -> ActionSession:
         ),
     )
 
-    with SessionRecorder(
+    with RecordedPlaywrightExecutor(
+        page,
         trace_dir,
-        capture_screenshot,
         goal=TASK_GOAL,
         task_verification=task_verification,
-    ) as recorder:
-        run_playwright_agent(page, recorder, decide_next_action)
+    ) as executor:
+        executor.run(decide_next_action)
 
-    return recorder.session
+    return executor.session
 
 
 def main() -> None:

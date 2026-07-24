@@ -121,6 +121,8 @@ The repository currently includes:
   expectations;
 - a Playwright action entry point for traced navigate, click, and fill
   trajectories;
+- a single recorded Playwright executor that owns session and screenshot
+  lifecycle for supported actions;
 - a bounded observe-decide-act Playwright loop with typed action decisions and
   automatic structured expectation verification;
 - a deterministic local video-search agent trajectory demonstration;

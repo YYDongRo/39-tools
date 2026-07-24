@@ -24,6 +24,7 @@ written as versioned JSON traces.
 - Playwright click diagnostics with minimal structured element-state evidence
 - Structured Playwright text and visibility expectations with automatic waiting
   and evidence
+- A single Playwright executor for recorded navigate, fill, and click actions
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
 - Controlled replay for saved click actions with strict argument validation
@@ -383,6 +384,51 @@ even without an expectation; that action remains unverified. The final page URL
 is recorded as visibility verification evidence rather than compared exactly,
 so redirects do not cause a false mismatch.
 
+### Record a task with one executor
+
+Create one executor for a browser task, then send all supported actions through
+it:
+
+```python
+from pathlib import Path
+
+from agent_devtools.integrations.playwright import (
+    InputValueExpectation,
+    RecordedPlaywrightExecutor,
+    TextExpectation,
+    VisibilityExpectation,
+)
+
+
+with RecordedPlaywrightExecutor(
+    page,
+    Path("trace/my-agent-run"),
+) as executor:
+    executor.navigate(
+        target_url,
+        expectation=VisibilityExpectation("#search"),
+    )
+    executor.fill(
+        "#search",
+        "Agent debugging",
+        expectation=InputValueExpectation(),
+    )
+    executor.click(
+        "#search-button",
+        expectation=TextExpectation(
+            "#video-result",
+            "Result for: Agent debugging",
+        ),
+    )
+
+print(executor.report_path)
+```
+
+The executor owns the session recorder and screenshot callback. Each method
+updates the same `session.json` and `report.html`. A dynamic agent can instead
+call `executor.run(decide_next_action)`. Actions made directly through the raw
+Playwright `page` are not intercepted and therefore are not recorded.
+
 ## Failure categories
 
 Core recording uses four conservative categories:
@@ -569,14 +615,14 @@ uv run --extra browser python examples/video_search_agent.py
 The rule-based agent repeatedly observes the current page, then returns a
 `PlaywrightAction` or stops when the player is running. It can skip steps that
 the page has already completed; it does not execute a fixed action list.
-`run_playwright_agent()` sends every decision through
-`record_playwright_action()` and `SessionRecorder`. The recorder captures
-before-and-after screenshots and updates `session.json` and `report.html` after
-every action. The browser starts at `about:blank`, so navigation to the local
-site is the first recorded action. That navigation is verified by waiting for
-the search field to become visible, and the final URL is retained as evidence.
-The fill action records its actual input value as an observation. When the agent
-finishes, the final report is already complete.
+`RecordedPlaywrightExecutor` owns the recorder and sends every dynamic decision
+through the existing action recording path. It captures before-and-after
+screenshots and updates `session.json` and `report.html` after every action. The
+browser starts at `about:blank`, so navigation to the local site is the first
+recorded action. That navigation is verified by waiting for the search field to
+become visible, and the final URL is retained as evidence. The fill action
+records its actual input value as an observation. When the agent finishes, the
+final report is already complete.
 
 The task creates:
 

@@ -9,6 +9,7 @@ from agent_devtools.action import ActionOutcome, ActionStatus
 from agent_devtools.integrations.playwright import (
     InputValueExpectation,
     PlaywrightAction,
+    RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
     expect_text,
@@ -94,18 +95,14 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
                 expected="Playing: Agent debugging",
             ),
         )
-        with SessionRecorder(
+        with RecordedPlaywrightExecutor(
+            page,
             trace_dir,
-            lambda path: page.screenshot(path=str(path), full_page=True),
             goal="Search for 'Agent debugging' and play the result",
             task_verification=task_verification,
-        ) as recorder:
-            recorded_actions = run_playwright_agent(
-                page,
-                recorder,
-                decide_next_action,
-            )
-        session = recorder.session
+        ) as executor:
+            recorded_actions = executor.run(decide_next_action)
+        session = executor.session
 
         browser.close()
 
@@ -172,6 +169,44 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert "&#x27;#search&#x27; is visible" in report
     assert "Observations" in report
     assert "&quot;input_value_after&quot;: &quot;Agent debugging&quot;" in report
+
+
+def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "direct-executor"
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        with RecordedPlaywrightExecutor(page, trace_dir) as executor:
+            navigate = executor.navigate(
+                TARGET_URL,
+                expectation=VisibilityExpectation("#search"),
+            )
+            fill = executor.fill("#search", SEARCH_QUERY)
+            search = executor.click(
+                "#search-button",
+                expectation=TextExpectation(
+                    "#video-result",
+                    f"Result for: {SEARCH_QUERY}",
+                ),
+            )
+
+        browser.close()
+
+    assert executor.session.actions == [navigate, fill, search]
+    assert [action.action_type for action in executor.session.actions] == [
+        "navigate",
+        "fill",
+        "click",
+    ]
+    assert fill.observations == {"input_value_after": SEARCH_QUERY}
+    assert navigate.verification is not None
+    assert navigate.verification.passed
+    assert search.verification is not None
+    assert search.verification.passed
+    assert executor.report_path == trace_dir / "report.html"
+    assert executor.report_path.is_file()
 
 
 def test_navigation_visibility_expectation_reports_missing_element(

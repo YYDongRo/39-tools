@@ -3,13 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from types import TracebackType
+from typing import TYPE_CHECKING, Self
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
+from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.verification import VerificationResult, verify_text_state
 
@@ -435,6 +437,162 @@ def record_playwright_action(
     )
 
 
+def _verification_for_action(
+    page: Page,
+    action: PlaywrightAction,
+) -> Callable[[], VerificationResult] | None:
+    if isinstance(action.expectation, TextExpectation):
+        return expect_text(page, action.expectation)
+    if isinstance(action.expectation, VisibilityExpectation):
+        return expect_visible(page, action.expectation)
+    if isinstance(action.expectation, InputValueExpectation):
+        selector = action.arguments.get("selector")
+        text = action.arguments.get("text")
+        if not isinstance(selector, str) or not selector.strip():
+            raise ValueError("fill actions require a non-empty selector")
+        if not isinstance(text, str):
+            raise ValueError("fill actions require text")
+        return expect_input_value(
+            page,
+            selector,
+            text,
+            action.expectation,
+        )
+    return None
+
+
+class RecordedPlaywrightExecutor:
+    def __init__(
+        self,
+        page: Page,
+        output_dir: Path,
+        *,
+        goal: str | None = None,
+        task_verification: Callable[[], VerificationResult] | None = None,
+    ) -> None:
+        self.page = page
+        self.recorder = SessionRecorder(
+            output_dir,
+            self._capture_screenshot,
+            goal=goal,
+            task_verification=task_verification,
+        )
+
+    @property
+    def session(self) -> ActionSession:
+        return self.recorder.session
+
+    @property
+    def report_path(self) -> Path:
+        return self.recorder.output_dir / "report.html"
+
+    def __enter__(self) -> Self:
+        self.recorder.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.recorder.__exit__(exception_type, exception, traceback)
+
+    def execute(self, action: PlaywrightAction) -> ActionRecord:
+        if not isinstance(action, PlaywrightAction):
+            raise TypeError("action must be a PlaywrightAction")
+        return record_playwright_action(
+            self.page,
+            self.recorder,
+            action.action_type,
+            action.arguments,
+            verification=_verification_for_action(self.page, action),
+        )
+
+    def navigate(
+        self,
+        url: str,
+        *,
+        timeout_ms: int | None = None,
+        expectation: (
+            TextExpectation | VisibilityExpectation | None
+        ) = None,
+    ) -> ActionRecord:
+        arguments: dict[str, object] = {"url": url}
+        if timeout_ms is not None:
+            arguments["timeout_ms"] = timeout_ms
+        return self.execute(
+            PlaywrightAction(
+                "navigate",
+                arguments,
+                expectation=expectation,
+            )
+        )
+
+    def click(
+        self,
+        selector: str,
+        *,
+        timeout_ms: int | None = None,
+        expectation: (
+            TextExpectation | VisibilityExpectation | None
+        ) = None,
+    ) -> ActionRecord:
+        arguments: dict[str, object] = {"selector": selector}
+        if timeout_ms is not None:
+            arguments["timeout_ms"] = timeout_ms
+        return self.execute(
+            PlaywrightAction(
+                "click",
+                arguments,
+                expectation=expectation,
+            )
+        )
+
+    def fill(
+        self,
+        selector: str,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        expectation: (
+            TextExpectation
+            | VisibilityExpectation
+            | InputValueExpectation
+            | None
+        ) = None,
+    ) -> ActionRecord:
+        arguments: dict[str, object] = {
+            "selector": selector,
+            "text": text,
+        }
+        if timeout_ms is not None:
+            arguments["timeout_ms"] = timeout_ms
+        return self.execute(
+            PlaywrightAction(
+                "fill",
+                arguments,
+                expectation=expectation,
+            )
+        )
+
+    def run(
+        self,
+        decide_next_action: Callable[[Page], PlaywrightAction | None],
+        *,
+        max_steps: int = 100,
+    ) -> list[ActionRecord]:
+        return run_playwright_agent(
+            self.page,
+            self.recorder,
+            decide_next_action,
+            max_steps=max_steps,
+        )
+
+    def _capture_screenshot(self, path: Path) -> None:
+        self.page.screenshot(path=str(path), full_page=True)
+
+
 def run_playwright_agent(
     page: Page,
     recorder: SessionRecorder,
@@ -459,34 +617,12 @@ def run_playwright_agent(
                 "decide_next_action must return a PlaywrightAction or None"
             )
 
-        if isinstance(next_action.expectation, TextExpectation):
-            verification = expect_text(page, next_action.expectation)
-        elif isinstance(next_action.expectation, VisibilityExpectation):
-            verification = expect_visible(page, next_action.expectation)
-        elif isinstance(next_action.expectation, InputValueExpectation):
-            selector = next_action.arguments.get("selector")
-            text = next_action.arguments.get("text")
-            if not isinstance(selector, str) or not selector.strip():
-                raise ValueError(
-                    "fill actions require a non-empty selector"
-                )
-            if not isinstance(text, str):
-                raise ValueError("fill actions require text")
-            verification = expect_input_value(
-                page,
-                selector,
-                text,
-                next_action.expectation,
-            )
-        else:
-            verification = None
-
         action = record_playwright_action(
             page,
             recorder,
             next_action.action_type,
             next_action.arguments,
-            verification=verification,
+            verification=_verification_for_action(page, next_action),
         )
         recorded_actions.append(action)
         if action.status is ActionStatus.FAILURE:
