@@ -429,6 +429,16 @@ updates the same `session.json` and `report.html`. A dynamic agent can instead
 call `executor.run(decide_next_action)`. Actions made directly through the raw
 Playwright `page` are not intercepted and therefore are not recorded.
 
+Run a controlled executor failure that clicks a missing element:
+
+```bash
+uv run --extra browser python examples/executor_click_failure.py
+```
+
+The command prints the generated `report.html` path. Each run writes to a new
+directory under `trace/executor-click-failure/` and records the click as
+`target_not_found` with its selector evidence and before-and-after screenshots.
+
 ## Failure categories
 
 Core recording uses four conservative categories:
