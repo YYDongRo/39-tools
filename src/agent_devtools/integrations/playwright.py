@@ -641,10 +641,14 @@ def run_playwright_agent(
         raise ValueError("max_steps must be a positive integer")
 
     recorded_actions: list[ActionRecord] = []
-    for _ in range(max_steps):
+    while True:
         next_action = decide_next_action(page)
         if next_action is None:
             return recorded_actions
+        if len(recorded_actions) >= max_steps:
+            raise RuntimeError(
+                f"agent did not finish within {max_steps} steps"
+            )
         if not isinstance(next_action, PlaywrightAction):
             raise TypeError(
                 "decide_next_action must return a PlaywrightAction or None"
@@ -660,8 +664,6 @@ def run_playwright_agent(
         recorded_actions.append(action)
         if action.status is ActionStatus.FAILURE:
             return recorded_actions
-
-    raise RuntimeError(f"agent did not finish within {max_steps} steps")
 
 
 def diagnose_playwright_click_failure(

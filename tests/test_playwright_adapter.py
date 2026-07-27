@@ -182,6 +182,34 @@ def test_playwright_agent_finishes_without_actions() -> None:
     assert actions == []
 
 
+def test_playwright_agent_can_finish_at_step_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 20, 12, 0, tzinfo=UTC),
+        duration_ms=10,
+        status=ActionStatus.SUCCESS,
+    )
+    decisions = iter(
+        [PlaywrightAction("click", {"selector": "#target"}), None]
+    )
+    monkeypatch.setattr(
+        "agent_devtools.integrations.playwright.record_playwright_action",
+        lambda *args, **kwargs: recorded_action,
+    )
+
+    actions = run_playwright_agent(
+        object(),  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
+        lambda page: next(decisions),
+        max_steps=1,
+    )
+
+    assert actions == [recorded_action]
+
+
 def test_click_trace_rejects_non_empty_output_directory(tmp_path: Path) -> None:
     (tmp_path / "existing.txt").write_text("existing", encoding="utf-8")
 
