@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, TypeVar
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
@@ -13,11 +13,109 @@ from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
+from agent_devtools.tool_recorder import RecordedTools, record_tools
 from agent_devtools.verification import VerificationResult, verify_text_state
 
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
+
+
+PlaywrightToolT = TypeVar("PlaywrightToolT")
+
+
+def observe_playwright_page(page: Page) -> dict[str, object]:
+    state = page.evaluate(
+        """
+        () => {
+          const root = document.documentElement;
+          const active = document.activeElement;
+          let focusedElement = null;
+
+          if (
+            active &&
+            active !== document.body &&
+            active !== document.documentElement
+          ) {
+            const bounds = active.getBoundingClientRect();
+            focusedElement = {
+              tag: active.tagName.toLowerCase(),
+              id: active.id || null,
+              role: active.getAttribute("role"),
+              type: active.getAttribute("type"),
+              editable: Boolean(
+                active.isContentEditable ||
+                ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
+              ),
+              bounds: {
+                x: Math.round(bounds.x),
+                y: Math.round(bounds.y),
+                width: Math.round(bounds.width),
+                height: Math.round(bounds.height),
+              },
+            };
+          }
+
+          return {
+            url: window.location.href,
+            title: document.title,
+            ready_state: document.readyState,
+            visibility_state: document.visibilityState,
+            element_count: document.querySelectorAll("*").length,
+            scroll: {
+              x: Math.round(window.scrollX),
+              y: Math.round(window.scrollY),
+              max_x: root
+                ? Math.max(0, root.scrollWidth - window.innerWidth)
+                : 0,
+              max_y: root
+                ? Math.max(0, root.scrollHeight - window.innerHeight)
+                : 0,
+            },
+            focused_element: focusedElement,
+          };
+        }
+        """
+    )
+    if not isinstance(state, dict):
+        raise TypeError("Playwright page observation must be an object")
+
+    return {
+        "url": state.get("url"),
+        "title": state.get("title"),
+        "ready_state": state.get("ready_state"),
+        "visibility_state": state.get("visibility_state"),
+        "viewport": page.viewport_size,
+        "scroll": state.get("scroll"),
+        "focused_element": state.get("focused_element"),
+        "element_count": state.get("element_count"),
+    }
+
+
+def record_playwright_tools(
+    tools: PlaywrightToolT,
+    page: Page,
+    output_dir: str | Path,
+    *,
+    goal: str | None = None,
+    task_verification: Callable[[], VerificationResult] | None = None,
+    methods: Iterable[str] | None = None,
+    full_page_screenshots: bool = False,
+) -> RecordedTools[PlaywrightToolT]:
+    if not isinstance(full_page_screenshots, bool):
+        raise TypeError("full_page_screenshots must be a boolean")
+    return record_tools(
+        tools,
+        output_dir,
+        capture_screenshot=lambda path: page.screenshot(
+            path=str(path),
+            full_page=full_page_screenshots,
+        ),
+        observe_state=lambda: observe_playwright_page(page),
+        goal=goal,
+        task_verification=task_verification,
+        methods=methods,
+    )
 
 
 @dataclass(frozen=True)

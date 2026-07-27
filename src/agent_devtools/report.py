@@ -10,6 +10,14 @@ from agent_devtools.verification import VerificationResult
 
 
 _PAGE_URL_KEYS = {"page_url_before", "page_url_after"}
+_STRUCTURED_STATE_KEYS = {
+    "state_before",
+    "state_after",
+    "state_changes",
+    "state_before_error_type",
+    "state_after_error_type",
+    "observation_finalizer_error_type",
+}
 _FIELD_LABELS = {
     "diagnostic_error_type": "Diagnostic error",
     "input_value_after": "Input value after",
@@ -92,7 +100,10 @@ def _observations_section(action: ActionRecord) -> str:
     observations_without_urls = {
         key: value
         for key, value in action.observations.items()
-        if key not in _PAGE_URL_KEYS or not isinstance(value, str)
+        if (
+            (key not in _PAGE_URL_KEYS or not isinstance(value, str))
+            and key not in _STRUCTURED_STATE_KEYS
+        )
     }
     if not observations_without_urls:
         return ""
@@ -100,6 +111,67 @@ def _observations_section(action: ActionRecord) -> str:
       <section class="observations">
         <h2>Observations</h2>
         {_key_value_grid(observations_without_urls)}
+      </section>"""
+
+
+def _structured_state_section(action: ActionRecord) -> str:
+    observations = action.observations
+    if not any(key in observations for key in _STRUCTURED_STATE_KEYS):
+        return ""
+
+    changes = observations.get("state_changes")
+    if isinstance(changes, list):
+        if changes:
+            change_items = "".join(
+                f"<li>{escape(str(change))}</li>" for change in changes
+            )
+            change_content = f"<ul>{change_items}</ul>"
+        else:
+            change_content = (
+                '<p class="missing">No structured state changes detected.</p>'
+            )
+    else:
+        change_content = (
+            '<p class="missing">State changes unavailable.</p>'
+        )
+
+    error_content = ""
+    for label, key in (
+        ("Before", "state_before_error_type"),
+        ("After", "state_after_error_type"),
+        ("Finalizer", "observation_finalizer_error_type"),
+    ):
+        error_type = observations.get(key)
+        if isinstance(error_type, str):
+            error_content += (
+                '<p class="missing">'
+                f"{label} observation unavailable ({escape(error_type)})."
+                "</p>"
+            )
+
+    snapshots = ""
+    for label, key in (
+        ("State before", "state_before"),
+        ("State after", "state_after"),
+    ):
+        state = observations.get(key)
+        if isinstance(state, dict):
+            encoded_state = escape(
+                json.dumps(state, ensure_ascii=False, indent=2)
+            )
+            snapshots += f"""
+        <details class="state-snapshot">
+          <summary>{label}</summary>
+          <pre>{encoded_state}</pre>
+        </details>"""
+
+    return f"""
+      <section class="structured-state">
+        <h2>Structured state</h2>
+        <h3>Detected changes</h3>
+        {change_content}
+        {error_content}
+        {snapshots}
       </section>"""
 
 
@@ -205,6 +277,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       </section>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
+    structured_state_section = _structured_state_section(action)
     page_url_details = _page_url_details(action)
 
     document = f"""<!doctype html>
@@ -281,7 +354,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       <section>
         <h2>Arguments</h2>
         <pre>{arguments}</pre>
-      </section>{observations_section}{failure_section}{verification_section}
+      </section>{observations_section}{structured_state_section}{failure_section}{verification_section}
       <section class="screenshots">
 {_screenshot_panel("Before", data["screenshot_before"])}
 {_screenshot_panel("After", data["screenshot_after"])}
@@ -313,6 +386,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
             </div>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
+    structured_state_section = _structured_state_section(action)
     page_url_details = _page_url_details(action)
 
     screenshots = []
@@ -354,7 +428,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               {page_url_details}
             </dl>
             <h3>Arguments</h3>
-            <pre>{arguments}</pre>{observations_section}{failure_section}{verification_section}
+            <pre>{arguments}</pre>{observations_section}{structured_state_section}{failure_section}{verification_section}
             <div class="action-screenshots">{screenshot_section}
             </div>
           </div>

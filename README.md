@@ -29,6 +29,7 @@ written as versioned JSON traces.
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
 - A generic synchronous tool wrapper that records public method calls
+- Optional automatic before-and-after structured state capture with changed paths
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -92,6 +93,7 @@ trace = record_tools(
     original_tools,
     Path("trace/my-agent-run"),
     capture_screenshot=capture_screenshot,
+    observe_state=observe_state,
 )
 with trace as tools:
     agent.run(task, tools=tools)
@@ -105,6 +107,38 @@ tool exception is recorded before being raised back to the agent. Pass
 `methods={"click", "fill", "scroll"}` when the object also has public methods
 that should not be treated as actions. Arguments may contain sensitive data.
 Calls made directly on `original_tools` cannot be intercepted.
+
+`observe_state` is optional. When provided, it runs before and after every
+recorded method call. It must return a small dictionary of current runtime
+state. The action stores JSON-safe `state_before`, `state_after`, and sorted
+`state_changes` paths such as `url` or `scroll.y`. Observer exceptions and
+invalid return values are recorded by error type and do not change the tool
+call's execution status. State collection does not verify correctness: a URL
+change is evidence, not proof that the agent reached the intended URL.
+
+For Playwright tools, use the convenience wrapper so screenshots and safe page
+metadata are configured automatically:
+
+```python
+from agent_devtools.playwright import record_playwright_tools
+
+trace = record_playwright_tools(
+    original_tools,
+    page,
+    Path("trace/my-browser-agent-run"),
+)
+with trace as tools:
+    agent.run(task, tools=tools)
+```
+
+The default Playwright observer records URL, title, document readiness and
+visibility, viewport, scroll range, element count, and a minimal focused-element
+descriptor. It does not collect input values, page text, full DOM content,
+cookies, browser storage, or network traffic. URLs, titles, tool arguments, and
+screenshots can still contain sensitive information and should be handled as
+debugging evidence. Screenshots capture the current viewport by default, which
+matches what the agent sees and keeps reports compact. Set
+`full_page_screenshots=True` only when the complete page is required.
 
 ## Record a simulated action
 
@@ -741,21 +775,25 @@ uv run --extra browser python examples/youtube_agent_demo.py --headed
 The live demo wraps a small external-style tool object once, then lets the agent
 call its normal `navigate`, `fill`, and `click` methods. It searches for
 `computer use agents`, opens the first regular video result, and writes its
-report under `trace/youtube-agent/<run-id>/`. Pass a different search with
-`--query "your search"`. This is a manual demonstration, not a CI test: cookie
-dialogs, localization, advertisements, network failures, and YouTube UI changes
-can alter or block the trajectory. The screenshots and typed query are stored
-locally in the trace and may contain sensitive content.
+report under `trace/youtube-agent/<run-id>/`. The Playwright convenience wrapper
+automatically captures screenshots and structured page state around each tool
+call. Pass a different search with `--query "your search"`. This is a manual
+demonstration, not a CI test: cookie dialogs, localization, advertisements,
+network failures, and YouTube UI changes can alter or block the trajectory. The
+screenshots and typed query are stored locally in the trace and may contain
+sensitive content.
 
 ## Current limitations
 
 - Session recording is synchronous
 - Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
+- No built-in desktop or Android structured state observer
 - No CLI, dashboard, or recovery system
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics are limited to click and fill
 - Callers must provide expected states; the tool does not infer intent
+- Structured state changes are evidence only; they are not automatic verification
 - Structured Playwright expectations currently support exact text and
   input-value matching, plus single-element visibility
 

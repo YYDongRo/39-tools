@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from agent_devtools import ActionOutcome, ActionStatus, record_tools
+from agent_devtools import ActionOutcome, ActionStatus
 from agent_devtools.integrations.playwright import (
     expect_text,
     run_playwright_agent,
@@ -16,6 +16,7 @@ from agent_devtools.playwright import (
     RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
+    record_playwright_tools,
 )
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder
@@ -229,7 +230,7 @@ def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:
     assert executor.report_path.is_file()
 
 
-def test_generic_tool_wrapper_records_browser_tool_calls(
+def test_playwright_tool_wrapper_records_calls_and_structured_state(
     tmp_path: Path,
 ) -> None:
     class BrowserTools:
@@ -250,13 +251,10 @@ def test_generic_tool_wrapper_records_browser_tool_calls(
     with playwright.sync_playwright() as browser_api:
         browser = browser_api.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1000, "height": 700})
-        trace = record_tools(
+        trace = record_playwright_tools(
             BrowserTools(page),
+            page,
             trace_dir,
-            capture_screenshot=lambda path: page.screenshot(
-                path=str(path),
-                full_page=True,
-            ),
         )
 
         with trace as tools:
@@ -279,11 +277,45 @@ def test_generic_tool_wrapper_records_browser_tool_calls(
         action.status is ActionStatus.SUCCESS
         for action in trace.session.actions
     )
+    navigation_observations = trace.session.actions[0].observations
+    state_before = navigation_observations["state_before"]
+    state_after = navigation_observations["state_after"]
+    assert isinstance(state_before, dict)
+    assert isinstance(state_after, dict)
+    assert state_before["url"] == "about:blank"
+    assert state_after["url"] == TARGET_URL
+    assert state_after["title"] == "Local Video Search"
+    assert state_after["ready_state"] == "complete"
+    assert state_after["visibility_state"] == "visible"
+    assert state_after["viewport"] == {"width": 1000, "height": 700}
+    assert isinstance(state_after["element_count"], int)
+    assert {"title", "url"}.issubset(
+        navigation_observations["state_changes"]
+    )
+
+    fill_observations = trace.session.actions[1].observations
+    assert SEARCH_QUERY not in repr(fill_observations["state_after"])
+    assert "focused_element" in fill_observations["state_changes"]
     assert trace.report_path.is_file()
     for action_number in range(1, 4):
         action_dir = trace_dir / "actions" / f"{action_number:03d}"
         assert (action_dir / "before.png").stat().st_size > 0
         assert (action_dir / "after.png").stat().st_size > 0
+
+
+def test_playwright_tool_wrapper_rejects_invalid_screenshot_mode(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        TypeError,
+        match="full_page_screenshots must be a boolean",
+    ):
+        record_playwright_tools(
+            object(),
+            object(),  # type: ignore[arg-type]
+            tmp_path / "trace",
+            full_page_screenshots="yes",  # type: ignore[arg-type]
+        )
 
 
 def test_navigation_visibility_expectation_reports_missing_element(

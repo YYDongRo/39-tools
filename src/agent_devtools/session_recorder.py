@@ -76,6 +76,7 @@ class SessionRecorder:
         operation: Callable[[], object],
         *,
         observations: dict[str, object] | None = None,
+        finalize_observations: Callable[[], None] | None = None,
         verification: Callable[[], VerificationResult] | None = None,
         failure_diagnosis: Callable[[ActionRecord], ActionRecord] | None = None,
     ) -> ActionRecord:
@@ -96,6 +97,7 @@ class SessionRecorder:
             screenshot_before=screenshot_before,
             screenshot_after=screenshot_after,
             observations=observations,
+            finalize_observations=finalize_observations,
             verification=verification,
         )
         if (

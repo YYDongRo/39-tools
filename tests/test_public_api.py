@@ -8,6 +8,8 @@ from agent_devtools.integrations.playwright import (
     RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
+    observe_playwright_page,
+    record_playwright_tools,
 )
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
@@ -43,6 +45,8 @@ def test_playwright_public_api_exports_supported_types() -> None:
         "RecordedPlaywrightExecutor": RecordedPlaywrightExecutor,
         "TextExpectation": TextExpectation,
         "VisibilityExpectation": VisibilityExpectation,
+        "observe_playwright_page": observe_playwright_page,
+        "record_playwright_tools": record_playwright_tools,
     }
 
     assert set(public_playwright.__all__) == set(expected_exports)

@@ -79,6 +79,67 @@ def test_report_displays_changed_page_urls_compactly(tmp_path: Path) -> None:
         assert "page_url_after" not in content
 
 
+def test_report_displays_structured_state_compactly(tmp_path: Path) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#search"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        observations={
+            "state_before": {
+                "url": "https://example.com/&lt;before&gt;",
+                "scroll": {"x": 0, "y": 0},
+            },
+            "state_after": {
+                "url": "https://example.com/<after>",
+                "scroll": {"x": 0, "y": 100},
+            },
+            "state_changes": ["scroll.y", "url"],
+        },
+    )
+    action_output = tmp_path / "action.html"
+    session_output = tmp_path / "session.html"
+
+    write_action_html(action, action_output)
+    write_session_html(ActionSession(actions=[action]), session_output)
+
+    for output_path in (action_output, session_output):
+        content = output_path.read_text(encoding="utf-8")
+        assert "Structured state" in content
+        assert "Detected changes" in content
+        assert "<li>scroll.y</li>" in content
+        assert "<li>url</li>" in content
+        assert "<summary>State before</summary>" in content
+        assert "<summary>State after</summary>" in content
+        assert "https://example.com/&lt;after&gt;" in content
+        assert "<dt>State Before</dt>" not in content
+
+
+def test_report_displays_observer_failure_without_raw_message(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        observations={
+            "state_before_error_type": "RuntimeError",
+            "state_after": {"ready": True},
+        },
+    )
+    output_path = tmp_path / "report.html"
+
+    write_action_html(action, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "Before observation unavailable (RuntimeError)." in content
+    assert "State changes unavailable." in content
+    assert "<summary>State after</summary>" in content
+
+
 def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
     action = ActionRecord(
         action_type="click",

@@ -24,13 +24,17 @@ class RecordedTools(Generic[ToolT]):
         output_dir: str | Path,
         *,
         capture_screenshot: Callable[[Path], None] | None = None,
+        observe_state: Callable[[], dict[str, object]] | None = None,
         goal: str | None = None,
         task_verification: Callable[[], VerificationResult] | None = None,
         methods: Iterable[str] | None = None,
     ) -> None:
+        if observe_state is not None and not callable(observe_state):
+            raise TypeError("observe_state must be callable or None")
         self._tools = tools
         self._proxy = _ToolProxy(self)
         self._methods = _method_names(methods)
+        self._observe_state = observe_state
         self._wrappers: dict[str, Callable[..., object]] = {}
         self._recorder = SessionRecorder(
             Path(output_dir),
@@ -85,6 +89,13 @@ class RecordedTools(Generic[ToolT]):
         @wraps(method)
         def recorded_method(*args: object, **kwargs: object) -> ReturnT:
             arguments = _call_arguments(method, args, kwargs)
+            observations: dict[str, object] = {}
+            if self._observe_state is not None:
+                _store_state_observation(
+                    observations,
+                    "state_before",
+                    self._observe_state,
+                )
             result: ReturnT | None = None
             caught_error: Exception | None = None
             caught_traceback: TracebackType | None = None
@@ -98,7 +109,32 @@ class RecordedTools(Generic[ToolT]):
                     caught_traceback = error.__traceback__
                     raise
 
-            self._recorder.record(name, arguments, operation)
+            def finalize_observations() -> None:
+                if self._observe_state is None:
+                    return
+                _store_state_observation(
+                    observations,
+                    "state_after",
+                    self._observe_state,
+                )
+                state_before = observations.get("state_before")
+                state_after = observations.get("state_after")
+                if isinstance(state_before, dict) and isinstance(
+                    state_after,
+                    dict,
+                ):
+                    observations["state_changes"] = _changed_paths(
+                        state_before,
+                        state_after,
+                    )
+
+            self._recorder.record(
+                name,
+                arguments,
+                operation,
+                observations=observations,
+                finalize_observations=finalize_observations,
+            )
 
             if caught_error is not None:
                 raise caught_error.with_traceback(caught_traceback)
@@ -120,6 +156,7 @@ def record_tools(
     output_dir: str | Path,
     *,
     capture_screenshot: Callable[[Path], None] | None = None,
+    observe_state: Callable[[], dict[str, object]] | None = None,
     goal: str | None = None,
     task_verification: Callable[[], VerificationResult] | None = None,
     methods: Iterable[str] | None = None,
@@ -128,6 +165,7 @@ def record_tools(
         tools,
         output_dir,
         capture_screenshot=capture_screenshot,
+        observe_state=observe_state,
         goal=goal,
         task_verification=task_verification,
         methods=methods,
@@ -172,3 +210,79 @@ def _json_value(value: object) -> Any:
         )
     except (TypeError, ValueError, RecursionError):
         return repr(value)
+
+
+def _store_state_observation(
+    observations: dict[str, object],
+    key: str,
+    observe_state: Callable[[], dict[str, object]],
+) -> None:
+    try:
+        state = observe_state()
+        if not isinstance(state, dict) or not all(
+            isinstance(name, str) for name in state
+        ):
+            raise TypeError(
+                "observe_state must return a dictionary with string keys"
+            )
+        normalized_state = _json_state(state)
+    except Exception as error:
+        observations[f"{key}_error_type"] = type(error).__name__
+        return
+
+    observations[key] = normalized_state
+
+
+def _json_state(state: dict[str, object]) -> dict[str, object]:
+    try:
+        _validate_state_value(state)
+        normalized = json.loads(
+            json.dumps(state, ensure_ascii=False, allow_nan=False)
+        )
+    except (TypeError, ValueError, RecursionError) as error:
+        raise TypeError("state must contain JSON-safe values") from error
+    if not isinstance(normalized, dict):
+        raise TypeError("state must normalize to a dictionary")
+    return normalized
+
+
+def _validate_state_value(value: object) -> None:
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError("state dictionaries require string keys")
+        for nested_value in value.values():
+            _validate_state_value(nested_value)
+        return
+    if isinstance(value, (list, tuple)):
+        for nested_value in value:
+            _validate_state_value(nested_value)
+        return
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return
+    raise TypeError("state contains an unsupported value")
+
+
+def _changed_paths(
+    before: dict[str, object],
+    after: dict[str, object],
+    prefix: str = "",
+) -> list[str]:
+    changed: list[str] = []
+    missing = object()
+    for key in sorted(before.keys() | after.keys()):
+        path = f"{prefix}.{key}" if prefix else key
+        before_value = before.get(key, missing)
+        after_value = after.get(key, missing)
+        if isinstance(before_value, dict) and isinstance(after_value, dict):
+            nested_changes = _changed_paths(
+                before_value,
+                after_value,
+                path,
+            )
+            if len(nested_changes) == 1:
+                changed.extend(nested_changes)
+            elif nested_changes:
+                changed.append(path)
+        elif before_value != after_value:
+            changed.append(path)
+    return changed

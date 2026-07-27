@@ -129,6 +129,10 @@ The repository currently includes:
   lifecycle for supported actions;
 - a generic synchronous tool wrapper for recording public method calls with a
   single setup point;
+- optional automatic before-and-after structured state observations with
+  deterministic changed paths and non-fatal observer errors;
+- a Playwright tool wrapper that automatically captures screenshots and small
+  page-state metadata without collecting page text, form values, or full DOM;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;

@@ -128,6 +128,82 @@ def test_record_action_captures_observations_updated_by_operation() -> None:
     assert action.outcome is ActionOutcome.UNVERIFIED
 
 
+def test_record_action_finalizes_observations_after_duration(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    times = iter((5_000_000_000, 5_080_000_000))
+    monkeypatch.setattr(recorder, "monotonic_ns", lambda: next(times))
+    observations: dict[str, object] = {}
+    events: list[str] = []
+
+    def operation() -> None:
+        events.append("operation")
+
+    def finalize_observations() -> None:
+        events.append("observation")
+        observations["state_after"] = {"ready": True}
+
+    def verification() -> VerificationResult:
+        events.append("verification")
+        return verify_text_state("ready", "ready")
+
+    action = recorder.record_action(
+        action_type="click",
+        arguments={},
+        operation=operation,
+        observations=observations,
+        finalize_observations=finalize_observations,
+        verification=verification,
+    )
+
+    assert events == ["operation", "observation", "verification"]
+    assert action.duration_ms == 80
+    assert action.observations == {"state_after": {"ready": True}}
+
+
+def test_record_action_finalizes_observations_after_failure() -> None:
+    observations: dict[str, object] = {}
+
+    def operation() -> None:
+        raise RuntimeError("tool failed")
+
+    action = recorder.record_action(
+        action_type="click",
+        arguments={},
+        operation=operation,
+        observations=observations,
+        finalize_observations=lambda: observations.update(
+            {"state_after": {"dialog_visible": True}}
+        ),
+    )
+
+    assert action.status is ActionStatus.FAILURE
+    assert action.failure_reason == "RuntimeError: tool failed"
+    assert action.observations == {
+        "state_after": {"dialog_visible": True}
+    }
+
+
+def test_observation_finalizer_error_does_not_change_action_status() -> None:
+    observations: dict[str, object] = {}
+
+    def broken_finalizer() -> None:
+        raise RuntimeError("observer failed")
+
+    action = recorder.record_action(
+        action_type="click",
+        arguments={},
+        operation=lambda: None,
+        observations=observations,
+        finalize_observations=broken_finalizer,
+    )
+
+    assert action.status is ActionStatus.SUCCESS
+    assert action.observations == {
+        "observation_finalizer_error_type": "RuntimeError"
+    }
+
+
 def test_record_action_propagates_verification_error() -> None:
     def broken_verification() -> VerificationResult:
         raise RuntimeError("page was already closed")

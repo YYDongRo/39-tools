@@ -8,8 +8,8 @@ from playwright.sync_api import Page, sync_playwright
 from agent_devtools import (
     ActionOutcome,
     VerificationResult,
-    record_tools,
 )
+from agent_devtools.playwright import record_playwright_tools
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -157,13 +157,10 @@ def main() -> None:
         )
         page = context.new_page()
 
-        trace = record_tools(
+        trace = record_playwright_tools(
             YouTubeTools(page),
+            page,
             trace_dir,
-            capture_screenshot=lambda path: page.screenshot(
-                path=str(path),
-                full_page=True,
-            ),
             goal=goal,
             task_verification=lambda: verify_task(page),
         )

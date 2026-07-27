@@ -113,6 +113,15 @@ def test_record_tools_rejects_invalid_method_names(
         )
 
 
+def test_record_tools_rejects_non_callable_observer(tmp_path: Path) -> None:
+    with pytest.raises(TypeError, match="observe_state must be callable"):
+        record_tools(
+            ExampleTools(),
+            tmp_path / "trace",
+            observe_state="state",  # type: ignore[arg-type]
+        )
+
+
 def test_record_tools_returns_recorded_tools(
     tmp_path: Path,
 ) -> None:
@@ -144,3 +153,215 @@ def test_tool_methods_do_not_conflict_with_trace_properties(
         "session",
         "report_path",
     ]
+
+
+def test_record_tools_captures_before_after_state_and_changes(
+    tmp_path: Path,
+) -> None:
+    states = iter(
+        [
+            {
+                "url": "https://example.com/start",
+                "scroll": {"x": 0, "y": 0},
+                "focus": {"id": "search", "tag": "input"},
+                "ready": True,
+                "removed": "before only",
+            },
+            {
+                "url": "https://example.com/result",
+                "scroll": {"x": 0, "y": 100},
+                "focus": {"id": "submit", "tag": "button"},
+                "ready": True,
+                "added": "after only",
+            },
+        ]
+    )
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=lambda: next(states),
+    )
+
+    with trace as tools:
+        tools.add(1, 2)
+
+    assert trace.session.actions[0].observations == {
+        "state_before": {
+            "url": "https://example.com/start",
+            "scroll": {"x": 0, "y": 0},
+            "focus": {"id": "search", "tag": "input"},
+            "ready": True,
+            "removed": "before only",
+        },
+        "state_after": {
+            "url": "https://example.com/result",
+            "scroll": {"x": 0, "y": 100},
+            "focus": {"id": "submit", "tag": "button"},
+            "ready": True,
+            "added": "after only",
+        },
+        "state_changes": [
+            "added",
+            "focus",
+            "removed",
+            "scroll.y",
+            "url",
+        ],
+    }
+    assert read_session_json(trace.report_path.with_name("session.json")) == (
+        trace.session
+    )
+
+
+def test_record_tools_captures_after_state_when_action_fails(
+    tmp_path: Path,
+) -> None:
+    states = iter(
+        [
+            {"dialog": "closed"},
+            {"dialog": "error"},
+        ]
+    )
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=lambda: next(states),
+    )
+
+    with pytest.raises(RuntimeError, match="tool failed"):
+        with trace as tools:
+            tools.fail("tool failed")
+
+    action = trace.session.actions[0]
+    assert action.status is ActionStatus.FAILURE
+    assert action.observations["state_after"] == {"dialog": "error"}
+    assert action.observations["state_changes"] == ["dialog"]
+
+
+def test_observer_error_does_not_prevent_tool_call(tmp_path: Path) -> None:
+    call_count = 0
+
+    def observe_state() -> dict[str, object]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("page is changing")
+        return {"ready": True}
+
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=observe_state,
+    )
+
+    with trace as tools:
+        result = tools.add(1, 2)
+
+    assert result == 3
+    assert trace.session.actions[0].status is ActionStatus.SUCCESS
+    assert trace.session.actions[0].observations == {
+        "state_before_error_type": "RuntimeError",
+        "state_after": {"ready": True},
+    }
+
+
+def test_after_observer_error_does_not_hide_tool_failure(
+    tmp_path: Path,
+) -> None:
+    call_count = 0
+
+    def observe_state() -> dict[str, object]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise RuntimeError("page closed")
+        return {"ready": True}
+
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=observe_state,
+    )
+
+    with pytest.raises(RuntimeError, match="tool failed"):
+        with trace as tools:
+            tools.fail("tool failed")
+
+    action = trace.session.actions[0]
+    assert action.failure_reason == "RuntimeError: tool failed"
+    assert action.observations == {
+        "state_before": {"ready": True},
+        "state_after_error_type": "RuntimeError",
+    }
+
+
+def test_identical_states_record_no_changed_paths(tmp_path: Path) -> None:
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=lambda: {"ready": True, "scroll": {"y": 0}},
+    )
+
+    with trace as tools:
+        tools.add(1, 2)
+
+    assert trace.session.actions[0].observations["state_changes"] == []
+    assert "No structured state changes detected." in (
+        trace.report_path.read_text(encoding="utf-8")
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        None,
+        [],
+        {1: "value"},
+        {"nested": {1: "value"}},
+        {"path": Path("private-state")},
+        {"number": float("nan")},
+    ],
+)
+def test_invalid_observer_result_is_recorded_without_failing_action(
+    tmp_path: Path,
+    invalid_state: object,
+) -> None:
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=lambda: invalid_state,  # type: ignore[arg-type,return-value]
+    )
+
+    with trace as tools:
+        result = tools.add(1, 2)
+
+    assert result == 3
+    assert trace.session.actions[0].status is ActionStatus.SUCCESS
+    assert trace.session.actions[0].observations == {
+        "state_before_error_type": "TypeError",
+        "state_after_error_type": "TypeError",
+    }
+    assert "private-state" not in repr(
+        trace.session.actions[0].observations
+    )
+
+
+def test_circular_observer_state_is_recorded_as_type_error(
+    tmp_path: Path,
+) -> None:
+    circular_state: dict[str, object] = {}
+    circular_state["self"] = circular_state
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        observe_state=lambda: circular_state,
+    )
+
+    with trace as tools:
+        result = tools.add(1, 2)
+
+    assert result == 3
+    assert trace.session.actions[0].observations == {
+        "state_before_error_type": "TypeError",
+        "state_after_error_type": "TypeError",
+    }

@@ -4,6 +4,8 @@ from agent_devtools.integrations.playwright import (
     RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
+    observe_playwright_page,
+    record_playwright_tools,
 )
 
 
@@ -13,4 +15,6 @@ __all__ = [
     "RecordedPlaywrightExecutor",
     "TextExpectation",
     "VisibilityExpectation",
+    "observe_playwright_page",
+    "record_playwright_tools",
 ]
