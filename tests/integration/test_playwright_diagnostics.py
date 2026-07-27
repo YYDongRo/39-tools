@@ -140,5 +140,9 @@ def test_executor_persists_click_failure_diagnosis(
 
     assert action.status is ActionStatus.FAILURE
     assert action.failure_category is category
+    assert action.observations == {
+        "page_url_before": page_path.as_uri(),
+        "page_url_after": page_path.as_uri(),
+    }
     assert loaded_action == action
     assert category.value in report

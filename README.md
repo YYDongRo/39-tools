@@ -380,9 +380,10 @@ fill_action = PlaywrightAction(
 value verifier after each action executes. `InputValueExpectation()` derives
 the expected selector and value from the fill arguments, so they are not
 repeated. Every Playwright fill records `input_value_after` as an observation,
-even without an expectation; that action remains unverified. The final page URL
-is recorded as visibility verification evidence rather than compared exactly,
-so redirects do not cause a false mismatch.
+even without an expectation; that action remains unverified. Every supported
+Playwright action also records `page_url_before` and `page_url_after` without
+treating a redirect as a mismatch. The HTML report displays one URL when it is
+unchanged and shows the before-and-after URLs only when navigation occurs.
 
 ### Record a task with one executor
 
@@ -428,6 +429,10 @@ The executor owns the session recorder and screenshot callback. Each method
 updates the same `session.json` and `report.html`. A dynamic agent can instead
 call `executor.run(decide_next_action)`. Actions made directly through the raw
 Playwright `page` are not intercepted and therefore are not recorded.
+
+Generated traces can contain sensitive page URLs, typed text, screenshots, and
+exception messages. Keep trace directories private unless they have been
+reviewed and redacted.
 
 Run a controlled executor failure that clicks a missing element:
 

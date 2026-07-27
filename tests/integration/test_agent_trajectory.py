@@ -132,7 +132,13 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     }
     assert session.actions[1].verification is None
     assert session.actions[1].observations == {
-        "input_value_after": SEARCH_QUERY
+        "page_url_before": TARGET_URL,
+        "input_value_after": SEARCH_QUERY,
+        "page_url_after": TARGET_URL,
+    }
+    assert session.actions[0].observations == {
+        "page_url_before": "about:blank",
+        "page_url_after": TARGET_URL,
     }
     assert all(
         action.verification is not None
@@ -200,7 +206,19 @@ def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:
         "fill",
         "click",
     ]
-    assert fill.observations == {"input_value_after": SEARCH_QUERY}
+    assert navigate.observations == {
+        "page_url_before": "about:blank",
+        "page_url_after": TARGET_URL,
+    }
+    assert fill.observations == {
+        "page_url_before": TARGET_URL,
+        "input_value_after": SEARCH_QUERY,
+        "page_url_after": TARGET_URL,
+    }
+    assert search.observations == {
+        "page_url_before": TARGET_URL,
+        "page_url_after": TARGET_URL,
+    }
     assert navigate.verification is not None
     assert navigate.verification.passed
     assert search.verification is not None
@@ -327,7 +345,11 @@ def test_fill_can_optionally_verify_exact_input_value(tmp_path: Path) -> None:
         browser.close()
 
     action = recorded_actions[0]
-    assert action.observations == {"input_value_after": SEARCH_QUERY}
+    assert action.observations == {
+        "page_url_before": TARGET_URL,
+        "input_value_after": SEARCH_QUERY,
+        "page_url_after": TARGET_URL,
+    }
     assert action.verification is not None
     assert action.verification.passed
     assert action.outcome is ActionOutcome.SUCCESS
@@ -373,7 +395,9 @@ def test_fill_exact_verification_reports_formatted_value(
     action = recorded_actions[0]
     assert action.status is ActionStatus.SUCCESS
     assert action.observations == {
-        "input_value_after": SEARCH_QUERY.upper()
+        "page_url_before": TARGET_URL,
+        "input_value_after": SEARCH_QUERY.upper(),
+        "page_url_after": TARGET_URL,
     }
     assert action.verification is not None
     assert not action.verification.passed

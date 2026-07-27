@@ -9,6 +9,9 @@ from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
 
 
+_PAGE_URL_KEYS = {"page_url_before", "page_url_after"}
+
+
 def _screenshot_panel(title: str, screenshot_path: object) -> str:
     if screenshot_path is None:
         content = '<p class="missing">Not captured</p>'
@@ -76,16 +79,41 @@ def _verification_section(action: ActionRecord) -> str:
 
 
 def _observations_section(action: ActionRecord) -> str:
-    if not action.observations:
+    observations_without_urls = {
+        key: value
+        for key, value in action.observations.items()
+        if key not in _PAGE_URL_KEYS or not isinstance(value, str)
+    }
+    if not observations_without_urls:
         return ""
     observations = escape(
-        json.dumps(action.observations, ensure_ascii=False, indent=2)
+        json.dumps(observations_without_urls, ensure_ascii=False, indent=2)
     )
     return f"""
       <section class="observations">
         <h2>Observations</h2>
         <pre>{observations}</pre>
       </section>"""
+
+
+def _page_url_details(action: ActionRecord) -> str:
+    before = action.observations.get("page_url_before")
+    after = action.observations.get("page_url_after")
+    if not isinstance(before, str) and not isinstance(after, str):
+        return ""
+    if before == after and isinstance(before, str):
+        return f"<div><dt>Page URL</dt><dd>{escape(before)}</dd></div>"
+
+    details = []
+    if isinstance(before, str):
+        details.append(
+            f"<div><dt>Page URL before</dt><dd>{escape(before)}</dd></div>"
+        )
+    if isinstance(after, str):
+        details.append(
+            f"<div><dt>Page URL after</dt><dd>{escape(after)}</dd></div>"
+        )
+    return "".join(details)
 
 
 def _outcome_failure_category(action: ActionRecord) -> FailureCategory | None:
@@ -130,6 +158,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       </section>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
+    page_url_details = _page_url_details(action)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -190,6 +219,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
           <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
           <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
           <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
+          {page_url_details}
           <div><dt>Before screenshot</dt><dd>{escape(str(data["screenshot_before"] or "—"))}</dd></div>
           <div><dt>After screenshot</dt><dd>{escape(str(data["screenshot_after"] or "—"))}</dd></div>
         </dl>
@@ -245,6 +275,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
             </div>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
+    page_url_details = _page_url_details(action)
 
     screenshots = []
     for label, path in (
@@ -282,6 +313,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
               <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
               <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
+              {page_url_details}
             </dl>
             <h3>Arguments</h3>
             <pre>{arguments}</pre>{observations_section}{failure_section}{verification_section}

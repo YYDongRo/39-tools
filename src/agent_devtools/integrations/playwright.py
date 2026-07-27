@@ -428,10 +428,19 @@ def record_playwright_action(
     else:
         raise ValueError(f"unsupported Playwright action: {action_type}")
 
+    browser_operation = operation
+
+    def execute_with_page_url_observations() -> None:
+        _observe_page_url(page, observations, "page_url_before")
+        try:
+            browser_operation()
+        finally:
+            _observe_page_url(page, observations, "page_url_after")
+
     return recorder.record(
         action_type,
         dict(arguments),
-        operation,
+        execute_with_page_url_observations,
         observations=observations,
         verification=verification,
         failure_diagnosis=(
@@ -440,6 +449,17 @@ def record_playwright_action(
         if action_type == "click"
         else None,
     )
+
+
+def _observe_page_url(
+    page: Page,
+    observations: dict[str, object],
+    key: str,
+) -> None:
+    try:
+        observations[key] = page.url
+    except Exception as error:
+        observations[f"{key}_error_type"] = type(error).__name__
 
 
 def _verification_for_action(

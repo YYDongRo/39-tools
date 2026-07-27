@@ -119,6 +119,8 @@ The repository currently includes:
   automatic waiting;
 - automatic post-fill input-value observations and optional exact-value
   expectations;
+- automatic before-and-after page URL observations for supported Playwright
+  actions, displayed compactly in HTML reports;
 - a Playwright action entry point for traced navigate, click, and fill
   trajectories;
 - a single recorded Playwright executor that owns session and screenshot

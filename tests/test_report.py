@@ -17,7 +17,11 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
         status=ActionStatus.SUCCESS,
         screenshot_before=Path("before.png"),
         screenshot_after=Path("after.png"),
-        observations={"input_value_after": "<Agent debugging>"},
+        observations={
+            "page_url_before": "https://example.com/search?q=<agent>",
+            "page_url_after": "https://example.com/search?q=<agent>",
+            "input_value_after": "<Agent debugging>",
+        },
     )
     output_path = tmp_path / "trace" / "report.html"
 
@@ -31,8 +35,44 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     assert "<dt>Verification status</dt><dd>not run</dd>" in content
     assert "Observations" in content
     assert "&lt;Agent debugging&gt;" in content
+    assert "<dt>Page URL</dt>" in content
+    assert "https://example.com/search?q=&lt;agent&gt;" in content
+    assert "Page URL before" not in content
+    assert "Page URL after" not in content
+    assert "page_url_before" not in content
+    assert "page_url_after" not in content
     assert 'src="before.png"' in content
     assert 'src="after.png"' in content
+
+
+def test_report_displays_changed_page_urls_compactly(tmp_path: Path) -> None:
+    action = ActionRecord(
+        action_type="navigate",
+        arguments={"url": "https://example.com/video"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        observations={
+            "page_url_before": "about:blank",
+            "page_url_after": "https://example.com/video",
+        },
+    )
+    action_output = tmp_path / "action.html"
+    session_output = tmp_path / "session.html"
+
+    write_action_html(action, action_output)
+    write_session_html(ActionSession(actions=[action]), session_output)
+
+    for output_path in (action_output, session_output):
+        content = output_path.read_text(encoding="utf-8")
+        assert "<dt>Page URL before</dt><dd>about:blank</dd>" in content
+        assert (
+            "<dt>Page URL after</dt>"
+            "<dd>https://example.com/video</dd>"
+        ) in content
+        assert "Observations" not in content
+        assert "page_url_before" not in content
+        assert "page_url_after" not in content
 
 
 def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
