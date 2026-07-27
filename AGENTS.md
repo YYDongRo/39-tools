@@ -128,6 +128,8 @@ The repository currently includes:
 - a single recorded Playwright executor that owns session and screenshot
   lifecycle for supported actions;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
+- wheel and source-distribution build validation with Python 3.11 through 3.14
+  compatibility coverage;
 - a bounded observe-decide-act Playwright loop with typed action decisions and
   automatic structured expectation verification;
 - a deterministic local video-search agent trajectory demonstration;

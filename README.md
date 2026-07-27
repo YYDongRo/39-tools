@@ -35,7 +35,7 @@ written as versioned JSON traces.
 
 ## Requirements
 
-- Python 3.14 or newer
+- Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/)
 
 ## Setup
