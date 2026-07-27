@@ -174,7 +174,7 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     assert "5 actions" in report
     assert "&#x27;#search&#x27; is visible" in report
     assert "Observations" in report
-    assert "&quot;input_value_after&quot;: &quot;Agent debugging&quot;" in report
+    assert "<dt>Input value after</dt><dd>Agent debugging</dd>" in report
 
 
 def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:

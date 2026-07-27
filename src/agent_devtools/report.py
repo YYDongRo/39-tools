@@ -10,6 +10,16 @@ from agent_devtools.verification import VerificationResult
 
 
 _PAGE_URL_KEYS = {"page_url_before", "page_url_after"}
+_FIELD_LABELS = {
+    "diagnostic_error_type": "Diagnostic error",
+    "input_value_after": "Input value after",
+    "selector": "Selector",
+    "selector_count": "Matches",
+    "selector_count_after": "Matches after",
+    "target_editable": "Editable",
+    "target_enabled": "Enabled",
+    "target_visible": "Visible",
+}
 
 
 def _screenshot_panel(title: str, screenshot_path: object) -> str:
@@ -86,14 +96,67 @@ def _observations_section(action: ActionRecord) -> str:
     }
     if not observations_without_urls:
         return ""
-    observations = escape(
-        json.dumps(observations_without_urls, ensure_ascii=False, indent=2)
-    )
     return f"""
       <section class="observations">
         <h2>Observations</h2>
-        <pre>{observations}</pre>
+        {_key_value_grid(observations_without_urls)}
       </section>"""
+
+
+def _key_value_grid(values: dict[str, object]) -> str:
+    items = "".join(
+        "<div><dt>"
+        f"{escape(_FIELD_LABELS.get(key, key.replace('_', ' ').title()))}"
+        "</dt><dd>"
+        f"{_display_value(value)}"
+        "</dd></div>"
+        for key, value in values.items()
+    )
+    return f'<dl class="key-value-grid">{items}</dl>'
+
+
+def _display_value(value: object) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return '""' if not value else escape(value)
+    return escape(json.dumps(value, ensure_ascii=False))
+
+
+def _failure_content(action: ActionRecord) -> str:
+    if action.failure_reason is None:
+        return ""
+
+    category_section = ""
+    if action.failure_category is not None:
+        category_section = (
+            "<p><strong>Category:</strong> "
+            f"{escape(action.failure_category.value)}</p>"
+        )
+
+    reason = action.failure_reason
+    summary = reason.splitlines()[0] if reason.splitlines() else reason
+    raw_details = ""
+    if "\n" in reason:
+        raw_details = f"""
+        <details class="raw-error">
+          <summary>Raw error details</summary>
+          <pre>{escape(reason)}</pre>
+        </details>"""
+
+    evidence_section = ""
+    if action.failure_evidence:
+        evidence_section = f"""
+        <h3>Diagnostic evidence</h3>
+        {_key_value_grid(action.failure_evidence)}"""
+
+    return f"""
+        {category_section}
+        <p class="error-summary">{escape(summary)}</p>
+        {raw_details}
+        {evidence_section}"""
 
 
 def _page_url_details(action: ActionRecord) -> str:
@@ -132,29 +195,13 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
-    failure_reason = data["failure_reason"]
-    failure_category = data["failure_category"]
-    failure_evidence = data["failure_evidence"]
     failure_section = ""
-    if failure_reason is not None:
-        category_section = ""
-        if failure_category is not None:
-            category_section = (
-                "<p><strong>Category:</strong> "
-                f"{escape(str(failure_category))}</p>"
-            )
-        evidence_section = ""
-        if failure_evidence:
-            evidence = escape(
-                json.dumps(failure_evidence, ensure_ascii=False, indent=2)
-            )
-            evidence_section = f"<h3>Diagnostic evidence</h3><pre>{evidence}</pre>"
+    failure_content = _failure_content(action)
+    if failure_content:
         failure_section = f"""
       <section class="failure">
         <h2>Failure reason</h2>
-        {category_section}
-        <p>{escape(str(failure_reason))}</p>
-        {evidence_section}
+        {failure_content}
       </section>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
@@ -187,6 +234,13 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
              overflow-x: auto; padding: 16px; }}
       .failure {{ background: #fff1f2; border: 1px solid #fecdd3; }}
       .failure p {{ white-space: pre-wrap; }}
+      .key-value-grid {{ background: rgba(255, 255, 255, .72);
+                         border-radius: 8px; grid-template-columns:
+                         repeat(auto-fit, minmax(140px, 1fr)); margin: 0;
+                         padding: 16px; }}
+      .raw-error {{ margin-top: 16px; }}
+      .raw-error summary {{ cursor: pointer; font-weight: 700; }}
+      .raw-error pre {{ margin-bottom: 0; }}
       .verification {{ border: 1px solid #cbd5e1; }}
       .verification-failure {{ background: #fff1f2; border-radius: 8px;
                                margin-top: 20px; padding: 16px; }}
@@ -249,29 +303,13 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
     )
-    failure_reason = data["failure_reason"]
-    failure_category = data["failure_category"]
-    failure_evidence = data["failure_evidence"]
     failure_section = ""
-    if failure_reason is not None:
-        category_section = ""
-        if failure_category is not None:
-            category_section = (
-                "<p><strong>Category:</strong> "
-                f"{escape(str(failure_category))}</p>"
-            )
-        evidence_section = ""
-        if failure_evidence:
-            evidence = escape(
-                json.dumps(failure_evidence, ensure_ascii=False, indent=2)
-            )
-            evidence_section = f"<h3>Diagnostic evidence</h3><pre>{evidence}</pre>"
+    failure_content = _failure_content(action)
+    if failure_content:
         failure_section = f"""
             <div class="failure">
               <strong>Failure reason</strong>
-              {category_section}
-              <p>{escape(str(failure_reason))}</p>
-              {evidence_section}
+              {failure_content}
             </div>"""
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
@@ -452,6 +490,13 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .failure {{ background: #fff1f2; border: 1px solid #fecdd3;
                   border-radius: 8px; margin-top: 20px; padding: 16px; }}
       .failure p {{ margin: 8px 0 0; white-space: pre-wrap; }}
+      .key-value-grid {{ background: rgba(255, 255, 255, .72);
+                         border-radius: 8px; grid-template-columns:
+                         repeat(auto-fit, minmax(140px, 1fr)); margin: 0;
+                         padding: 16px; }}
+      .raw-error {{ margin-top: 16px; }}
+      .raw-error summary {{ cursor: pointer; font-weight: 700; }}
+      .raw-error pre {{ margin-bottom: 0; }}
       .verification {{ border: 1px solid #cbd5e1; border-radius: 8px;
                        margin-top: 20px; padding: 16px; }}
       .verification-failure {{ background: #fff1f2; border-radius: 8px;

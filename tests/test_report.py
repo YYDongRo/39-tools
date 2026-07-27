@@ -34,7 +34,11 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     assert "<dt>Execution status</dt><dd>success</dd>" in content
     assert "<dt>Verification status</dt><dd>not run</dd>" in content
     assert "Observations" in content
-    assert "&lt;Agent debugging&gt;" in content
+    assert (
+        "<dt>Input value after</dt><dd>&lt;Agent debugging&gt;</dd>"
+        in content
+    )
+    assert "&quot;input_value_after&quot;" not in content
     assert "<dt>Page URL</dt>" in content
     assert "https://example.com/search?q=&lt;agent&gt;" in content
     assert "Page URL before" not in content
@@ -82,8 +86,13 @@ def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
         start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
         duration_ms=250,
         status=ActionStatus.FAILURE,
-        failure_reason="Element <button> was not found",
+        failure_reason=(
+            "Element <button> was not found\n"
+            "Call log:\n"
+            "- waiting for locator"
+        ),
         failure_evidence={"selector": "<button>", "selector_count": 0},
+        observations={"input_value_after": ""},
     )
     output_path = tmp_path / "report.html"
 
@@ -95,7 +104,11 @@ def test_write_failed_action_report_without_screenshots(tmp_path: Path) -> None:
     assert "<strong>Category:</strong> unknown" in content
     assert "Diagnostic evidence" in content
     assert "&lt;button&gt;" in content
-    assert "&quot;selector_count&quot;: 0" in content
+    assert "<dt>Matches</dt><dd>0</dd>" in content
+    assert '<details class="raw-error">' in content
+    assert "<summary>Raw error details</summary>" in content
+    assert "Call log:" in content
+    assert "<dt>Input value after</dt><dd>\"\"</dd>" in content
     assert content.count("Not captured") == 2
 
 
@@ -162,7 +175,7 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
     assert "<span>timeout</span><strong>1</strong>" in content
     assert "<span>unknown</span><strong>1</strong>" in content
     assert "Diagnostic evidence" in content
-    assert "&quot;target_visible&quot;: true" in content
+    assert "<dt>Visible</dt><dd>true</dd>" in content
     assert 'src="action-1/before.png"' in content
 
 

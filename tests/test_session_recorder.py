@@ -59,7 +59,7 @@ def test_records_session_with_screenshots_and_persists_each_action(
     report = (output_dir / "report.html").read_text(encoding="utf-8")
     assert "<dt>Verification status</dt><dd>passed</dd>" in report
     assert "Observations" in report
-    assert "&quot;target_visible_after&quot;: true" in report
+    assert "<dt>Target Visible After</dt><dd>true</dd>" in report
 
 
 def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:
