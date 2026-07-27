@@ -444,6 +444,15 @@ The command prints the generated `report.html` path. Each run writes to a new
 directory under `trace/executor-click-failure/` and records the click as
 `target_not_found` with its selector evidence and before-and-after screenshots.
 
+Run the corresponding fill failure demo against a readonly input:
+
+```bash
+uv run --extra browser python examples/executor_fill_failure.py
+```
+
+It writes a new trace under `trace/executor-fill-failure/` and records
+`target_not_editable` with visibility, enabled, and editability evidence.
+
 ## Failure categories
 
 Core recording uses four conservative categories:
