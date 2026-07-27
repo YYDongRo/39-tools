@@ -28,6 +28,7 @@ written as versioned JSON traces.
 - Stable public imports for core records and the recommended Playwright API
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
+- A generic synchronous tool wrapper that records public method calls
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -77,6 +78,33 @@ It opens a local page, records and verifies one click, captures before-and-after
 screenshots, and prints the generated `report.html` path. Each run creates a new
 directory under `trace/quickstart/`, so it can be run repeatedly without
 overwriting earlier evidence.
+
+### Wrap an existing agent tool object
+
+Wrap the tools once, then give the wrapped object to the agent:
+
+```python
+from pathlib import Path
+
+from agent_devtools import record_tools
+
+trace = record_tools(
+    original_tools,
+    Path("trace/my-agent-run"),
+    capture_screenshot=capture_screenshot,
+)
+with trace as tools:
+    agent.run(task, tools=tools)
+
+print(trace.report_path)
+```
+
+Every public synchronous method called through `tools` is recorded using its
+method name and bound arguments. Return values are passed back unchanged, and a
+tool exception is recorded before being raised back to the agent. Pass
+`methods={"click", "fill", "scroll"}` when the object also has public methods
+that should not be treated as actions. Arguments may contain sensitive data.
+Calls made directly on `original_tools` cannot be intercepted.
 
 ## Record a simulated action
 
@@ -701,6 +729,23 @@ can use; it does not automatically connect to arbitrary third-party agents or
 the real YouTube website. A future integration can replace the rule-based
 decision function with an LLM or framework callback without changing the
 recording path.
+
+### Try the live YouTube demo
+
+Run the same agent-like loop against the real YouTube website:
+
+```bash
+uv run --extra browser python examples/youtube_agent_demo.py --headed
+```
+
+The live demo wraps a small external-style tool object once, then lets the agent
+call its normal `navigate`, `fill`, and `click` methods. It searches for
+`computer use agents`, opens the first regular video result, and writes its
+report under `trace/youtube-agent/<run-id>/`. Pass a different search with
+`--query "your search"`. This is a manual demonstration, not a CI test: cookie
+dialogs, localization, advertisements, network failures, and YouTube UI changes
+can alter or block the trajectory. The screenshots and typed query are stored
+locally in the trace and may contain sensitive content.
 
 ## Current limitations
 

@@ -12,6 +12,7 @@ from agent_devtools.integrations.playwright import (
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
+from agent_devtools.tool_recorder import RecordedTools, record_tools
 from agent_devtools.verification import VerificationResult
 
 
@@ -22,10 +23,12 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
         "FailureCategory": FailureCategory,
+        "RecordedTools": RecordedTools,
         "SessionRecorder": SessionRecorder,
         "VerificationResult": VerificationResult,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
+        "record_tools": record_tools,
     }
 
     assert set(agent_devtools.__all__) == set(expected_exports)

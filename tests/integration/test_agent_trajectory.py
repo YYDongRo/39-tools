@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from agent_devtools import ActionOutcome, ActionStatus
+from agent_devtools import ActionOutcome, ActionStatus, record_tools
 from agent_devtools.integrations.playwright import (
     expect_text,
     run_playwright_agent,
@@ -227,6 +227,63 @@ def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:
     assert search.verification.passed
     assert executor.report_path == trace_dir / "report.html"
     assert executor.report_path.is_file()
+
+
+def test_generic_tool_wrapper_records_browser_tool_calls(
+    tmp_path: Path,
+) -> None:
+    class BrowserTools:
+        def __init__(self, page: Page) -> None:
+            self.page = page
+
+        def navigate(self, url: str) -> None:
+            self.page.goto(url)
+
+        def fill(self, selector: str, text: str) -> None:
+            self.page.locator(selector).fill(text)
+
+        def click(self, selector: str) -> None:
+            self.page.locator(selector).click()
+
+    trace_dir = tmp_path / "wrapped-tools"
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1000, "height": 700})
+        trace = record_tools(
+            BrowserTools(page),
+            trace_dir,
+            capture_screenshot=lambda path: page.screenshot(
+                path=str(path),
+                full_page=True,
+            ),
+        )
+
+        with trace as tools:
+            tools.navigate(TARGET_URL)
+            tools.fill("#search", SEARCH_QUERY)
+            tools.click("#search-button")
+
+        browser.close()
+
+    assert [action.action_type for action in trace.session.actions] == [
+        "navigate",
+        "fill",
+        "click",
+    ]
+    assert trace.session.actions[1].arguments == {
+        "selector": "#search",
+        "text": SEARCH_QUERY,
+    }
+    assert all(
+        action.status is ActionStatus.SUCCESS
+        for action in trace.session.actions
+    )
+    assert trace.report_path.is_file()
+    for action_number in range(1, 4):
+        action_dir = trace_dir / "actions" / f"{action_number:03d}"
+        assert (action_dir / "before.png").stat().st_size > 0
+        assert (action_dir / "after.png").stat().st_size > 0
 
 
 def test_navigation_visibility_expectation_reports_missing_element(
