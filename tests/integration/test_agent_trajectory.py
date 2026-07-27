@@ -5,15 +5,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from agent_devtools.action import ActionOutcome, ActionStatus
+from agent_devtools import ActionOutcome, ActionStatus
 from agent_devtools.integrations.playwright import (
+    expect_text,
+    run_playwright_agent,
+)
+from agent_devtools.playwright import (
     InputValueExpectation,
     PlaywrightAction,
     RecordedPlaywrightExecutor,
     TextExpectation,
     VisibilityExpectation,
-    expect_text,
-    run_playwright_agent,
 )
 from agent_devtools.serialization import read_session_json
 from agent_devtools.session_recorder import SessionRecorder

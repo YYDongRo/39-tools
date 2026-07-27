@@ -25,6 +25,7 @@ written as versioned JSON traces.
 - Structured Playwright text and visibility expectations with automatic waiting
   and evidence
 - A single Playwright executor for recorded navigate, fill, and click actions
+- Stable public imports for core records and the recommended Playwright API
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
 - Controlled replay for saved click actions with strict argument validation
@@ -50,6 +51,32 @@ Run the test suite:
 ```bash
 uv run pytest
 ```
+
+## Quickstart
+
+Install the optional browser dependency and Chromium, then run the reusable
+quickstart:
+
+```bash
+uv sync --extra browser
+uv run --extra browser playwright install chromium
+uv run --extra browser python examples/quickstart.py
+```
+
+The example uses the recommended public imports:
+
+```python
+from agent_devtools import ActionOutcome
+from agent_devtools.playwright import (
+    RecordedPlaywrightExecutor,
+    TextExpectation,
+)
+```
+
+It opens a local page, records and verifies one click, captures before-and-after
+screenshots, and prints the generated `report.html` path. Each run creates a new
+directory under `trace/quickstart/`, so it can be run repeatedly without
+overwriting earlier evidence.
 
 ## Record a simulated action
 
