@@ -146,3 +146,98 @@ def test_executor_persists_click_failure_diagnosis(
     }
     assert loaded_action == action
     assert category.value in report
+
+
+@pytest.mark.parametrize(
+    ("selector", "category", "expected_evidence"),
+    [
+        (
+            "#missing-input",
+            FailureCategory.TARGET_NOT_FOUND,
+            {
+                "selector": "#missing-input",
+                "selector_count": 0,
+                "target_visible": None,
+                "target_enabled": None,
+                "target_editable": None,
+            },
+        ),
+        (
+            ".ambiguous-input",
+            FailureCategory.TARGET_AMBIGUOUS,
+            {
+                "selector": ".ambiguous-input",
+                "selector_count": 2,
+                "target_visible": None,
+                "target_enabled": None,
+                "target_editable": None,
+            },
+        ),
+        (
+            "#hidden-input",
+            FailureCategory.TARGET_NOT_VISIBLE,
+            {
+                "selector": "#hidden-input",
+                "selector_count": 1,
+                "target_visible": False,
+                "target_enabled": True,
+                "target_editable": True,
+            },
+        ),
+        (
+            "#disabled-input",
+            FailureCategory.TARGET_DISABLED,
+            {
+                "selector": "#disabled-input",
+                "selector_count": 1,
+                "target_visible": True,
+                "target_enabled": False,
+                "target_editable": False,
+            },
+        ),
+        (
+            "#readonly-input",
+            FailureCategory.TARGET_NOT_EDITABLE,
+            {
+                "selector": "#readonly-input",
+                "selector_count": 1,
+                "target_visible": True,
+                "target_enabled": True,
+                "target_editable": False,
+            },
+        ),
+    ],
+)
+def test_executor_persists_fill_failure_diagnosis(
+    tmp_path: Path,
+    selector: str,
+    category: FailureCategory,
+    expected_evidence: dict[str, object],
+) -> None:
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve()
+    trace_dir = tmp_path / category.value
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(page_path.as_uri())
+
+        with RecordedPlaywrightExecutor(page, trace_dir) as executor:
+            action = executor.fill(selector, "Agent debugging", timeout_ms=100)
+
+        browser.close()
+
+    loaded_action = read_session_json(
+        trace_dir / "session.json"
+    ).actions[0]
+    report = (trace_dir / "report.html").read_text(encoding="utf-8")
+
+    assert action.status is ActionStatus.FAILURE
+    assert action.failure_category is category
+    assert action.failure_evidence == expected_evidence
+    assert action.observations["page_url_before"] == page_path.as_uri()
+    assert action.observations["page_url_after"] == page_path.as_uri()
+    assert loaded_action == action
+    assert category.value in report

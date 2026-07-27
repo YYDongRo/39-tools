@@ -456,13 +456,14 @@ Core recording uses four conservative categories:
 The original failure reason is always preserved. The classifier does not infer
 `wrong_target`, `blocked_target`, or `page_not_ready` from error-message text.
 
-The optional Playwright adapter can refine a failed click using direct element
-observations:
+The optional Playwright adapter can refine failed click and fill actions using
+direct element observations:
 
 - `target_not_found` when the selector matches no elements;
 - `target_ambiguous` when the selector matches multiple elements;
 - `target_not_visible` when exactly one target exists but is not visible;
-- `target_disabled` when exactly one target is visible but disabled.
+- `target_disabled` when exactly one target is visible but disabled;
+- `target_not_editable` when a fill target exists but cannot accept input.
 
 ```python
 from agent_devtools.integrations.playwright import record_playwright_click
@@ -477,9 +478,9 @@ print(action.failure_category)
 print(action.failure_evidence)
 ```
 
-Evidence contains only the selector, match count, visibility, enabled state, and
-diagnostic error type when inspection itself fails. It does not capture the full
-DOM or page text.
+Evidence contains only the selector, match count, visibility, enabled state,
+fill editability, and diagnostic error type when inspection itself fails. It
+does not capture the full DOM or page text.
 
 ## Load an existing trace
 
@@ -672,7 +673,7 @@ recording path.
 - No general desktop screenshot capture
 - No CLI, dashboard, or recovery system
 - Playwright navigate, click, and fill recording are the only current runtime
-  integration; structured failure diagnostics remain limited to click
+  integration; structured failure diagnostics are limited to click and fill
 - Callers must provide expected states; the tool does not infer intent
 - Structured Playwright expectations currently support exact text and
   input-value matching, plus single-element visibility

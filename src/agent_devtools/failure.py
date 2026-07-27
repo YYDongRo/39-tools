@@ -9,6 +9,7 @@ class FailureCategory(StrEnum):
     TARGET_AMBIGUOUS = "target_ambiguous"
     TARGET_NOT_VISIBLE = "target_not_visible"
     TARGET_DISABLED = "target_disabled"
+    TARGET_NOT_EDITABLE = "target_not_editable"
     UNKNOWN = "unknown"
 
 

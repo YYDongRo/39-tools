@@ -437,17 +437,25 @@ def record_playwright_action(
         finally:
             _observe_page_url(page, observations, "page_url_after")
 
+    failure_diagnosis: Callable[[ActionRecord], ActionRecord] | None = None
+    if action_type == "click":
+        failure_diagnosis = lambda action: diagnose_playwright_click_failure(
+            page,
+            action,
+        )
+    elif action_type == "fill":
+        failure_diagnosis = lambda action: diagnose_playwright_fill_failure(
+            page,
+            action,
+        )
+
     return recorder.record(
         action_type,
         dict(arguments),
         execute_with_page_url_observations,
         observations=observations,
         verification=verification,
-        failure_diagnosis=(
-            lambda action: diagnose_playwright_click_failure(page, action)
-        )
-        if action_type == "click"
-        else None,
+        failure_diagnosis=failure_diagnosis,
     )
 
 
@@ -667,12 +675,51 @@ def diagnose_playwright_click_failure(
     if not isinstance(selector, str) or not selector.strip():
         raise ValueError("failed click actions require a non-empty selector")
 
+    return _diagnose_playwright_target_failure(
+        page,
+        action,
+        selector,
+        check_editable=False,
+    )
+
+
+def diagnose_playwright_fill_failure(
+    page: Page,
+    action: ActionRecord,
+) -> ActionRecord:
+    if (
+        action.action_type != "fill"
+        or action.status is not ActionStatus.FAILURE
+    ):
+        raise ValueError("only failed fill actions can be diagnosed")
+
+    selector = action.arguments.get("selector")
+    if not isinstance(selector, str) or not selector.strip():
+        raise ValueError("failed fill actions require a non-empty selector")
+
+    return _diagnose_playwright_target_failure(
+        page,
+        action,
+        selector,
+        check_editable=True,
+    )
+
+
+def _diagnose_playwright_target_failure(
+    page: Page,
+    action: ActionRecord,
+    selector: str,
+    *,
+    check_editable: bool,
+) -> ActionRecord:
     evidence: dict[str, object] = {
         "selector": selector,
         "selector_count": None,
         "target_visible": None,
         "target_enabled": None,
     }
+    if check_editable:
+        evidence["target_editable"] = None
     category = action.failure_category
 
     try:
@@ -690,11 +737,17 @@ def diagnose_playwright_click_failure(
             target_enabled = target.is_enabled()
             evidence["target_visible"] = target_visible
             evidence["target_enabled"] = target_enabled
+            target_editable = None
+            if check_editable:
+                target_editable = target.is_editable()
+                evidence["target_editable"] = target_editable
 
             if not target_visible:
                 category = FailureCategory.TARGET_NOT_VISIBLE
             elif not target_enabled:
                 category = FailureCategory.TARGET_DISABLED
+            elif check_editable and not target_editable:
+                category = FailureCategory.TARGET_NOT_EDITABLE
     except Exception as error:
         evidence["diagnostic_error_type"] = type(error).__name__
 
