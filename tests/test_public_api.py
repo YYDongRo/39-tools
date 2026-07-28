@@ -1,6 +1,10 @@
 import agent_devtools
 import agent_devtools.playwright as public_playwright
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
+from agent_devtools.async_tool_recorder import (
+    RecordedAsyncTools,
+    record_async_tools,
+)
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
     InputValueExpectation,
@@ -25,11 +29,13 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
         "FailureCategory": FailureCategory,
+        "RecordedAsyncTools": RecordedAsyncTools,
         "RecordedTools": RecordedTools,
         "SessionRecorder": SessionRecorder,
         "VerificationResult": VerificationResult,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
+        "record_async_tools": record_async_tools,
         "record_tools": record_tools,
     }
 

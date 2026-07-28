@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable
 from functools import wraps
-from inspect import signature
+from inspect import isawaitable, iscoroutinefunction, signature
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Generic, TypeVar, cast
@@ -77,6 +77,11 @@ class RecordedTools(Generic[ToolT]):
         ):
             return attribute
 
+        if iscoroutinefunction(attribute):
+            raise TypeError(
+                f"async tool method {name!r} requires record_async_tools()"
+            )
+
         if name not in self._wrappers:
             self._wrappers[name] = self._wrap_method(name, attribute)
         return self._wrappers[name]
@@ -104,6 +109,14 @@ class RecordedTools(Generic[ToolT]):
                 nonlocal result, caught_error, caught_traceback
                 try:
                     result = method(*args, **kwargs)
+                    if isawaitable(result):
+                        close = getattr(result, "close", None)
+                        if callable(close):
+                            close()
+                        raise TypeError(
+                            f"async tool method {name!r} requires "
+                            "record_async_tools()"
+                        )
                 except Exception as error:
                     caught_error = error
                     caught_traceback = error.__traceback__

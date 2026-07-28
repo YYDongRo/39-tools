@@ -27,6 +27,19 @@ class CollidingTools:
         return "tool report"
 
 
+class AsyncTools:
+    async def run(self) -> str:
+        return "done"
+
+
+class HiddenAsyncTools:
+    async def _run(self) -> str:
+        return "done"
+
+    def run(self) -> object:
+        return self._run()
+
+
 def test_record_tools_forwards_calls_and_records_arguments(
     tmp_path: Path,
 ) -> None:
@@ -129,6 +142,29 @@ def test_record_tools_returns_recorded_tools(
         record_tools(ExampleTools(), tmp_path / "trace"),
         RecordedTools,
     )
+
+
+def test_record_tools_rejects_async_method(tmp_path: Path) -> None:
+    trace = record_tools(AsyncTools(), tmp_path / "trace")
+
+    with pytest.raises(TypeError, match="requires record_async_tools"):
+        with trace as tools:
+            tools.run()
+
+    assert trace.session.action_count == 0
+
+
+def test_record_tools_rejects_method_returning_awaitable(
+    tmp_path: Path,
+) -> None:
+    trace = record_tools(HiddenAsyncTools(), tmp_path / "trace")
+
+    with pytest.raises(TypeError, match="requires record_async_tools"):
+        with trace as tools:
+            tools.run()
+
+    assert trace.session.action_count == 1
+    assert trace.session.actions[0].status is ActionStatus.FAILURE
 
 
 def test_record_tools_accepts_string_output_path(tmp_path: Path) -> None:

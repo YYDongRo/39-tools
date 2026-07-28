@@ -29,6 +29,7 @@ written as versioned JSON traces.
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
 - A bounded Playwright agent loop that records dynamically selected actions
 - A generic synchronous tool wrapper that records public method calls
+- A generic sequential async tool wrapper with sync or async evidence callbacks
 - Optional automatic before-and-after structured state capture with changed paths
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
@@ -115,6 +116,36 @@ state. The action stores JSON-safe `state_before`, `state_after`, and sorted
 invalid return values are recorded by error type and do not change the tool
 call's execution status. State collection does not verify correctness: a URL
 change is evidence, not proof that the agent reached the intended URL.
+
+For an async tool object, use `record_async_tools` and await the agent's tool
+calls normally:
+
+```python
+from pathlib import Path
+
+from agent_devtools import record_async_tools
+
+trace = record_async_tools(
+    original_tools,
+    Path("trace/my-async-agent-run"),
+    capture_screenshot=capture_screenshot,
+    observe_state=observe_state,
+)
+async with trace as tools:
+    await agent.run(task, tools=tools)
+
+print(trace.report_path)
+```
+
+Public `async def` methods are automatically recorded. Screenshot, state, and
+task-verification callbacks may be synchronous or asynchronous. Synchronous
+methods are forwarded unchanged unless their names are explicitly selected
+with `methods={...}`; an explicitly selected synchronous method is called as
+`await tools.method(...)`. The first version requires tool actions to run one
+at a time. It rejects overlapping calls, including calls started together with
+`asyncio.gather`, because a single ordered trace cannot reliably represent
+their before-and-after evidence. Run `uv run python examples/async_tools.py`
+for a dependency-free example that prints the generated report path.
 
 For Playwright tools, use the convenience wrapper so screenshots and safe page
 metadata are configured automatically:
@@ -785,7 +816,8 @@ sensitive content.
 
 ## Current limitations
 
-- Session recording is synchronous
+- Async tool recording supports sequential actions only; concurrent actions are
+  rejected, and JSON/HTML persistence still uses synchronous local file writes
 - Replay is limited to single synchronous click actions; there is no session replay
 - No general desktop screenshot capture
 - No built-in desktop or Android structured state observer

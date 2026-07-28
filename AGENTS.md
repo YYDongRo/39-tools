@@ -129,6 +129,9 @@ The repository currently includes:
   lifecycle for supported actions;
 - a generic synchronous tool wrapper for recording public method calls with a
   single setup point;
+- a generic sequential async tool wrapper that awaits tool execution and accepts
+  synchronous or asynchronous screenshot, observation, and task-verification
+  callbacks;
 - optional automatic before-and-after structured state observations with
   deterministic changed paths and non-fatal observer errors;
 - a Playwright tool wrapper that automatically captures screenshots and small
@@ -147,6 +150,8 @@ Action and task verification results are stored in JSON, displayed in HTML
 reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.
+Async tool recording intentionally rejects overlapping actions and uses
+synchronous local writes for JSON and HTML persistence.
 Action and session recorders can run caller-provided verification callbacks
 before persistence. Integrations must still choose expected states; the core
 does not infer intent.
