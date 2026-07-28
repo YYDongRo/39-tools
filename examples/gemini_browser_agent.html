@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Shop</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 3rem auto; max-width: 46rem; padding: 0 1rem; }
+    form { display: flex; gap: 0.5rem; }
+    input { flex: 1; padding: 0.7rem; }
+    button { padding: 0.7rem 1rem; }
+    #results { margin-top: 2rem; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Agent Shop</h1>
+  <p>Search the local catalog.</p>
+  <form id="search-form">
+    <label for="search">Product</label>
+    <input id="search" name="query" placeholder="Search products" autocomplete="off">
+    <button id="search-button" type="submit">Search</button>
+  </form>
+  <section id="results" aria-live="polite" hidden>
+    <h2>Search results</h2>
+    <p id="no-results" hidden>No matching products.</p>
+    <a id="headphones-result" href="gemini_product.html">Wireless Headphones</a>
+  </section>
+  <script>
+    document.querySelector("#search-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = document.querySelector("#search").value.toLowerCase();
+      const matched = query.includes("headphone");
+      document.querySelector("#results").hidden = false;
+      document.querySelector("#headphones-result").hidden = !matched;
+      document.querySelector("#no-results").hidden = matched;
+    });
+  </script>
+</body>
+</html>

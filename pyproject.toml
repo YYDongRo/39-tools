@@ -18,6 +18,9 @@ browser = [
 llm-openai = [
     "openai>=2.49.0",
 ]
+llm-gemini = [
+    "google-genai>=2.14.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
