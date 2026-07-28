@@ -167,3 +167,42 @@ def test_analyzes_session_loaded_from_existing_json(tmp_path: Path) -> None:
     assert len(findings) == 1
     assert findings[0].code == "possible_stuck_loop"
     assert findings[0].action_numbers == (1, 2, 3)
+
+
+def test_finds_page_error_during_successful_action() -> None:
+    action = _action()
+    action.observations["browser_events"] = [
+        {
+            "event_type": "page_error",
+            "message": "player initialization failed",
+            "url": "https://example.com/video",
+            "count": 1,
+        }
+    ]
+
+    findings = analyze_session(ActionSession(actions=[action]))
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.code == "page_error_during_action"
+    assert finding.title == "Page error during action"
+    assert finding.action_numbers == (1,)
+    assert finding.likely_cause == "player initialization failed"
+
+
+def test_groups_same_browser_error_across_actions() -> None:
+    actions = [_action(), _action()]
+    for action in actions:
+        action.observations["browser_events"] = [
+            {
+                "event_type": "console_error",
+                "message": "player unavailable",
+                "count": 1,
+            }
+        ]
+
+    findings = analyze_session(ActionSession(actions=actions))
+
+    assert len(findings) == 1
+    assert findings[0].code == "console_error_during_action"
+    assert findings[0].action_numbers == (1, 2)

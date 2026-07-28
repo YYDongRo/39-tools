@@ -12,10 +12,11 @@ class TrajectoryFinding:
     action_numbers: tuple[int, ...]
     evidence: dict[str, object] = field(default_factory=dict)
     suggestions: tuple[str, ...] = ()
+    likely_cause: str | None = None
 
 
 def analyze_session(session: ActionSession) -> list[TrajectoryFinding]:
-    findings: list[TrajectoryFinding] = []
+    findings = _browser_error_findings(session)
     run_start = 0
 
     while run_start < len(session.actions):
@@ -61,6 +62,91 @@ def analyze_session(session: ActionSession) -> list[TrajectoryFinding]:
         run_start = run_end
 
     return findings
+
+
+def _browser_error_findings(
+    session: ActionSession,
+) -> list[TrajectoryFinding]:
+    grouped: dict[
+        tuple[str, str, str],
+        tuple[dict[str, object], list[int]],
+    ] = {}
+    for action_number, action in enumerate(session.actions, start=1):
+        if action.status is not ActionStatus.SUCCESS:
+            continue
+        event = _primary_browser_error(action)
+        if event is None:
+            continue
+        event_type = event["event_type"]
+        message = event["message"]
+        url = event.get("url", "")
+        if not isinstance(url, str):
+            url = ""
+        key = (event_type, message, url)
+        if key not in grouped:
+            grouped[key] = (event, [])
+        grouped[key][1].append(action_number)
+
+    findings: list[TrajectoryFinding] = []
+    for (event_type, message, _), (event, action_numbers) in grouped.items():
+        numbers = tuple(action_numbers)
+        action_label = (
+            f"Action {numbers[0]}"
+            if len(numbers) == 1
+            else "Actions " + ", ".join(str(number) for number in numbers)
+        )
+        page_error = event_type == "page_error"
+        findings.append(
+            TrajectoryFinding(
+                code=(
+                    "page_error_during_action"
+                    if page_error
+                    else "console_error_during_action"
+                ),
+                title=(
+                    "Page error during action"
+                    if page_error
+                    else "Console error during action"
+                ),
+                summary=(
+                    f"{action_label} completed, but the page reported "
+                    + (
+                        "a JavaScript error."
+                        if page_error
+                        else "a console error."
+                    )
+                ),
+                action_numbers=numbers,
+                evidence=dict(event),
+                suggestions=(
+                    "Inspect the application code associated with this action.",
+                    "Check whether the error prevented the expected UI update.",
+                ),
+                likely_cause=message,
+            )
+        )
+    return findings
+
+
+def _primary_browser_error(
+    action: ActionRecord,
+) -> dict[str, str | int] | None:
+    events = action.observations.get("browser_events")
+    if not isinstance(events, list):
+        return None
+    valid_events = [
+        event
+        for event in events
+        if isinstance(event, dict)
+        and event.get("event_type") in {"page_error", "console_error"}
+        and isinstance(event.get("message"), str)
+        and bool(event["message"])
+    ]
+    for event_type in ("page_error", "console_error"):
+        for event in valid_events:
+            if event["event_type"] == event_type:
+                return event  # type: ignore[return-value]
+    return None
 
 
 def _is_successful_no_progress_action(action: ActionRecord) -> bool:

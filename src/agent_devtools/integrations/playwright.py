@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypeVar
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.async_tool_recorder import (
+    RecordedAsyncTools,
+    record_async_tools,
+)
 from agent_devtools.failure import FailureCategory
+from agent_devtools.integrations.playwright_events import (
+    AsyncPlaywrightEventCollector,
+    PlaywrightEventCollector,
+)
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
@@ -18,65 +26,77 @@ from agent_devtools.verification import VerificationResult, verify_text_state
 
 
 if TYPE_CHECKING:
+    from playwright.async_api import Page as AsyncPage
     from playwright.sync_api import Page
 
 
 PlaywrightToolT = TypeVar("PlaywrightToolT")
 
 
+_PAGE_STATE_SCRIPT = """
+() => {
+  const root = document.documentElement;
+  const active = document.activeElement;
+  let focusedElement = null;
+
+  if (
+    active &&
+    active !== document.body &&
+    active !== document.documentElement
+  ) {
+    const bounds = active.getBoundingClientRect();
+    focusedElement = {
+      tag: active.tagName.toLowerCase(),
+      id: active.id || null,
+      role: active.getAttribute("role"),
+      type: active.getAttribute("type"),
+      editable: Boolean(
+        active.isContentEditable ||
+        ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
+      ),
+      bounds: {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+      },
+    };
+  }
+
+  return {
+    url: window.location.href,
+    title: document.title,
+    ready_state: document.readyState,
+    visibility_state: document.visibilityState,
+    element_count: document.querySelectorAll("*").length,
+    scroll: {
+      x: Math.round(window.scrollX),
+      y: Math.round(window.scrollY),
+      max_x: root ? Math.max(0, root.scrollWidth - window.innerWidth) : 0,
+      max_y: root ? Math.max(0, root.scrollHeight - window.innerHeight) : 0,
+    },
+    focused_element: focusedElement,
+  };
+}
+"""
+
+
 def observe_playwright_page(page: Page) -> dict[str, object]:
-    state = page.evaluate(
-        """
-        () => {
-          const root = document.documentElement;
-          const active = document.activeElement;
-          let focusedElement = null;
+    state = page.evaluate(_PAGE_STATE_SCRIPT)
+    return _normalize_page_state(state, page.viewport_size)
 
-          if (
-            active &&
-            active !== document.body &&
-            active !== document.documentElement
-          ) {
-            const bounds = active.getBoundingClientRect();
-            focusedElement = {
-              tag: active.tagName.toLowerCase(),
-              id: active.id || null,
-              role: active.getAttribute("role"),
-              type: active.getAttribute("type"),
-              editable: Boolean(
-                active.isContentEditable ||
-                ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
-              ),
-              bounds: {
-                x: Math.round(bounds.x),
-                y: Math.round(bounds.y),
-                width: Math.round(bounds.width),
-                height: Math.round(bounds.height),
-              },
-            };
-          }
 
-          return {
-            url: window.location.href,
-            title: document.title,
-            ready_state: document.readyState,
-            visibility_state: document.visibilityState,
-            element_count: document.querySelectorAll("*").length,
-            scroll: {
-              x: Math.round(window.scrollX),
-              y: Math.round(window.scrollY),
-              max_x: root
-                ? Math.max(0, root.scrollWidth - window.innerWidth)
-                : 0,
-              max_y: root
-                ? Math.max(0, root.scrollHeight - window.innerHeight)
-                : 0,
-            },
-            focused_element: focusedElement,
-          };
-        }
-        """
-    )
+async def observe_async_playwright_page(
+    page: AsyncPage,
+) -> dict[str, object]:
+    state = await page.evaluate(_PAGE_STATE_SCRIPT)
+    return _normalize_page_state(state, page.viewport_size)
+
+
+def _normalize_page_state(
+    state: object,
+    viewport_size: dict[str, int] | None,
+) -> dict[str, object]:
     if not isinstance(state, dict):
         raise TypeError("Playwright page observation must be an object")
 
@@ -85,7 +105,7 @@ def observe_playwright_page(page: Page) -> dict[str, object]:
         "title": state.get("title"),
         "ready_state": state.get("ready_state"),
         "visibility_state": state.get("visibility_state"),
-        "viewport": page.viewport_size,
+        "viewport": viewport_size,
         "scroll": state.get("scroll"),
         "focused_element": state.get("focused_element"),
         "element_count": state.get("element_count"),
@@ -101,9 +121,21 @@ def record_playwright_tools(
     task_verification: Callable[[], VerificationResult] | None = None,
     methods: Iterable[str] | None = None,
     full_page_screenshots: bool = False,
+    capture_browser_events: bool = True,
+    event_settle_ms: int = 100,
+    max_browser_events: int = 20,
 ) -> RecordedTools[PlaywrightToolT]:
     if not isinstance(full_page_screenshots, bool):
         raise TypeError("full_page_screenshots must be a boolean")
+    if not isinstance(capture_browser_events, bool):
+        raise TypeError("capture_browser_events must be a boolean")
+    event_collector = None
+    if capture_browser_events:
+        event_collector = PlaywrightEventCollector(
+            page,
+            settle_ms=event_settle_ms,
+            max_events=max_browser_events,
+        )
     return record_tools(
         tools,
         output_dir,
@@ -115,6 +147,59 @@ def record_playwright_tools(
         goal=goal,
         task_verification=task_verification,
         methods=methods,
+        event_collector=event_collector,
+    )
+
+
+def record_async_playwright_tools(
+    tools: PlaywrightToolT,
+    page: AsyncPage,
+    output_dir: str | Path,
+    *,
+    goal: str | None = None,
+    task_verification: (
+        Callable[
+            [],
+            VerificationResult | Awaitable[VerificationResult],
+        ]
+        | None
+    ) = None,
+    methods: Iterable[str] | None = None,
+    full_page_screenshots: bool = False,
+    capture_browser_events: bool = True,
+    event_settle_ms: int = 100,
+    max_browser_events: int = 20,
+) -> RecordedAsyncTools[PlaywrightToolT]:
+    if not isinstance(full_page_screenshots, bool):
+        raise TypeError("full_page_screenshots must be a boolean")
+    if not isinstance(capture_browser_events, bool):
+        raise TypeError("capture_browser_events must be a boolean")
+    event_collector = None
+    if capture_browser_events:
+        event_collector = AsyncPlaywrightEventCollector(
+            page,
+            settle_ms=event_settle_ms,
+            max_events=max_browser_events,
+        )
+
+    async def capture_screenshot(path: Path) -> None:
+        await page.screenshot(
+            path=str(path),
+            full_page=full_page_screenshots,
+        )
+
+    async def observe_state() -> dict[str, object]:
+        return await observe_async_playwright_page(page)
+
+    return record_async_tools(
+        tools,
+        output_dir,
+        capture_screenshot=capture_screenshot,
+        observe_state=observe_state,
+        goal=goal,
+        task_verification=task_verification,
+        methods=methods,
+        event_collector=event_collector,
     )
 
 

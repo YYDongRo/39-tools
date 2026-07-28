@@ -40,6 +40,31 @@ class HiddenAsyncTools:
         return self._run()
 
 
+class EventCollector:
+    def __init__(self) -> None:
+        self.events: list[str] = []
+
+    def start(self) -> None:
+        self.events.append("start")
+
+    def finish(self) -> list[dict[str, object]]:
+        self.events.append("finish")
+        return [
+            {
+                "event_type": "console_error",
+                "message": "application failed",
+            }
+        ]
+
+
+class BrokenEventCollector:
+    def start(self) -> None:
+        pass
+
+    def finish(self) -> list[dict[str, object]]:
+        raise RuntimeError("collector unavailable")
+
+
 def test_record_tools_forwards_calls_and_records_arguments(
     tmp_path: Path,
 ) -> None:
@@ -174,6 +199,45 @@ def test_record_tools_accepts_string_output_path(tmp_path: Path) -> None:
         tools.add(1, 1)
 
     assert trace.report_path.is_file()
+
+
+def test_record_tools_collects_action_events(tmp_path: Path) -> None:
+    collector = EventCollector()
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        event_collector=collector,
+    )
+
+    with trace as tools:
+        tools.add(1, 2)
+
+    assert collector.events == ["start", "finish"]
+    assert trace.session.actions[0].observations["browser_events"] == [
+        {
+            "event_type": "console_error",
+            "message": "application failed",
+        }
+    ]
+
+
+def test_event_collection_error_does_not_fail_tool_action(
+    tmp_path: Path,
+) -> None:
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        event_collector=BrokenEventCollector(),
+    )
+
+    with trace as tools:
+        result = tools.add(1, 2)
+
+    assert result == 3
+    assert trace.session.actions[0].status is ActionStatus.SUCCESS
+    assert trace.session.actions[0].observations == {
+        "event_collection_finish_error_type": "RuntimeError"
+    }
 
 
 def test_tool_methods_do_not_conflict_with_trace_properties(

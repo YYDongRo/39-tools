@@ -19,6 +19,11 @@ _STRUCTURED_STATE_KEYS = {
     "state_after_error_type",
     "observation_finalizer_error_type",
 }
+_ACTION_EVENT_KEYS = {
+    "browser_events",
+    "event_collection_start_error_type",
+    "event_collection_finish_error_type",
+}
 _FIELD_LABELS = {
     "diagnostic_error_type": "Diagnostic error",
     "input_value_after": "Input value after",
@@ -104,6 +109,7 @@ def _observations_section(action: ActionRecord) -> str:
         if (
             (key not in _PAGE_URL_KEYS or not isinstance(value, str))
             and key not in _STRUCTURED_STATE_KEYS
+            and key not in _ACTION_EVENT_KEYS
         )
     }
     if not observations_without_urls:
@@ -173,6 +179,29 @@ def _structured_state_section(action: ActionRecord) -> str:
         {change_content}
         {error_content}
         {snapshots}
+      </section>"""
+
+
+def _browser_events_section(action: ActionRecord) -> str:
+    events = action.observations.get("browser_events")
+    if not isinstance(events, list) or not events:
+        return ""
+    event_count = sum(
+        event.get("count", 1)
+        for event in events
+        if isinstance(event, dict)
+        and isinstance(event.get("count", 1), int)
+    )
+    encoded_events = escape(
+        json.dumps(events, ensure_ascii=False, indent=2)
+    )
+    event_label = "event" if event_count == 1 else "events"
+    return f"""
+      <section class="browser-evidence">
+        <details>
+          <summary>Browser evidence ({event_count} {event_label})</summary>
+          <pre>{encoded_events}</pre>
+        </details>
       </section>"""
 
 
@@ -298,6 +327,12 @@ def _trajectory_finding_card(finding: TrajectoryFinding) -> str:
         f"<li>{escape(suggestion)}</li>"
         for suggestion in finding.suggestions
     )
+    likely_cause = ""
+    if finding.likely_cause is not None:
+        likely_cause = (
+            '<p class="likely-cause"><strong>Likely cause:</strong> '
+            f"{escape(finding.likely_cause)}</p>"
+        )
     return f"""
           <article class="finding-card">
             <div class="finding-title-row">
@@ -305,6 +340,7 @@ def _trajectory_finding_card(finding: TrajectoryFinding) -> str:
               <h3>{escape(finding.title)}</h3>
             </div>
             <p class="finding-summary">{escape(finding.summary)}</p>
+            {likely_cause}
             <p class="finding-actions"><strong>Related:</strong>
               {action_links}</p>
             <details class="finding-details">
@@ -334,6 +370,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
     structured_state_section = _structured_state_section(action)
+    browser_events_section = _browser_events_section(action)
     page_url_details = _page_url_details(action)
 
     document = f"""<!doctype html>
@@ -410,7 +447,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       <section>
         <h2>Arguments</h2>
         <pre>{arguments}</pre>
-      </section>{observations_section}{structured_state_section}{failure_section}{verification_section}
+      </section>{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
       <section class="screenshots">
 {_screenshot_panel("Before", data["screenshot_before"])}
 {_screenshot_panel("After", data["screenshot_after"])}
@@ -443,6 +480,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
     verification_section = _verification_section(action)
     observations_section = _observations_section(action)
     structured_state_section = _structured_state_section(action)
+    browser_events_section = _browser_events_section(action)
     page_url_details = _page_url_details(action)
 
     screenshots = []
@@ -484,7 +522,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               {page_url_details}
             </dl>
             <h3>Arguments</h3>
-            <pre>{arguments}</pre>{observations_section}{structured_state_section}{failure_section}{verification_section}
+            <pre>{arguments}</pre>{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
             <div class="action-screenshots">{screenshot_section}
             </div>
           </div>
@@ -614,12 +652,18 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .finding-title-row {{ align-items: center; display: flex; gap: 10px; }}
       .finding-title-row h3 {{ margin-bottom: 0; }}
       .finding-summary {{ font-weight: 600; margin: 14px 0 10px; }}
+      .likely-cause {{ background: #fef3c7; border-left: 4px solid #f59e0b;
+                       border-radius: 4px; margin: 12px 0; padding: 10px 12px; }}
       .finding-actions {{ color: #475569; margin-bottom: 0; }}
       .finding-actions a {{ color: #1d4ed8; }}
       .finding-details {{ margin-top: 14px; }}
       .finding-details summary {{ cursor: pointer; font-weight: 700; }}
       .finding-details pre {{ margin-bottom: 12px; }}
       .finding-details ul {{ margin-bottom: 0; }}
+      .browser-evidence {{ border-top: 1px solid #e2e8f0; margin-top: 20px;
+                           padding-top: 16px; }}
+      .browser-evidence summary {{ cursor: pointer; font-weight: 700; }}
+      .browser-evidence pre {{ margin-bottom: 0; }}
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}

@@ -11,6 +11,7 @@ from types import TracebackType
 from typing import Any, Generic, TypeVar, cast
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import FailureCategory, classify_exception
 from agent_devtools.report import write_session_html
 from agent_devtools.serialization import write_session_json
@@ -20,6 +21,7 @@ from agent_devtools.tool_recorder import (
     _changed_paths,
     _json_state,
     _method_names,
+    _normalize_events,
 )
 from agent_devtools.verification import VerificationResult
 
@@ -54,6 +56,7 @@ class RecordedAsyncTools(Generic[ToolT]):
             | None
         ) = None,
         methods: Iterable[str] | None = None,
+        event_collector: ActionEventCollector | None = None,
     ) -> None:
         if observe_state is not None and not callable(observe_state):
             raise TypeError("observe_state must be callable or None")
@@ -70,6 +73,7 @@ class RecordedAsyncTools(Generic[ToolT]):
         self._capture_screenshot = capture_screenshot
         self._observe_state = observe_state
         self._task_verification = task_verification
+        self._event_collector = event_collector
         self._wrappers: dict[str, Callable[..., Awaitable[object]]] = {}
         self._active_action = False
         self.output_dir = Path(output_dir)
@@ -155,6 +159,7 @@ class RecordedAsyncTools(Generic[ToolT]):
             try:
                 arguments = _call_arguments(method, args, kwargs)
                 observations: dict[str, object] = {}
+                event_collection_started = False
                 if self._observe_state is not None:
                     await _store_state_observation(
                         observations,
@@ -163,9 +168,25 @@ class RecordedAsyncTools(Generic[ToolT]):
                     )
 
                 async def operation() -> ReturnT:
+                    nonlocal event_collection_started
+                    if self._event_collector is not None:
+                        event_collection_started = (
+                            await _start_event_collection(
+                                observations,
+                                self._event_collector,
+                            )
+                        )
                     return await _resolve(method(*args, **kwargs))
 
                 async def finalize_observations() -> None:
+                    if (
+                        event_collection_started
+                        and self._event_collector is not None
+                    ):
+                        await _finish_event_collection(
+                            observations,
+                            self._event_collector,
+                        )
                     if self._observe_state is None:
                         return
                     await _store_state_observation(
@@ -324,6 +345,7 @@ def record_async_tools(
         | None
     ) = None,
     methods: Iterable[str] | None = None,
+    event_collector: ActionEventCollector | None = None,
 ) -> RecordedAsyncTools[ToolT]:
     return RecordedAsyncTools(
         tools,
@@ -333,6 +355,7 @@ def record_async_tools(
         goal=goal,
         task_verification=task_verification,
         methods=methods,
+        event_collector=event_collector,
     )
 
 
@@ -364,6 +387,36 @@ async def _store_state_observation(
         return
 
     observations[key] = normalized_state
+
+
+async def _start_event_collection(
+    observations: dict[str, object],
+    event_collector: ActionEventCollector,
+) -> bool:
+    try:
+        await _resolve(event_collector.start())
+    except Exception as error:
+        observations["event_collection_start_error_type"] = type(
+            error
+        ).__name__
+        return False
+    return True
+
+
+async def _finish_event_collection(
+    observations: dict[str, object],
+    event_collector: ActionEventCollector,
+) -> None:
+    try:
+        events = await _resolve(event_collector.finish())
+        normalized = _normalize_events(events)
+    except Exception as error:
+        observations["event_collection_finish_error_type"] = type(
+            error
+        ).__name__
+        return
+    if normalized:
+        observations["browser_events"] = normalized
 
 
 def _action_from_result(

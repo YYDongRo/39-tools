@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from agent_devtools import ActionOutcome, ActionStatus
+from agent_devtools.analysis import analyze_session
 from agent_devtools.integrations.playwright import (
     expect_text,
     run_playwright_agent,
@@ -316,6 +317,59 @@ def test_playwright_tool_wrapper_rejects_invalid_screenshot_mode(
             tmp_path / "trace",
             full_page_screenshots="yes",  # type: ignore[arg-type]
         )
+
+
+def test_playwright_tool_wrapper_captures_page_error_likely_cause(
+    tmp_path: Path,
+) -> None:
+    class BrowserTools:
+        def __init__(self, page: Page) -> None:
+            self.page = page
+
+        def click(self, selector: str) -> None:
+            self.page.locator(selector).click()
+
+    diagnostics_url = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve().as_uri()
+    trace_dir = tmp_path / "browser-page-error"
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(diagnostics_url)
+        trace = record_playwright_tools(
+            BrowserTools(page),
+            page,
+            trace_dir,
+        )
+
+        with trace as tools:
+            tools.click("#error-target")
+
+        browser.close()
+
+    action = trace.session.actions[0]
+    assert action.status is ActionStatus.SUCCESS
+    browser_events = action.observations["browser_events"]
+    assert isinstance(browser_events, list)
+    assert {
+        event["event_type"]
+        for event in browser_events
+        if isinstance(event, dict)
+    } == {"console_error", "page_error"}
+    findings = analyze_session(trace.session)
+    assert len(findings) == 1
+    assert findings[0].code == "page_error_during_action"
+    assert findings[0].action_numbers == (1,)
+    assert "player initialization failed" in (
+        findings[0].likely_cause or ""
+    )
+
+    report = trace.report_path.read_text(encoding="utf-8")
+    assert "Page error during action" in report
+    assert "<strong>Likely cause:</strong> player initialization failed" in report
+    assert "Browser evidence (2 events)" in report
 
 
 def test_navigation_visibility_expectation_reports_missing_element(

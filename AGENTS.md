@@ -138,6 +138,9 @@ The repository currently includes:
   structured state, shown as non-outcome-changing warnings in HTML reports;
 - a Playwright tool wrapper that automatically captures screenshots and small
   page-state metadata without collecting page text, form values, or full DOM;
+- bounded action-scoped Playwright `pageerror` and `console.error` evidence for
+  synchronous and asynchronous tools, with sanitized event URLs and likely-cause
+  findings;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -161,6 +164,8 @@ Structured Playwright expectations currently support exact text and input
 values, plus single-element visibility.
 Automatic trajectory analysis is intentionally limited to conservative stuck-loop
 warnings and does not infer whether the user's task is correct.
+Browser event evidence does not include network failures, HTTP status errors,
+request or response bodies, headers, or cookies.
 
 # Near-Term Roadmap
 

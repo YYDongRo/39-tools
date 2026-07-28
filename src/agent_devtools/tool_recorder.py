@@ -8,6 +8,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Generic, TypeVar, cast
 
+from agent_devtools.events import ActionEventCollector
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.verification import VerificationResult
@@ -28,6 +29,7 @@ class RecordedTools(Generic[ToolT]):
         goal: str | None = None,
         task_verification: Callable[[], VerificationResult] | None = None,
         methods: Iterable[str] | None = None,
+        event_collector: ActionEventCollector | None = None,
     ) -> None:
         if observe_state is not None and not callable(observe_state):
             raise TypeError("observe_state must be callable or None")
@@ -35,6 +37,7 @@ class RecordedTools(Generic[ToolT]):
         self._proxy = _ToolProxy(self)
         self._methods = _method_names(methods)
         self._observe_state = observe_state
+        self._event_collector = event_collector
         self._wrappers: dict[str, Callable[..., object]] = {}
         self._recorder = SessionRecorder(
             Path(output_dir),
@@ -104,9 +107,16 @@ class RecordedTools(Generic[ToolT]):
             result: ReturnT | None = None
             caught_error: Exception | None = None
             caught_traceback: TracebackType | None = None
+            event_collection_started = False
 
             def operation() -> None:
+                nonlocal event_collection_started
                 nonlocal result, caught_error, caught_traceback
+                if self._event_collector is not None:
+                    event_collection_started = _start_event_collection(
+                        observations,
+                        self._event_collector,
+                    )
                 try:
                     result = method(*args, **kwargs)
                     if isawaitable(result):
@@ -123,6 +133,14 @@ class RecordedTools(Generic[ToolT]):
                     raise
 
             def finalize_observations() -> None:
+                if (
+                    event_collection_started
+                    and self._event_collector is not None
+                ):
+                    _finish_event_collection(
+                        observations,
+                        self._event_collector,
+                    )
                 if self._observe_state is None:
                     return
                 _store_state_observation(
@@ -173,6 +191,7 @@ def record_tools(
     goal: str | None = None,
     task_verification: Callable[[], VerificationResult] | None = None,
     methods: Iterable[str] | None = None,
+    event_collector: ActionEventCollector | None = None,
 ) -> RecordedTools[ToolT]:
     return RecordedTools(
         tools,
@@ -182,6 +201,7 @@ def record_tools(
         goal=goal,
         task_verification=task_verification,
         methods=methods,
+        event_collector=event_collector,
     )
 
 
@@ -244,6 +264,63 @@ def _store_state_observation(
         return
 
     observations[key] = normalized_state
+
+
+def _start_event_collection(
+    observations: dict[str, object],
+    event_collector: ActionEventCollector,
+) -> bool:
+    try:
+        result = event_collector.start()
+        if isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError(
+                "async event collectors require record_async_tools()"
+            )
+    except Exception as error:
+        observations["event_collection_start_error_type"] = type(
+            error
+        ).__name__
+        return False
+    return True
+
+
+def _finish_event_collection(
+    observations: dict[str, object],
+    event_collector: ActionEventCollector,
+) -> None:
+    try:
+        events = event_collector.finish()
+        if isawaitable(events):
+            close = getattr(events, "close", None)
+            if callable(close):
+                close()
+            raise TypeError(
+                "async event collectors require record_async_tools()"
+            )
+        normalized = _normalize_events(events)
+    except Exception as error:
+        observations["event_collection_finish_error_type"] = type(
+            error
+        ).__name__
+        return
+    if normalized:
+        observations["browser_events"] = normalized
+
+
+def _normalize_events(events: object) -> list[dict[str, object]]:
+    if not isinstance(events, list) or not all(
+        isinstance(event, dict) for event in events
+    ):
+        raise TypeError("event collector must return a list of dictionaries")
+    normalized = _json_state({"events": events})["events"]
+    if not isinstance(normalized, list) or not all(
+        isinstance(event, dict) for event in normalized
+    ):
+        raise TypeError("events must normalize to a list of dictionaries")
+    return normalized
 
 
 def _json_state(state: dict[str, object]) -> dict[str, object]:

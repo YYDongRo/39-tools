@@ -38,6 +38,25 @@ class AsyncTools:
         return self.value
 
 
+class AsyncEventCollector:
+    def __init__(self) -> None:
+        self.lifecycle: list[str] = []
+
+    async def start(self) -> None:
+        await asyncio.sleep(0)
+        self.lifecycle.append("start")
+
+    async def finish(self) -> list[dict[str, object]]:
+        await asyncio.sleep(0)
+        self.lifecycle.append("finish")
+        return [
+            {
+                "event_type": "page_error",
+                "message": "script failed",
+            }
+        ]
+
+
 def test_record_async_tools_awaits_calls_and_records_arguments(
     tmp_path: Path,
 ) -> None:
@@ -171,6 +190,31 @@ def test_record_async_tools_accepts_sync_callbacks(tmp_path: Path) -> None:
         assert len(screenshot_paths) == 2
         assert trace.session.actions[0].observations["state_changes"] == [
             "value"
+        ]
+
+    asyncio.run(run())
+
+
+def test_record_async_tools_collects_async_action_events(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        collector = AsyncEventCollector()
+        trace = record_async_tools(
+            AsyncTools(),
+            tmp_path / "trace",
+            event_collector=collector,
+        )
+
+        async with trace as tools:
+            await tools.add(1)
+
+        assert collector.lifecycle == ["start", "finish"]
+        assert trace.session.actions[0].observations["browser_events"] == [
+            {
+                "event_type": "page_error",
+                "message": "script failed",
+            }
         ]
 
     asyncio.run(run())

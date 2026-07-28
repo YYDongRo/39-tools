@@ -24,6 +24,7 @@ written as versioned JSON traces.
 - Playwright click diagnostics with minimal structured element-state evidence
 - Structured Playwright text and visibility expectations with automatic waiting
   and evidence
+- Action-scoped Playwright page and console error evidence with likely causes
 - A single Playwright executor for recorded navigate, fill, and click actions
 - Stable public imports for core records and the recommended Playwright API
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
@@ -171,6 +172,32 @@ screenshots can still contain sensitive information and should be handled as
 debugging evidence. Screenshots capture the current viewport by default, which
 matches what the agent sees and keeps reports compact. Set
 `full_page_screenshots=True` only when the complete page is required.
+
+The wrapper also listens for uncaught JavaScript `pageerror` events and
+`console.error` messages during each action. It waits 100 ms after the tool call
+by default so immediate asynchronous errors can arrive, deduplicates identical
+events, stores at most 20 unique events per action, and removes query strings and
+fragments from event URLs. Reports show one evidence-based likely cause at the
+top and keep the complete event list collapsed under the related action. Error
+messages themselves may still contain sensitive application data. Set
+`capture_browser_events=False`, `event_settle_ms=...`, or
+`max_browser_events=...` to change this behavior. Response bodies, request
+headers, cookies, network failures, and HTTP status errors are not collected.
+
+Async Playwright users get the same screenshots, structured state, and browser
+error evidence through the matching convenience wrapper:
+
+```python
+from agent_devtools.playwright import record_async_playwright_tools
+
+trace = record_async_playwright_tools(
+    original_tools,
+    page,
+    Path("trace/my-async-browser-run"),
+)
+async with trace as tools:
+    await agent.run(task, tools=tools)
+```
 
 ## Record a simulated action
 
@@ -844,6 +871,8 @@ sensitive content.
 - No CLI, dashboard, or recovery system
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics are limited to click and fill
+- Browser runtime evidence currently covers `pageerror` and `console.error`;
+  failed requests and HTTP error responses are not yet collected
 - Callers must provide expected states; the tool does not infer intent
 - Structured state changes are evidence only; they are not automatic verification
 - Automatic trajectory analysis currently detects only three or more identical

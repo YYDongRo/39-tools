@@ -24,6 +24,7 @@
     <main>
       <h1>Browser action diagnostics</h1>
       <button id="visible-target" type="button">Visible target</button>
+      <button id="error-target" type="button">JavaScript error target</button>
       <button class="ambiguous-target" type="button">First target</button>
       <button class="ambiguous-target" type="button">Second target</button>
       <button id="hidden-target" type="button" hidden>Hidden target</button>
@@ -35,6 +36,12 @@
       <input id="hidden-input" value="" hidden>
       <input id="disabled-input" value="" disabled>
       <input id="readonly-input" value="" readonly>
+      <script>
+        document.querySelector("#error-target").addEventListener("click", () => {
+          console.error("player service unavailable");
+          throw new Error("player initialization failed");
+        });
+      </script>
     </main>
   </body>
 </html>
