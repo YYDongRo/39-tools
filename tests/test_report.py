@@ -30,9 +30,12 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     content = output_path.read_text(encoding="utf-8")
     assert "&lt;click&gt;" in content
     assert "&lt;button&gt;" in content
-    assert 'class="status status-unverified"' in content
+    assert (
+        'class="status status-neutral">execution succeeded</span>'
+        in content
+    )
     assert "<dt>Execution status</dt><dd>success</dd>" in content
-    assert "<dt>Verification status</dt><dd>not run</dd>" in content
+    assert "<dt>Verification status</dt><dd>not configured</dd>" in content
     assert "Observations" in content
     assert (
         "<dt>Input value after</dt><dd>&lt;Agent debugging&gt;</dd>"
@@ -220,10 +223,11 @@ def test_write_mixed_session_report(tmp_path: Path) -> None:
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert (
-        "3 actions · 1 verified success · 2 failures · 0 unverified actions"
-        in content
-    )
+    assert '<strong class="result-title">Completed with failures</strong>' in content
+    assert '<span>Actions</span><strong>3</strong>' in content
+    assert '<span>Executed</span><strong>1 succeeded</strong>' in content
+    assert '<span>Action failures</span><strong>2</strong>' in content
+    assert '<span>Action checks</span><strong>1 of 3 run</strong>' in content
     assert "Action 1" in content
     assert "Action 2" in content
     assert "Action 3" in content
@@ -262,10 +266,10 @@ def test_successful_session_omits_failure_summary(tmp_path: Path) -> None:
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert (
-        "1 action · 1 verified success · 0 failures · 0 unverified actions"
-        in content
-    )
+    assert '<span>Actions</span><strong>1</strong>' in content
+    assert '<span>Executed</span><strong>1 succeeded</strong>' in content
+    assert '<span>Action failures</span><strong>0</strong>' in content
+    assert '<span>Action checks</span><strong>1 run</strong>' in content
     assert "Failure categories" not in content
     assert "Potential issues" not in content
 
@@ -400,12 +404,11 @@ def test_session_report_marks_missing_verification_as_unverified(
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert (
-        "1 action · 0 verified successes · 0 failures · 1 unverified action"
-        in content
-    )
-    assert "contains unverified actions" in content
-    assert 'class="status status-unverified"' in content
+    assert '<strong class="result-title">Execution completed</strong>' in content
+    assert "All recorded actions executed successfully." in content
+    assert '<span>Action checks</span><strong>Not configured</strong>' in content
+    assert 'class="status status-neutral">execution succeeded</span>' in content
+    assert "unverified action" not in content
 
 
 def test_session_report_displays_successful_task_verification(
@@ -434,10 +437,10 @@ def test_session_report_displays_successful_task_verification(
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert 'class="status status-success">task successful</span>' in content
+    assert '<strong class="result-title">Successful</strong>' in content
     assert "<strong>User request:</strong> Play the &lt;video&gt;" in content
-    assert "Task verification" in content
-    assert "<dt>Status</dt><dd>passed</dd>" in content
+    assert "Final checks" in content
+    assert 'class="check-total check-total-passed">passed</span>' in content
     assert "&lt;player-status&gt;" in content
 
 
@@ -457,8 +460,9 @@ def test_session_report_displays_automatic_verification_metadata(
     content = output_path.read_text(encoding="utf-8")
     assert "<strong>User request:</strong> Open &amp; inspect the page" in content
     assert "<strong>Inferred goal:</strong> Reach the expected page" in content
-    assert "Automatic verification" in content
+    assert "Verification context" in content
     assert "<strong>Source:</strong> openai:gpt-test" in content
+    assert "<strong>Verification note:</strong>" in content
     assert "No reliable selector was available." in content
 
 
@@ -477,9 +481,9 @@ def test_session_report_displays_failed_task_verification(tmp_path: Path) -> Non
     write_session_html(session, output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert 'class="status status-failure">task failed</span>' in content
-    assert "Task verification" in content
-    assert "<dt>Status</dt><dd>failed</dd>" in content
+    assert '<strong class="result-title">Failed</strong>' in content
+    assert "Final checks" in content
+    assert 'class="check-total check-total-failed">failed</span>' in content
     assert "expected &#x27;Playing&#x27;, observed &#x27;Paused&#x27;" in content
 
 
@@ -489,11 +493,9 @@ def test_write_empty_session_report(tmp_path: Path) -> None:
     write_session_html(ActionSession(), output_path)
 
     content = output_path.read_text(encoding="utf-8")
-    assert (
-        "0 actions · 0 verified successes · 0 failures · 0 unverified actions"
-        in content
-    )
-    assert 'class="status status-empty"' in content
+    assert '<strong class="result-title">No actions</strong>' in content
+    assert '<span>Actions</span><strong>0</strong>' in content
+    assert '<span>Action checks</span><strong>Not configured</strong>' in content
     assert "No actions recorded." in content
     assert "Failure categories" not in content
 
@@ -532,9 +534,6 @@ def test_report_displays_verification_failure_as_final_failure(
     assert "&lt;status&gt;" in action_content
 
     session_content = session_output.read_text(encoding="utf-8")
-    assert (
-        "1 action · 0 verified successes · 1 failure · 0 unverified actions"
-        in session_content
-    )
-    assert "contains failures" in session_content
+    assert '<strong class="result-title">Completed with failures</strong>' in session_content
+    assert '<span>Action failures</span><strong>1</strong>' in session_content
     assert "<span>verification_mismatch</span><strong>1</strong>" in session_content

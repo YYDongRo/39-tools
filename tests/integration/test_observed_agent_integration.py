@@ -138,7 +138,7 @@ def test_observed_agent_captures_request_and_writes_verified_report(
     assert user_request in report
     assert "Inferred goal" in report
     assert "openai:test-model" in report
-    assert "Task checks" in report
+    assert "<h3>Checks</h3>" in report
 
 
 def test_observed_agent_creates_a_report_when_agent_raises(

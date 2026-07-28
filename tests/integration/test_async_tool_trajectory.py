@@ -158,8 +158,8 @@ def test_records_real_async_browser_trajectory(tmp_path: Path) -> None:
         report = trace.report_path.read_text(encoding="utf-8")
         assert "search for Agent debugging" in report
         assert EXPECTED_RESULT in report
-        assert "task successful" in report
-        assert "3 actions" in report
+        assert '<strong class="result-title">Successful</strong>' in report
+        assert '<span>Actions</span><strong>3</strong>' in report
 
     asyncio.run(run())
 

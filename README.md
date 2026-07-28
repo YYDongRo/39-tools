@@ -36,7 +36,8 @@ report after the agent run.
 - Optional automatic before-and-after structured state capture with changed paths
 - Automatic potential-issue warnings for repeated actions with no observed progress
 - Observed-agent wrappers that capture the user request and inject recorded tools
-- Optional OpenAI generation of bounded final-state checks from that request
+- Optional OpenAI or Gemini generation of bounded final-state checks from that request
+- A Gemini function-calling demo where model-selected browser actions are recorded
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -290,6 +291,42 @@ with:
 ```bash
 uv run --extra browser python examples/observed_agent.py
 ```
+
+#### Run a real Gemini-controlled local browser task
+
+Gemini can supply both the task decisions and the generated final-state checks.
+Install the optional dependencies, keep the key in your shell, and run:
+
+```bash
+uv sync --extra browser --extra llm-gemini
+uv run --extra browser --extra llm-gemini playwright install chromium
+read -s -p "Gemini API key: " GEMINI_API_KEY
+echo
+export GEMINI_API_KEY
+uv run --extra browser --extra llm-gemini python examples/gemini_browser_agent.py --headed
+```
+
+The local browser starts blank. Gemini observes the local demo shop and chooses
+`navigate`, `fill`, and `click` calls until it believes the user's request is
+finished. Agent DevTools records those state-changing calls, screenshots, page
+state, browser errors, and final verification in a new directory under
+`trace/gemini-browser-agent/`. The command prints the exact `report.html` path.
+The `observe` tool is deliberately excluded from the action timeline because it
+reads state without changing the computer.
+Pass `--task "..."` to send another natural-language request to the same local
+shop; that exact request becomes the report goal and the verification-generator
+input.
+
+The default is the cost-oriented `gemini-3.5-flash-lite`. Override it with
+`--model ...` or `GEMINI_MODEL`. The adapter uses API storage disabled and does
+not write the API key or raw Gemini responses to traces. For agent decisions,
+this demo does send bounded visible page text, interactive element selectors and
+values, and bounded tool error messages to Gemini. Use only non-sensitive pages
+until an application-specific redaction policy is added.
+
+To add Gemini-generated verification to another observed agent without using
+the demo agent, pass `gemini_expectations()` as its expectation generator. The
+async equivalent is `async_gemini_expectations()`.
 
 ### Verify the final browser task
 
@@ -890,10 +927,13 @@ print(loaded_session.outcome)
 
 Pass a screenshot callback to `SessionRecorder` to capture before-and-after
 images automatically. Action count and failure state are derived from the saved
-action list. The HTML timeline displays verified success, final failure, and
-unverified totals; failure categories include execution and verification
-failures. Each action shows its execution status, verification status, final
-outcome, timing, arguments, failure details, and screenshots.
+action list. The HTML timeline leads with the final task result, then summarizes
+successful executions, action failures, and action-check coverage. An action
+that executed successfully without its own check is shown neutrally instead of
+as a warning; final task verification remains separate and prominent. Failure
+categories include execution and verification failures. Each action shows its
+execution status, optional action check, timing, arguments, failure details, and
+screenshots.
 
 Session reports automatically analyze repeated no-progress actions. When at
 least three consecutive successful calls use the same action type and arguments,

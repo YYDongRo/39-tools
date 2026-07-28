@@ -173,9 +173,9 @@ def test_records_complete_agent_trajectory(tmp_path: Path) -> None:
     report = (trace_dir / "report.html").read_text(encoding="utf-8")
     assert "Playing: Agent debugging" in report
     assert "Search for &#x27;Agent debugging&#x27; and play the result" in report
-    assert "Task verification" in report
-    assert "task successful" in report
-    assert "5 actions" in report
+    assert "Final checks" in report
+    assert '<strong class="result-title">Successful</strong>' in report
+    assert '<span>Actions</span><strong>5</strong>' in report
     assert "&#x27;#search&#x27; is visible" in report
     assert "Observations" in report
     assert "<dt>Input value after</dt><dd>Agent debugging</dd>" in report

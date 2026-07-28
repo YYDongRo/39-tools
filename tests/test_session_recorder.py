@@ -57,7 +57,7 @@ def test_records_session_with_screenshots_and_persists_each_action(
     ]
     assert (output_dir / "report.html").is_file()
     report = (output_dir / "report.html").read_text(encoding="utf-8")
-    assert "<dt>Verification status</dt><dd>passed</dd>" in report
+    assert "<dt>Action check</dt><dd>passed</dd>" in report
     assert "Observations" in report
     assert "<dt>Target Visible After</dt><dd>true</dd>" in report
 
@@ -80,7 +80,7 @@ def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:
     assert loaded_action.verification is not None
     assert not loaded_action.verification.passed
     report = (recorder.output_dir / "report.html").read_text(encoding="utf-8")
-    assert "<dt>Verification status</dt><dd>failed</dd>" in report
+    assert "<dt>Action check</dt><dd>failed</dd>" in report
 
 
 def test_persists_task_verification_and_invalidates_it_on_new_action(
@@ -102,8 +102,8 @@ def test_persists_task_verification_and_invalidates_it_on_new_action(
     assert loaded_session.verification == result
     assert loaded_session.outcome is ActionOutcome.SUCCESS
     report = (recorder.output_dir / "report.html").read_text(encoding="utf-8")
-    assert "Task verification" in report
-    assert "task successful" in report
+    assert "Final checks" in report
+    assert '<strong class="result-title">Successful</strong>' in report
 
     recorder.record("click", {"selector": "#next"}, lambda: None)
 

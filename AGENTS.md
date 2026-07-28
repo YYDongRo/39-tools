@@ -109,8 +109,8 @@ The repository currently includes:
 - general action observations persisted separately from verification results;
 - conservative structured failure categories for timeouts, operation errors,
   verification mismatches, and unknown failures;
-- static session summaries with verified success, final failure, unverified,
-  and failure-category counts;
+- static session summaries with a prominent final result, action execution,
+  failure, action-check coverage, and failure-category counts;
 - controlled framework-independent replay for validated click actions, with
   real-browser success and timeout coverage and a controlled failure demo;
 - a Playwright click adapter that records minimal element-state evidence and
@@ -147,10 +147,13 @@ The repository currently includes:
 - synchronous and asynchronous observed-agent entry points that capture the
   user request as the goal, inject recorded Playwright tools, preserve the
   agent result, create unique run directories, and retain reports on errors;
-- optional synchronous and asynchronous OpenAI expectation generation that
+- optional synchronous and asynchronous OpenAI and Gemini expectation generation that
   converts the captured request into bounded data-only Playwright task checks,
   preserves provider failures as unverified report metadata, and never blocks
   the agent run;
+- a bounded Gemini function-calling adapter and local real-browser demo that
+  records model-selected navigate, fill, and click actions without recording
+  read-only observations as computer actions;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -171,9 +174,9 @@ Async tool recording intentionally rejects overlapping actions and uses
 synchronous local writes for JSON and HTML persistence.
 Action and session recorders can run caller-provided verification callbacks
 before persistence. The model-agnostic core does not infer intent. The optional
-OpenAI Playwright integration can propose conservative final-state checks from
-the captured request; generated checks are hypotheses and may remain unverified
-when context is insufficient.
+OpenAI and Gemini Playwright integrations can propose conservative final-state
+checks from the captured request; generated checks are hypotheses and may remain
+unverified when context is insufficient.
 Action-level Playwright expectations support exact text and input values, plus
 single-element visibility. Task checks additionally support component URL
 matching, contained text, and scalar DOM property equality.

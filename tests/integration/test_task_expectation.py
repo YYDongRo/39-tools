@@ -78,7 +78,7 @@ def test_sync_recorder_runs_declarative_task_expectation(
     assert trace.session.verification is not None
     assert trace.session.verification.passed
     report = trace.report_path.read_text(encoding="utf-8")
-    assert "Task checks" in report
+    assert "<h3>Checks</h3>" in report
     assert report.count('class="verification-check ') == 4
     assert "Full verification evidence" in report
 
@@ -113,7 +113,7 @@ def test_sync_assertion_points_to_failed_task_report(tmp_path: Path) -> None:
     assert trace.session.verification is not None
     assert not trace.session.verification.passed
     report = trace.report_path.read_text(encoding="utf-8")
-    assert "Task checks" in report
+    assert "<h3>Checks</h3>" in report
     assert report.count('class="verification-check ') == 1
 
 

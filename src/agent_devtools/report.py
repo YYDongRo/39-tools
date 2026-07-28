@@ -52,18 +52,28 @@ def _screenshot_panel(title: str, screenshot_path: object) -> str:
 
 def _verification_label(action: ActionRecord) -> str:
     if action.verification is None:
-        return "not run"
+        return "not configured"
     return "passed" if action.verification.passed else "failed"
+
+
+def _action_status(action: ActionRecord) -> tuple[str, str]:
+    if action.outcome is ActionOutcome.FAILURE:
+        return "failure", "failed"
+    if action.verification is not None:
+        return "success", "verified"
+    return "neutral", "execution succeeded"
 
 
 def _verification_result_section(
     verification: VerificationResult,
     title: str,
+    *,
+    summarize_checks: bool = False,
 ) -> str:
     status = "passed" if verification.passed else "failed"
     evidence_section = _verification_evidence_section(
         verification,
-        summarize_check=(title == "Task verification"),
+        summarize_check=summarize_checks,
     )
 
     failure_section = ""
@@ -80,14 +90,24 @@ def _verification_result_section(
           <p>{escape(verification.failure_reason)}</p>
         </div>"""
 
-    return f"""
-      <section class="verification">
+    if summarize_checks:
+        overview = f"""
+        <div class="verification-heading">
+          <h2>{escape(title)}</h2>
+          <span class="check-total check-total-{status}">{status}</span>
+        </div>"""
+    else:
+        overview = f"""
         <h2>{escape(title)}</h2>
         <dl>
           <div><dt>Status</dt><dd>{status}</dd></div>
           <div><dt>Expected state</dt><dd>{escape(verification.expected_state)}</dd></div>
           <div><dt>Observed state</dt><dd>{escape(verification.observed_state)}</dd></div>
-        </dl>
+        </dl>"""
+
+    return f"""
+      <section class="verification">
+        {overview}
         {failure_section}
         {evidence_section}
       </section>"""
@@ -138,7 +158,7 @@ def _verification_evidence_section(
 
     return f"""
         <div class="verification-check-list">
-          <h3>Task checks</h3>
+          <h3>Checks</h3>
           <ol>{''.join(check_items)}
           </ol>
         </div>
@@ -408,6 +428,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
     data = action_to_dict(action)
     execution_status = escape(str(data["status"]))
     outcome = escape(action.outcome.value)
+    display_status, display_label = _action_status(action)
     verification_status = _verification_label(action)
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
@@ -446,6 +467,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
       .status-unverified {{ background: #fef3c7; color: #92400e; }}
+      .status-neutral {{ background: #e0f2fe; color: #075985; }}
       dl {{ display: grid; gap: 20px; grid-template-columns: repeat(4, 1fr); }}
       dt {{ color: #64748b; font-size: 13px; font-weight: 700; }}
       dd {{ margin: 6px 0 0; overflow-wrap: anywhere; }}
@@ -481,13 +503,13 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
         <p class="eyebrow">Agent DevTools · Schema {data["schema_version"]}</p>
         <div class="title-row">
           <h1>{escape(str(data["action_type"]))}</h1>
-          <span class="status status-{outcome}">{outcome}</span>
+          <span class="status status-{display_status}">{display_label}</span>
         </div>
       </header>
       <section>
         <h2>Action details</h2>
         <dl>
-          <div><dt>Final outcome</dt><dd>{outcome}</dd></div>
+          <div><dt>Recorded outcome</dt><dd>{outcome}</dd></div>
           <div><dt>Execution status</dt><dd>{execution_status}</dd></div>
           <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
           <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
@@ -517,7 +539,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
 def _session_action_card(index: int, action: ActionRecord) -> str:
     data = action_to_dict(action)
     execution_status = escape(str(data["status"]))
-    outcome = escape(action.outcome.value)
+    display_status, display_label = _action_status(action)
     verification_status = _verification_label(action)
     arguments = escape(
         json.dumps(data["arguments"], ensure_ascii=False, indent=2)
@@ -565,11 +587,11 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
                 <p class="eyebrow">Action {index}</p>
                 <h2>{escape(str(data["action_type"]))}</h2>
               </div>
-              <span class="status status-{outcome}">{outcome}</span>
+              <span class="status status-{display_status}">{display_label}</span>
             </div>
             <dl>
-              <div><dt>Execution status</dt><dd>{execution_status}</dd></div>
-              <div><dt>Verification status</dt><dd>{verification_status}</dd></div>
+              <div><dt>Execution</dt><dd>{execution_status}</dd></div>
+              <div><dt>Action check</dt><dd>{verification_status}</dd></div>
               <div><dt>Start time</dt><dd>{escape(str(data["start_time"]))}</dd></div>
               <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
               {page_url_details}
@@ -583,11 +605,14 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
 
 
 def write_session_html(session: ActionSession, output_path: Path) -> None:
+    execution_success_count = sum(
+        action.status is ActionStatus.SUCCESS for action in session.actions
+    )
     failure_count = sum(
         action.outcome is ActionOutcome.FAILURE for action in session.actions
     )
-    success_count = sum(
-        action.outcome is ActionOutcome.SUCCESS for action in session.actions
+    checked_action_count = sum(
+        action.verification is not None for action in session.actions
     )
     unverified_count = sum(
         action.outcome is ActionOutcome.UNVERIFIED for action in session.actions
@@ -601,35 +626,61 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     }
     if session.verification is not None:
         overall_status = session.outcome.value
-        overall_label = (
-            "task successful"
-            if session.outcome is ActionOutcome.SUCCESS
-            else "task failed"
-        )
     elif session.goal is not None:
         overall_status = "unverified"
-        overall_label = "task unverified"
     elif session.action_count == 0:
         overall_status = "empty"
-        overall_label = "empty"
     elif session.has_failures:
         overall_status = "failure"
-        overall_label = "contains failures"
     elif unverified_count:
-        overall_status = "unverified"
-        overall_label = "contains unverified actions"
+        overall_status = "neutral"
     else:
         overall_status = "success"
-        overall_label = "all successful"
 
-    action_label = "action" if session.action_count == 1 else "actions"
-    success_label = (
-        "verified success" if success_count == 1 else "verified successes"
-    )
-    failure_label = "failure" if failure_count == 1 else "failures"
-    unverified_label = (
-        "unverified action" if unverified_count == 1 else "unverified actions"
-    )
+    if session.outcome is ActionOutcome.SUCCESS:
+        result_title = "Successful"
+        result_detail = (
+            session.verification.observed_state
+            if session.verification is not None
+            else "The task completed successfully."
+        )
+    elif session.outcome is ActionOutcome.FAILURE:
+        result_title = "Failed"
+        result_detail = (
+            session.verification.failure_reason
+            if session.verification is not None
+            and session.verification.failure_reason is not None
+            else "The final task checks did not pass."
+        )
+    elif session.action_count == 0:
+        result_title = "No actions"
+        result_detail = "Nothing was recorded in this run."
+    elif session.goal is not None:
+        result_title = "Not verified"
+        result_detail = "No final task check was completed."
+    elif session.has_failures:
+        result_title = "Completed with failures"
+        result_detail = f"{failure_count} action failures were recorded."
+    else:
+        result_title = "Execution completed"
+        result_detail = "All recorded actions executed successfully."
+
+    if checked_action_count == 0:
+        step_check_value = "Not configured"
+    elif checked_action_count == session.action_count:
+        step_check_value = f"{checked_action_count} run"
+    else:
+        step_check_value = (
+            f"{checked_action_count} of {session.action_count} run"
+        )
+    report_title = "Task run" if session.goal is not None else "Action session"
+    result_mark = {
+        "success": "✓",
+        "failure": "×",
+        "unverified": "?",
+        "empty": "—",
+        "neutral": "•",
+    }[overall_status]
     failure_summary = ""
     if failure_count:
         category_items = "\n".join(
@@ -657,7 +708,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     inferred_goal_section = ""
     if session.inferred_goal is not None:
         inferred_goal_section = (
-            '<p class="inferred-goal"><strong>Inferred goal:</strong> '
+            '<p><strong>Inferred goal:</strong> '
             f"{escape(session.inferred_goal)}</p>"
         )
     automatic_verification_section = ""
@@ -670,22 +721,25 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             if session.verification_source is not None
             else "Unavailable"
         )
-        note = (
-            f'<p class="verification-note">{escape(session.verification_note)}</p>'
-            if session.verification_note is not None
-            else ""
-        )
+        context_content = f"{inferred_goal_section}<p><strong>Source:</strong> {source}</p>"
         automatic_verification_section = f"""
-        <section class="automatic-verification">
-          <h2>Automatic verification</h2>
-          <p><strong>Source:</strong> {source}</p>
-          {note}
-        </section>"""
+        <details class="verification-context">
+          <summary>Verification context</summary>
+          {context_content}
+        </details>"""
+        inferred_goal_section = ""
+    verification_note_section = ""
+    if session.verification_note is not None:
+        verification_note_section = (
+            '<p class="verification-note"><strong>Verification note:</strong> '
+            f"{escape(session.verification_note)}</p>"
+        )
     task_verification_section = ""
     if session.verification is not None:
         task_verification_section = _verification_result_section(
             session.verification,
-            "Task verification",
+            "Final checks",
+            summarize_checks=True,
         )
     findings_section = _trajectory_findings_section(session)
 
@@ -697,26 +751,55 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     <title>Agent action session</title>
     <style>
       :root {{ color-scheme: light; font-family: system-ui, sans-serif; }}
-      body {{ background: #f3f4f6; color: #0f172a; margin: 0; }}
-      main {{ margin: 0 auto; max-width: 1200px; padding: 40px 24px; }}
-      header, .action-card, .empty-state {{ background: white; border-radius: 12px; }}
-      header {{ margin-bottom: 32px; padding: 28px; }}
+      body {{ background: #f8fafc; color: #0f172a; margin: 0; }}
+      main {{ margin: 0 auto; max-width: 1120px; padding: 48px 24px; }}
+      header, .action-card, .empty-state {{ background: white; border: 1px solid #e2e8f0;
+                                           border-radius: 16px; }}
+      header {{ box-shadow: 0 12px 36px rgba(15, 23, 42, .06);
+                margin-bottom: 28px; padding: 32px; }}
       h1, h2, h3, p {{ margin-top: 0; }}
       .eyebrow {{ color: #64748b; font-size: 13px; font-weight: 700;
                   letter-spacing: .04em; text-transform: uppercase; }}
       .title-row, .action-heading {{ align-items: center; display: flex;
                                     justify-content: space-between; gap: 16px; }}
       .title-row h1, .action-heading h2 {{ margin-bottom: 0; }}
-      .goal {{ font-size: 18px; margin: 20px 0 0; }}
-      .inferred-goal {{ color: #334155; margin: 10px 0 0; }}
-      .summary {{ color: #475569; margin: 16px 0 0; }}
-      .automatic-verification {{ background: #eff6ff; border: 1px solid #bfdbfe;
-                                  border-radius: 8px; margin-top: 20px;
-                                  padding: 16px; }}
-      .automatic-verification h2 {{ font-size: 16px; margin-bottom: 10px; }}
-      .automatic-verification p {{ margin-bottom: 0; }}
-      .automatic-verification .verification-note {{ color: #475569;
-                                                      margin-top: 8px; }}
+      .goal {{ font-size: 17px; line-height: 1.55; margin: 20px 0 0; }}
+      .result-hero {{ align-items: center; background: #f8fafc; border: 1px solid #e2e8f0;
+                      border-left: 6px solid #64748b; border-radius: 12px;
+                      display: flex; justify-content: space-between;
+                      margin-top: 24px; padding: 22px 24px; }}
+      .result-hero-success {{ background: #f0fdf4; border-color: #86efac;
+                              border-left-color: #16a34a; }}
+      .result-hero-failure {{ background: #fff1f2; border-color: #fda4af;
+                              border-left-color: #dc2626; }}
+      .result-hero-unverified {{ background: #fffbeb; border-color: #fcd34d;
+                                 border-left-color: #d97706; }}
+      .result-kicker {{ color: #64748b; display: block; font-size: 12px;
+                        font-weight: 800; letter-spacing: .08em;
+                        margin-bottom: 5px; text-transform: uppercase; }}
+      .result-title {{ display: block; font-size: 30px; letter-spacing: -.02em;
+                       line-height: 1.15; }}
+      .result-detail {{ color: #475569; margin: 8px 0 0; }}
+      .result-mark {{ align-items: center; background: white; border-radius: 50%;
+                      color: #166534; display: flex; flex: 0 0 auto;
+                      font-size: 24px; font-weight: 900; height: 48px;
+                      justify-content: center; width: 48px; }}
+      .result-hero-failure .result-mark {{ color: #991b1b; }}
+      .result-hero-unverified .result-mark {{ color: #92400e; }}
+      .run-stats {{ display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
+                    margin-top: 16px; }}
+      .run-stat {{ background: #f8fafc; border: 1px solid #e2e8f0;
+                   border-radius: 10px; padding: 14px 16px; }}
+      .run-stat span {{ color: #64748b; display: block; font-size: 12px;
+                        font-weight: 700; margin-bottom: 5px; }}
+      .run-stat strong {{ font-size: 16px; }}
+      .verification-context {{ border-top: 1px solid #e2e8f0; color: #475569;
+                               margin-top: 18px; padding-top: 14px; }}
+      .verification-context summary {{ cursor: pointer; font-weight: 700; }}
+      .verification-context p {{ margin: 10px 0 0; }}
+      .verification-note {{ background: #fffbeb; border: 1px solid #fcd34d;
+                            border-radius: 8px; color: #78350f;
+                            margin: 16px 0 0; padding: 12px 14px; }}
       .failure-summary {{ background: #fff1f2; border: 1px solid #fecdd3;
                           border-radius: 8px; margin-top: 20px; padding: 16px; }}
       .failure-summary h2 {{ font-size: 16px; margin-bottom: 12px; }}
@@ -756,6 +839,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
       .status-unverified {{ background: #fef3c7; color: #92400e; }}
+      .status-neutral {{ background: #e0f2fe; color: #075985; }}
       .status-empty {{ background: #e2e8f0; color: #475569; }}
       .timeline {{ position: relative; }}
       .timeline::before {{ background: #cbd5e1; bottom: 0; content: "";
@@ -763,10 +847,10 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .timeline-item {{ align-items: flex-start; display: grid; gap: 20px;
                         grid-template-columns: 40px minmax(0, 1fr);
                         margin-bottom: 28px; position: relative; }}
-      .marker {{ align-items: center; background: #2563eb; border: 4px solid #f3f4f6;
+      .marker {{ align-items: center; background: #2563eb; border: 4px solid #f8fafc;
                  border-radius: 50%; color: white; display: flex; font-weight: 700;
                  height: 32px; justify-content: center; width: 32px; z-index: 1; }}
-      .action-card {{ padding: 24px; }}
+      .action-card {{ box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 24px; }}
       dl {{ display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }}
       dt {{ color: #64748b; font-size: 13px; font-weight: 700; }}
       dd {{ margin: 6px 0 0; overflow-wrap: anywhere; }}
@@ -782,8 +866,16 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .raw-error {{ margin-top: 16px; }}
       .raw-error summary {{ cursor: pointer; font-weight: 700; }}
       .raw-error pre {{ margin-bottom: 0; }}
-      .verification {{ border: 1px solid #cbd5e1; border-radius: 8px;
-                       margin-top: 20px; padding: 16px; }}
+      .verification {{ background: white; border: 1px solid #cbd5e1;
+                       border-radius: 12px; margin: 0 0 28px; padding: 22px; }}
+      .action-card .verification {{ margin: 20px 0 0; }}
+      .verification-heading {{ align-items: center; display: flex;
+                               justify-content: space-between; }}
+      .verification-heading h2 {{ margin-bottom: 0; }}
+      .check-total {{ border-radius: 999px; font-size: 12px; font-weight: 800;
+                      padding: 6px 10px; text-transform: uppercase; }}
+      .check-total-passed {{ background: #dcfce7; color: #166534; }}
+      .check-total-failed {{ background: #fee2e2; color: #991b1b; }}
       .verification-failure {{ background: #fff1f2; border-radius: 8px;
                                margin-top: 16px; padding: 16px; }}
       .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
@@ -816,9 +908,10 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .missing {{ color: #64748b; }}
       .empty-state {{ padding: 32px; text-align: center; }}
       @media (max-width: 800px) {{
-        dl, .action-screenshots {{ grid-template-columns: 1fr; }}
+        dl, .action-screenshots, .run-stats {{ grid-template-columns: 1fr; }}
         .title-row, .action-heading, .findings-heading {{ align-items: flex-start;
                                                           flex-direction: column; }}
+        .result-mark {{ display: none; }}
       }}
     </style>
   </head>
@@ -827,13 +920,26 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       <header>
         <p class="eyebrow">Agent DevTools · Session schema {SESSION_SCHEMA_VERSION}</p>
         <div class="title-row">
-          <h1>Action session</h1>
-          <span class="status status-{overall_status}">{overall_label}</span>
+          <h1>{report_title}</h1>
         </div>
         {goal_section}
-        {inferred_goal_section}
-        <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label} · {unverified_count} {unverified_label}</p>
+        <section class="result-hero result-hero-{overall_status}">
+          <div>
+            <span class="result-kicker">Final result</span>
+            <strong class="result-title">{escape(result_title)}</strong>
+            <p class="result-detail">{escape(result_detail)}</p>
+          </div>
+          <span class="result-mark" aria-hidden="true">{result_mark}</span>
+        </section>
+        <section class="run-stats" aria-label="Run summary">
+          <div class="run-stat"><span>Actions</span><strong>{session.action_count}</strong></div>
+          <div class="run-stat"><span>Executed</span><strong>{execution_success_count} succeeded</strong></div>
+          <div class="run-stat"><span>Action failures</span><strong>{failure_count}</strong></div>
+          <div class="run-stat"><span>Action checks</span><strong>{step_check_value}</strong></div>
+        </section>
 {failure_summary}
+{verification_note_section}
+{inferred_goal_section}
 {automatic_verification_section}
       </header>
 {findings_section}
