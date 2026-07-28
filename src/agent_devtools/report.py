@@ -3,6 +3,7 @@ from html import escape
 from pathlib import Path
 
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
+from agent_devtools.analysis import TrajectoryFinding, analyze_session
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
 from agent_devtools.session import ActionSession
@@ -259,6 +260,61 @@ def _outcome_failure_category(action: ActionRecord) -> FailureCategory | None:
     return None
 
 
+def _trajectory_findings_section(session: ActionSession) -> str:
+    findings = analyze_session(session)
+    if not findings:
+        return ""
+
+    finding_cards = "\n".join(
+        _trajectory_finding_card(finding) for finding in findings
+    )
+    warning_label = "warning" if len(findings) == 1 else "warnings"
+    return f"""
+      <section class="trajectory-findings" aria-labelledby="findings-title">
+        <div class="findings-heading">
+          <div>
+            <p class="eyebrow">Automatic analysis</p>
+            <h2 id="findings-title">Potential issues</h2>
+          </div>
+          <span class="findings-count">{len(findings)} {warning_label}</span>
+        </div>
+        <p class="findings-note">These warnings highlight suspicious patterns.
+          They do not change the recorded task outcome.</p>
+        <div class="finding-list">
+{finding_cards}
+        </div>
+      </section>"""
+
+
+def _trajectory_finding_card(finding: TrajectoryFinding) -> str:
+    action_links = ", ".join(
+        f'<a href="#action-{number}">Action {number}</a>'
+        for number in finding.action_numbers
+    )
+    evidence = escape(
+        json.dumps(finding.evidence, ensure_ascii=False, indent=2)
+    )
+    suggestion_items = "".join(
+        f"<li>{escape(suggestion)}</li>"
+        for suggestion in finding.suggestions
+    )
+    return f"""
+          <article class="finding-card">
+            <div class="finding-title-row">
+              <span class="warning-label">Warning</span>
+              <h3>{escape(finding.title)}</h3>
+            </div>
+            <p class="finding-summary">{escape(finding.summary)}</p>
+            <p class="finding-actions"><strong>Related:</strong>
+              {action_links}</p>
+            <details class="finding-details">
+              <summary>Evidence and what to inspect</summary>
+              <pre>{evidence}</pre>
+              <ul>{suggestion_items}</ul>
+            </details>
+          </article>"""
+
+
 def write_action_html(action: ActionRecord, output_path: Path) -> None:
     data = action_to_dict(action)
     execution_status = escape(str(data["status"]))
@@ -410,7 +466,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
         screenshot_section = '<p class="missing">No screenshots captured.</p>'
 
     return f"""
-        <article class="timeline-item">
+        <article class="timeline-item" id="action-{index}">
           <div class="marker">{index}</div>
           <div class="action-card">
             <div class="action-heading">
@@ -513,6 +569,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             session.verification,
             "Task verification",
         )
+    findings_section = _trajectory_findings_section(session)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -541,6 +598,28 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                              list-style: none; margin: 0; padding: 0; }}
       .failure-summary li {{ background: white; border-radius: 999px;
                              display: flex; gap: 8px; padding: 6px 12px; }}
+      .trajectory-findings {{ background: #fffbeb; border: 2px solid #f59e0b;
+                              border-radius: 12px; margin-bottom: 24px;
+                              padding: 24px; }}
+      .findings-heading {{ align-items: center; display: flex; gap: 16px;
+                           justify-content: space-between; }}
+      .findings-heading h2 {{ margin-bottom: 0; }}
+      .findings-count, .warning-label {{ background: #fef3c7; border-radius: 999px;
+                                        color: #92400e; font-size: 13px;
+                                        font-weight: 700; padding: 6px 10px; }}
+      .findings-note {{ color: #78350f; margin: 12px 0 20px; }}
+      .finding-list {{ display: grid; gap: 12px; }}
+      .finding-card {{ background: white; border: 1px solid #fde68a;
+                       border-radius: 8px; padding: 18px; }}
+      .finding-title-row {{ align-items: center; display: flex; gap: 10px; }}
+      .finding-title-row h3 {{ margin-bottom: 0; }}
+      .finding-summary {{ font-weight: 600; margin: 14px 0 10px; }}
+      .finding-actions {{ color: #475569; margin-bottom: 0; }}
+      .finding-actions a {{ color: #1d4ed8; }}
+      .finding-details {{ margin-top: 14px; }}
+      .finding-details summary {{ cursor: pointer; font-weight: 700; }}
+      .finding-details pre {{ margin-bottom: 12px; }}
+      .finding-details ul {{ margin-bottom: 0; }}
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
@@ -588,7 +667,8 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .empty-state {{ padding: 32px; text-align: center; }}
       @media (max-width: 800px) {{
         dl, .action-screenshots {{ grid-template-columns: 1fr; }}
-        .title-row, .action-heading {{ align-items: flex-start; flex-direction: column; }}
+        .title-row, .action-heading, .findings-heading {{ align-items: flex-start;
+                                                          flex-direction: column; }}
       }}
     </style>
   </head>
@@ -604,6 +684,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
         <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label} · {unverified_count} {unverified_label}</p>
 {failure_summary}
       </header>
+{findings_section}
 {task_verification_section}
       <div class="timeline">
 {cards}

@@ -134,6 +134,8 @@ The repository currently includes:
   callbacks;
 - optional automatic before-and-after structured state observations with
   deterministic changed paths and non-fatal observer errors;
+- deterministic session analysis for repeated successful actions with unchanged
+  structured state, shown as non-outcome-changing warnings in HTML reports;
 - a Playwright tool wrapper that automatically captures screenshots and small
   page-state metadata without collecting page text, form values, or full DOM;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
@@ -157,6 +159,8 @@ before persistence. Integrations must still choose expected states; the core
 does not infer intent.
 Structured Playwright expectations currently support exact text and input
 values, plus single-element visibility.
+Automatic trajectory analysis is intentionally limited to conservative stuck-loop
+warnings and does not infer whether the user's task is correct.
 
 # Near-Term Roadmap
 

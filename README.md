@@ -31,6 +31,7 @@ written as versioned JSON traces.
 - A generic synchronous tool wrapper that records public method calls
 - A generic sequential async tool wrapper with sync or async evidence callbacks
 - Optional automatic before-and-after structured state capture with changed paths
+- Automatic potential-issue warnings for repeated actions with no observed progress
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -727,6 +728,25 @@ unverified totals; failure categories include execution and verification
 failures. Each action shows its execution status, verification status, final
 outcome, timing, arguments, failure details, and screenshots.
 
+Session reports automatically analyze repeated no-progress actions. When at
+least three consecutive successful calls use the same action type and arguments,
+and complete before-and-after structured state shows no change, a compact
+`Potential issues` section appears above the timeline. It links directly to the
+related actions and keeps evidence and inspection suggestions collapsed until
+opened. Findings are warnings rather than verification results: they do not
+change action or task outcomes and do not claim that the task is wrong.
+
+The same deterministic analysis can be run on a loaded session without changing
+the saved JSON schema:
+
+```python
+from agent_devtools import analyze_session, read_session_json
+
+session = read_session_json(Path("trace/my-session/session.json"))
+for finding in analyze_session(session):
+    print(finding.title, finding.action_numbers)
+```
+
 When `task_verification` is configured, leaving the `with` block normally runs
 it automatically and writes the final report. If an unhandled agent exception
 escapes, completed actions remain persisted, task verification is skipped, and
@@ -826,6 +846,8 @@ sensitive content.
   integration; structured failure diagnostics are limited to click and fill
 - Callers must provide expected states; the tool does not infer intent
 - Structured state changes are evidence only; they are not automatic verification
+- Automatic trajectory analysis currently detects only three or more identical
+  consecutive actions with complete, unchanged structured state
 - Structured Playwright expectations currently support exact text and
   input-value matching, plus single-element visibility
 

@@ -1,6 +1,7 @@
 import agent_devtools
 import agent_devtools.playwright as public_playwright
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
+from agent_devtools.analysis import TrajectoryFinding, analyze_session
 from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
@@ -32,7 +33,9 @@ def test_core_public_api_exports_supported_types() -> None:
         "RecordedAsyncTools": RecordedAsyncTools,
         "RecordedTools": RecordedTools,
         "SessionRecorder": SessionRecorder,
+        "TrajectoryFinding": TrajectoryFinding,
         "VerificationResult": VerificationResult,
+        "analyze_session": analyze_session,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
         "record_async_tools": record_async_tools,

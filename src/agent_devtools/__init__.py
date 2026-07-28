@@ -1,4 +1,5 @@
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
+from agent_devtools.analysis import TrajectoryFinding, analyze_session
 from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
@@ -20,7 +21,9 @@ __all__ = [
     "RecordedAsyncTools",
     "RecordedTools",
     "SessionRecorder",
+    "TrajectoryFinding",
     "VerificationResult",
+    "analyze_session",
     "read_action_json",
     "read_session_json",
     "record_async_tools",

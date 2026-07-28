@@ -267,6 +267,50 @@ def test_successful_session_omits_failure_summary(tmp_path: Path) -> None:
         in content
     )
     assert "Failure categories" not in content
+    assert "Potential issues" not in content
+
+
+def test_session_report_highlights_possible_stuck_loop_cleanly(
+    tmp_path: Path,
+) -> None:
+    unchanged = {"url": "https://example.com", "playing": False}
+    session = ActionSession(
+        actions=[
+            ActionRecord(
+                action_type="click",
+                arguments={"selector": "<#play>"},
+                start_time=datetime(2026, 7, 18, 7, index, tzinfo=UTC),
+                duration_ms=32,
+                status=ActionStatus.SUCCESS,
+                observations={
+                    "state_before": unchanged,
+                    "state_after": unchanged,
+                    "state_changes": [],
+                },
+            )
+            for index in range(3)
+        ]
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<h2 id="findings-title">Potential issues</h2>' in content
+    assert '<span class="findings-count">1 warning</span>' in content
+    assert "Possible stuck loop" in content
+    assert (
+        "Actions 1–3 repeated &#x27;click&#x27; with identical arguments, "
+        "but the observed state did not change."
+    ) in content
+    assert '<a href="#action-1">Action 1</a>' in content
+    assert '<a href="#action-3">Action 3</a>' in content
+    assert '<article class="timeline-item" id="action-1">' in content
+    assert '<details class="finding-details">' in content
+    assert "Evidence and what to inspect" in content
+    assert "Check whether the target is correct or blocked." in content
+    assert "&lt;#play&gt;" in content
+    assert "They do not change the recorded task outcome." in content
 
 
 def test_session_report_marks_missing_verification_as_unverified(
