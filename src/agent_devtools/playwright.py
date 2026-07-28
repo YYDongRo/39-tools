@@ -9,16 +9,42 @@ from agent_devtools.integrations.playwright import (
     record_async_playwright_tools,
     record_playwright_tools,
 )
+from agent_devtools.integrations.playwright_task import (
+    AllOf,
+    ElementVisible,
+    PropertyEquals,
+    TaskExpectation,
+    TextMatch,
+    UrlMatch,
+    all_of,
+    element_visible,
+    property_equals,
+    text_contains,
+    text_equals,
+    url_matches,
+)
 
 
 __all__ = [
+    "AllOf",
+    "ElementVisible",
     "InputValueExpectation",
     "PlaywrightAction",
+    "PropertyEquals",
     "RecordedPlaywrightExecutor",
+    "TaskExpectation",
+    "TextMatch",
     "TextExpectation",
+    "UrlMatch",
     "VisibilityExpectation",
+    "all_of",
+    "element_visible",
     "observe_async_playwright_page",
     "observe_playwright_page",
+    "property_equals",
     "record_async_playwright_tools",
     "record_playwright_tools",
+    "text_contains",
+    "text_equals",
+    "url_matches",
 ]

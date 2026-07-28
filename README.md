@@ -199,6 +199,54 @@ async with trace as tools:
     await agent.run(task, tools=tools)
 ```
 
+### Verify the final browser task
+
+For common browser tests, declare the final success conditions instead of
+writing a verification callback. Conditions run automatically when the
+recorder context exits normally:
+
+```python
+from agent_devtools.playwright import (
+    all_of,
+    element_visible,
+    property_equals,
+    record_playwright_tools,
+    text_contains,
+    url_matches,
+)
+
+trace = record_playwright_tools(
+    original_tools,
+    page,
+    Path("trace/youtube-test"),
+    goal="Search YouTube and play a video",
+    task_expectation=all_of(
+        url_matches(host="youtube.com", path_prefix="/watch"),
+        element_visible("video"),
+        text_contains("h1", "Agent"),
+        property_equals("video", "paused", False),
+    ),
+)
+
+with trace as tools:
+    agent.run(task, tools=tools)
+
+trace.assert_task_passed()
+```
+
+URL checks compare components rather than the complete URL. Query strings and
+fragments are ignored, and subdomains are accepted by default. Text checks can
+use `text_equals(...)` or `text_contains(...)`. Every selector-based check
+waits up to two seconds by default and requires exactly one matching element.
+`assert_task_passed()` raises `AssertionError` for a failed or unverified task
+and includes the absolute HTML report path in the message, which makes it
+suitable for pytest. Async Playwright uses the same task checks and assertion
+method with `record_async_playwright_tools`.
+
+These checks are deterministic and local. They do not infer the goal or call an
+LLM. Their data-only structure is intended to be a safe target for a future
+optional expectation generator.
+
 ## Record a simulated action
 
 Run the dependency-free example:
@@ -877,8 +925,9 @@ sensitive content.
 - Structured state changes are evidence only; they are not automatic verification
 - Automatic trajectory analysis currently detects only three or more identical
   consecutive actions with complete, unchanged structured state
-- Structured Playwright expectations currently support exact text and
-  input-value matching, plus single-element visibility
+- Action-level Playwright expectations support exact text and input values,
+  plus single-element visibility; task checks additionally support component
+  URL matching, contained text, and scalar DOM property equality
 
 ## License
 

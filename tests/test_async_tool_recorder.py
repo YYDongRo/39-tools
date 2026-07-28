@@ -248,6 +248,27 @@ def test_record_async_tools_runs_async_task_verification(
     asyncio.run(run())
 
 
+def test_async_trace_asserts_passed_task(tmp_path: Path) -> None:
+    async def run() -> None:
+        trace = record_async_tools(
+            AsyncTools(),
+            tmp_path / "trace",
+            goal="increase the value",
+            task_verification=lambda: VerificationResult(
+                expected_state="value increased",
+                observed_state="value increased",
+                passed=True,
+            ),
+        )
+
+        async with trace as tools:
+            await tools.add(1)
+
+        trace.assert_task_passed()
+
+    asyncio.run(run())
+
+
 def test_record_async_tools_rejects_concurrent_actions(
     tmp_path: Path,
 ) -> None:

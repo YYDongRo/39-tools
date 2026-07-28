@@ -16,6 +16,12 @@ from agent_devtools.integrations.playwright_events import (
     AsyncPlaywrightEventCollector,
     PlaywrightEventCollector,
 )
+from agent_devtools.integrations.playwright_task import (
+    TaskExpectation,
+    validate_task_expectation,
+    verify_async_playwright_task,
+    verify_playwright_task,
+)
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
@@ -119,6 +125,7 @@ def record_playwright_tools(
     *,
     goal: str | None = None,
     task_verification: Callable[[], VerificationResult] | None = None,
+    task_expectation: TaskExpectation | None = None,
     methods: Iterable[str] | None = None,
     full_page_screenshots: bool = False,
     capture_browser_events: bool = True,
@@ -129,6 +136,16 @@ def record_playwright_tools(
         raise TypeError("full_page_screenshots must be a boolean")
     if not isinstance(capture_browser_events, bool):
         raise TypeError("capture_browser_events must be a boolean")
+    if task_verification is not None and task_expectation is not None:
+        raise ValueError(
+            "use either task_verification or task_expectation, not both"
+        )
+    if task_expectation is not None:
+        validate_task_expectation(task_expectation)
+        task_verification = lambda: verify_playwright_task(
+            page,
+            task_expectation,
+        )
     event_collector = None
     if capture_browser_events:
         event_collector = PlaywrightEventCollector(
@@ -164,6 +181,7 @@ def record_async_playwright_tools(
         ]
         | None
     ) = None,
+    task_expectation: TaskExpectation | None = None,
     methods: Iterable[str] | None = None,
     full_page_screenshots: bool = False,
     capture_browser_events: bool = True,
@@ -174,6 +192,17 @@ def record_async_playwright_tools(
         raise TypeError("full_page_screenshots must be a boolean")
     if not isinstance(capture_browser_events, bool):
         raise TypeError("capture_browser_events must be a boolean")
+    if task_verification is not None and task_expectation is not None:
+        raise ValueError(
+            "use either task_verification or task_expectation, not both"
+        )
+    if task_expectation is not None:
+        validate_task_expectation(task_expectation)
+
+        async def generated_task_verification() -> VerificationResult:
+            return await verify_async_playwright_task(page, task_expectation)
+
+        task_verification = generated_task_verification
     event_collector = None
     if capture_browser_events:
         event_collector = AsyncPlaywrightEventCollector(

@@ -61,12 +61,10 @@ def _verification_result_section(
     title: str,
 ) -> str:
     status = "passed" if verification.passed else "failed"
-    evidence_section = ""
-    if verification.evidence:
-        evidence = escape(
-            json.dumps(verification.evidence, ensure_ascii=False, indent=2)
-        )
-        evidence_section = f"<h3>Verification evidence</h3><pre>{evidence}</pre>"
+    evidence_section = _verification_evidence_section(
+        verification,
+        summarize_check=(title == "Task verification"),
+    )
 
     failure_section = ""
     if verification.failure_reason is not None:
@@ -93,6 +91,61 @@ def _verification_result_section(
         {failure_section}
         {evidence_section}
       </section>"""
+
+
+def _verification_evidence_section(
+    verification: VerificationResult,
+    *,
+    summarize_check: bool,
+) -> str:
+    if not verification.evidence:
+        return ""
+
+    evidence = escape(
+        json.dumps(verification.evidence, ensure_ascii=False, indent=2)
+    )
+    checks = verification.evidence.get("checks")
+    if not isinstance(checks, list) or not all(
+        isinstance(check, dict) for check in checks
+    ):
+        if not summarize_check:
+            return f"<h3>Verification evidence</h3><pre>{evidence}</pre>"
+        checks = [
+            {
+                "passed": verification.passed,
+                "expected_state": verification.expected_state,
+                "observed_state": verification.observed_state,
+            }
+        ]
+
+    check_items = []
+    for index, check in enumerate(checks, start=1):
+        passed = check.get("passed") is True
+        check_status = "passed" if passed else "failed"
+        expected = escape(str(check.get("expected_state", "—")))
+        observed = escape(str(check.get("observed_state", "—")))
+        check_items.append(
+            f"""
+          <li class="verification-check verification-check-{check_status}">
+            <div>
+              <strong>Check {index}</strong>
+              <span class="check-status">{check_status}</span>
+            </div>
+            <p>{expected}</p>
+            <small>Observed: {observed}</small>
+          </li>"""
+        )
+
+    return f"""
+        <div class="verification-check-list">
+          <h3>Task checks</h3>
+          <ol>{''.join(check_items)}
+          </ol>
+        </div>
+        <details class="verification-evidence">
+          <summary>Full verification evidence</summary>
+          <pre>{evidence}</pre>
+        </details>"""
 
 
 def _verification_section(action: ActionRecord) -> str:
@@ -699,6 +752,24 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .verification-failure {{ background: #fff1f2; border-radius: 8px;
                                margin-top: 16px; padding: 16px; }}
       .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
+      .verification-check-list {{ margin-top: 20px; }}
+      .verification-check-list ol {{ display: grid; gap: 10px;
+                                     list-style: none; margin: 0; padding: 0; }}
+      .verification-check {{ border: 1px solid #e2e8f0; border-left-width: 4px;
+                             border-radius: 8px; padding: 14px; }}
+      .verification-check-passed {{ border-left-color: #22c55e; }}
+      .verification-check-failed {{ border-left-color: #ef4444; }}
+      .verification-check div {{ align-items: center; display: flex;
+                                 justify-content: space-between; }}
+      .verification-check p {{ margin: 8px 0 4px; }}
+      .verification-check small {{ color: #64748b; }}
+      .check-status {{ font-size: 12px; font-weight: 700;
+                       text-transform: uppercase; }}
+      .verification-check-passed .check-status {{ color: #166534; }}
+      .verification-check-failed .check-status {{ color: #991b1b; }}
+      .verification-evidence {{ margin-top: 16px; }}
+      .verification-evidence summary {{ cursor: pointer; font-weight: 700; }}
+      .verification-evidence pre {{ margin-bottom: 0; }}
       .action-screenshots {{ display: grid; gap: 16px;
                              grid-template-columns: repeat(2, minmax(0, 1fr));
                              margin-top: 20px; }}

@@ -93,6 +93,20 @@ class RecordedAsyncTools(Generic[ToolT]):
     def raw_tools(self) -> ToolT:
         return self._tools
 
+    def assert_task_passed(self) -> None:
+        verification = self.session.verification
+        report_path = self.report_path.resolve()
+        if verification is None:
+            raise AssertionError(
+                "Task was not verified. Configure a task expectation or "
+                f"task verification callback. Report: {report_path}"
+            )
+        if not verification.passed:
+            raise AssertionError(
+                f"Task verification failed: {verification.failure_reason}. "
+                f"Report: {report_path}"
+            )
+
     async def __aenter__(self) -> ToolT:
         return cast(ToolT, self._proxy)
 

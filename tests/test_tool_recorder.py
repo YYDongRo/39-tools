@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from agent_devtools import ActionStatus, RecordedTools, record_tools
+from agent_devtools import (
+    ActionStatus,
+    RecordedTools,
+    VerificationResult,
+    record_tools,
+)
 from agent_devtools.serialization import read_session_json
 
 
@@ -199,6 +204,40 @@ def test_record_tools_accepts_string_output_path(tmp_path: Path) -> None:
         tools.add(1, 1)
 
     assert trace.report_path.is_file()
+
+
+def test_assert_task_passed_reports_failure_and_report_path(
+    tmp_path: Path,
+) -> None:
+    trace = record_tools(
+        ExampleTools(),
+        tmp_path / "trace",
+        goal="produce the expected value",
+        task_verification=lambda: VerificationResult(
+            expected_state="expected",
+            observed_state="actual",
+            passed=False,
+            failure_reason="value did not match",
+        ),
+    )
+
+    with trace as tools:
+        tools.add(1, 1)
+
+    with pytest.raises(AssertionError, match="value did not match") as error:
+        trace.assert_task_passed()
+
+    assert str(trace.report_path.resolve()) in str(error.value)
+
+
+def test_assert_task_passed_rejects_unverified_task(tmp_path: Path) -> None:
+    trace = record_tools(ExampleTools(), tmp_path / "trace")
+
+    with trace as tools:
+        tools.add(1, 1)
+
+    with pytest.raises(AssertionError, match="Task was not verified"):
+        trace.assert_task_passed()
 
 
 def test_record_tools_collects_action_events(tmp_path: Path) -> None:
