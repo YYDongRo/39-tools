@@ -138,9 +138,9 @@ The repository currently includes:
   structured state, shown as non-outcome-changing warnings in HTML reports;
 - a Playwright tool wrapper that automatically captures screenshots and small
   page-state metadata without collecting page text, form values, or full DOM;
-- bounded action-scoped Playwright `pageerror` and `console.error` evidence for
-  synchronous and asynchronous tools, with sanitized event URLs and likely-cause
-  findings;
+- bounded action-scoped Playwright `pageerror`, `console.error`, failed-request,
+  and HTTP 4xx/5xx evidence for synchronous and asynchronous tools, with
+  sanitized event URLs and prioritized likely-cause findings;
 - composable synchronous and asynchronous Playwright task checks for URL
   components, element visibility, exact or contained text, and scalar DOM
   properties, with automatic verification and pytest-friendly assertions;
@@ -177,10 +177,12 @@ when context is insufficient.
 Action-level Playwright expectations support exact text and input values, plus
 single-element visibility. Task checks additionally support component URL
 matching, contained text, and scalar DOM property equality.
-Automatic trajectory analysis is intentionally limited to conservative stuck-loop
-warnings and does not infer whether the user's task is correct.
-Browser event evidence does not include network failures, HTTP status errors,
-request or response bodies, headers, or cookies.
+Automatic trajectory analysis is intentionally limited to conservative
+stuck-loop and explicit browser/runtime error warnings and does not infer
+whether the user's task is correct.
+Browser event evidence includes failed requests and HTTP 4xx/5xx responses but
+does not include successful request timelines, request or response bodies,
+headers, or cookies.
 
 # Near-Term Roadmap
 

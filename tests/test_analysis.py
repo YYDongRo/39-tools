@@ -206,3 +206,53 @@ def test_groups_same_browser_error_across_actions() -> None:
     assert len(findings) == 1
     assert findings[0].code == "console_error_during_action"
     assert findings[0].action_numbers == (1, 2)
+
+
+def test_reports_network_failure_as_likely_cause() -> None:
+    action = _action()
+    action.observations["browser_events"] = [
+        {
+            "event_type": "request_failed",
+            "message": "GET fetch request failed: net::ERR_FAILED",
+            "method": "GET",
+            "resource_type": "fetch",
+            "url": "https://example.com/api/search",
+            "failure": "net::ERR_FAILED",
+            "count": 1,
+        }
+    ]
+
+    findings = analyze_session(ActionSession(actions=[action]))
+
+    assert len(findings) == 1
+    assert findings[0].code == "network_request_failed"
+    assert findings[0].title == "Network request failed during action"
+    assert findings[0].likely_cause == (
+        "GET fetch request failed: net::ERR_FAILED"
+    )
+
+
+def test_prioritizes_api_http_error_over_console_error() -> None:
+    action = _action()
+    action.observations["browser_events"] = [
+        {
+            "event_type": "console_error",
+            "message": "Failed to load resource",
+            "count": 1,
+        },
+        {
+            "event_type": "http_error",
+            "message": "POST xhr request returned HTTP 500",
+            "method": "POST",
+            "resource_type": "xhr",
+            "url": "https://example.com/api/save",
+            "status": 500,
+            "count": 1,
+        },
+    ]
+
+    findings = analyze_session(ActionSession(actions=[action]))
+
+    assert len(findings) == 1
+    assert findings[0].code == "http_error_response"
+    assert findings[0].likely_cause == "POST xhr request returned HTTP 500"

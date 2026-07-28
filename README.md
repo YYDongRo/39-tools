@@ -3,9 +3,10 @@
 Agent DevTools is an open-source Python project for making computer-use agents
 observable, debuggable, and reliable.
 
-The current MVP records one computer action with its arguments, timing, outcome,
-failure reason, and optional before-and-after screenshot paths. Records can be
-written as versioned JSON traces.
+The current browser MVP records ordered computer-action trajectories with
+arguments, timing, outcomes, failure evidence, structured page state, and
+before-and-after screenshots. It writes versioned JSON traces and a static HTML
+report after the agent run.
 
 ## Current features
 
@@ -24,7 +25,8 @@ written as versioned JSON traces.
 - Playwright click diagnostics with minimal structured element-state evidence
 - Structured Playwright text and visibility expectations with automatic waiting
   and evidence
-- Action-scoped Playwright page and console error evidence with likely causes
+- Action-scoped Playwright page, console, request-failure, and HTTP-error
+  evidence with likely causes
 - A single Playwright executor for recorded navigate, fill, and click actions
 - Stable public imports for core records and the recommended Playwright API
 - Single-call Playwright click traces with screenshots, JSON, and HTML output
@@ -33,6 +35,8 @@ written as versioned JSON traces.
 - A generic sequential async tool wrapper with sync or async evidence callbacks
 - Optional automatic before-and-after structured state capture with changed paths
 - Automatic potential-issue warnings for repeated actions with no observed progress
+- Observed-agent wrappers that capture the user request and inject recorded tools
+- Optional OpenAI generation of bounded final-state checks from that request
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
 - An optional Playwright browser-click demo with real screenshots
@@ -167,22 +171,26 @@ with trace as tools:
 The default Playwright observer records URL, title, document readiness and
 visibility, viewport, scroll range, element count, and a minimal focused-element
 descriptor. It does not collect input values, page text, full DOM content,
-cookies, browser storage, or network traffic. URLs, titles, tool arguments, and
-screenshots can still contain sensitive information and should be handled as
-debugging evidence. Screenshots capture the current viewport by default, which
-matches what the agent sees and keeps reports compact. Set
+cookies, browser storage, request or response bodies, or headers. URLs, titles,
+tool arguments, screenshots, and error messages can still contain sensitive
+information and should be handled as debugging evidence. Screenshots capture
+the current viewport by default, which matches what the agent sees and keeps
+reports compact. Set
 `full_page_screenshots=True` only when the complete page is required.
 
 The wrapper also listens for uncaught JavaScript `pageerror` events and
-`console.error` messages during each action. It waits 100 ms after the tool call
-by default so immediate asynchronous errors can arrive, deduplicates identical
-events, stores at most 20 unique events per action, and removes query strings and
-fragments from event URLs. Reports show one evidence-based likely cause at the
-top and keep the complete event list collapsed under the related action. Error
-messages themselves may still contain sensitive application data. Set
+`console.error` messages, failed network requests, and HTTP 4xx/5xx responses
+during each action. It waits 100 ms after the tool call by default so immediate
+asynchronous errors can arrive, deduplicates identical events, and stores at
+most 20 unique events per action. Network evidence contains only the method,
+resource type, status or browser failure, and a URL with credentials, query
+strings, and fragments removed. Reports show one prioritized, evidence-based
+likely cause at the top and keep the complete event list collapsed under the
+related action. Error messages and URL paths may still contain sensitive
+application data. Set
 `capture_browser_events=False`, `event_settle_ms=...`, or
-`max_browser_events=...` to change this behavior. Response bodies, request
-headers, cookies, network failures, and HTTP status errors are not collected.
+`max_browser_events=...` to change this behavior. Successful request timelines,
+headers, cookies, and request or response bodies are not collected.
 
 Async Playwright users get the same screenshots, structured state, and browser
 error evidence through the matching convenience wrapper:
@@ -1005,12 +1013,15 @@ sensitive content.
   framework call shapes need adapters
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics are limited to click and fill
-- Browser runtime evidence currently covers `pageerror` and `console.error`;
-  failed requests and HTTP error responses are not yet collected
-- Callers must provide expected states; the tool does not infer intent
+- Browser runtime evidence records failed requests and HTTP 4xx/5xx responses,
+  but not successful request timelines, redirects, headers, cookies, or bodies
+- Deterministic expected states can be supplied directly; the optional OpenAI
+  generator can propose bounded checks from the user request, but generated
+  checks are not ground truth
 - Structured state changes are evidence only; they are not automatic verification
-- Automatic trajectory analysis currently detects only three or more identical
-  consecutive actions with complete, unchanged structured state
+- Automatic trajectory analysis currently covers browser/runtime errors and
+  three or more identical consecutive actions with unchanged structured state;
+  it is not general semantic root-cause analysis
 - Action-level Playwright expectations support exact text and input values,
   plus single-element visibility; task checks additionally support component
   URL matching, contained text, and scalar DOM property equality

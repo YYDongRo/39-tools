@@ -72,8 +72,6 @@ def _browser_error_findings(
         tuple[dict[str, object], list[int]],
     ] = {}
     for action_number, action in enumerate(session.actions, start=1):
-        if action.status is not ActionStatus.SUCCESS:
-            continue
         event = _primary_browser_error(action)
         if event is None:
             continue
@@ -95,33 +93,19 @@ def _browser_error_findings(
             if len(numbers) == 1
             else "Actions " + ", ".join(str(number) for number in numbers)
         )
-        page_error = event_type == "page_error"
+        code, title, event_summary, suggestions = _browser_finding_details(
+            event_type
+        )
         findings.append(
             TrajectoryFinding(
-                code=(
-                    "page_error_during_action"
-                    if page_error
-                    else "console_error_during_action"
-                ),
-                title=(
-                    "Page error during action"
-                    if page_error
-                    else "Console error during action"
-                ),
+                code=code,
+                title=title,
                 summary=(
-                    f"{action_label} completed, but the page reported "
-                    + (
-                        "a JavaScript error."
-                        if page_error
-                        else "a console error."
-                    )
+                    f"{action_label} reported {event_summary}."
                 ),
                 action_numbers=numbers,
                 evidence=dict(event),
-                suggestions=(
-                    "Inspect the application code associated with this action.",
-                    "Check whether the error prevented the expected UI update.",
-                ),
+                suggestions=suggestions,
                 likely_cause=message,
             )
         )
@@ -138,15 +122,82 @@ def _primary_browser_error(
         event
         for event in events
         if isinstance(event, dict)
-        and event.get("event_type") in {"page_error", "console_error"}
+        and event.get("event_type")
+        in {"page_error", "console_error", "request_failed", "http_error"}
         and isinstance(event.get("message"), str)
         and bool(event["message"])
     ]
-    for event_type in ("page_error", "console_error"):
-        for event in valid_events:
-            if event["event_type"] == event_type:
-                return event  # type: ignore[return-value]
-    return None
+    if not valid_events:
+        return None
+    return min(  # type: ignore[return-value]
+        valid_events,
+        key=_browser_event_priority,
+    )
+
+
+def _browser_event_priority(event: dict[str, object]) -> int:
+    event_type = event.get("event_type")
+    resource_type = event.get("resource_type")
+    important_resource = resource_type in {
+        "document",
+        "xhr",
+        "fetch",
+        "script",
+        "media",
+    }
+    if event_type == "request_failed":
+        return 0 if important_resource else 4
+    if event_type == "http_error":
+        return 1 if important_resource else 5
+    if event_type == "page_error":
+        return 2
+    return 3
+
+
+def _browser_finding_details(
+    event_type: str,
+) -> tuple[str, str, str, tuple[str, ...]]:
+    if event_type == "request_failed":
+        return (
+            "network_request_failed",
+            "Network request failed during action",
+            "a network request failure",
+            (
+                "Check connectivity, DNS, request blocking, and timeouts.",
+                "Check whether the failed resource was required for the "
+                "UI update.",
+            ),
+        )
+    if event_type == "http_error":
+        return (
+            "http_error_response",
+            "HTTP error response during action",
+            "an HTTP error response",
+            (
+                "Inspect the failing endpoint and server-side logs.",
+                "Check whether authentication or rate limiting caused the "
+                "response.",
+            ),
+        )
+    if event_type == "page_error":
+        return (
+            "page_error_during_action",
+            "Page error during action",
+            "a JavaScript error",
+            (
+                "Inspect the application code associated with this action.",
+                "Check whether the error prevented the expected UI update.",
+            ),
+        )
+    return (
+        "console_error_during_action",
+        "Console error during action",
+        "a console error",
+        (
+            "Inspect the application code associated with this action.",
+            "Check whether the error prevented the expected UI update.",
+        ),
+    )
 
 
 def _is_successful_no_progress_action(action: ActionRecord) -> bool:

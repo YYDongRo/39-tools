@@ -345,6 +345,42 @@ def test_session_report_shows_likely_browser_cause_without_clutter(
     assert "browser_events" not in content
 
 
+def test_session_report_shows_http_error_as_likely_cause(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#search"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        observations={
+            "browser_events": [
+                {
+                    "event_type": "http_error",
+                    "message": "POST xhr request returned HTTP 500",
+                    "method": "POST",
+                    "resource_type": "xhr",
+                    "url": "https://example.com/api/search",
+                    "status": 500,
+                    "count": 1,
+                }
+            ]
+        },
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(ActionSession(actions=[action]), output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "HTTP error response during action" in content
+    assert (
+        "<strong>Likely cause:</strong> "
+        "POST xhr request returned HTTP 500"
+    ) in content
+    assert "Browser evidence (1 event)" in content
+
+
 def test_session_report_marks_missing_verification_as_unverified(
     tmp_path: Path,
 ) -> None:

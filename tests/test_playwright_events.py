@@ -56,6 +56,28 @@ class FakeConsoleMessage:
         }
 
 
+class FakeRequest:
+    def __init__(
+        self,
+        url: str,
+        *,
+        method: str = "GET",
+        resource_type: str = "fetch",
+        failure: str | None = None,
+    ) -> None:
+        self.url = url
+        self.method = method
+        self.resource_type = resource_type
+        self.failure = failure
+
+
+class FakeResponse:
+    def __init__(self, status: int, request: FakeRequest) -> None:
+        self.status = status
+        self.request = request
+        self.url = request.url
+
+
 def test_collects_deduplicates_and_sanitizes_browser_errors() -> None:
     page = FakePage()
     collector = PlaywrightEventCollector(
@@ -88,7 +110,76 @@ def test_collects_deduplicates_and_sanitizes_browser_errors() -> None:
             "count": 1,
         },
     ]
-    assert page.handlers == {"pageerror": [], "console": []}
+    assert page.handlers == {
+        "pageerror": [],
+        "console": [],
+        "requestfailed": [],
+        "response": [],
+    }
+
+
+def test_collects_failed_requests_and_http_errors_without_sensitive_url_data(
+) -> None:
+    page = FakePage()
+    collector = PlaywrightEventCollector(page, settle_ms=0)
+    collector.start()
+    request = FakeRequest(
+        "https://user:password@example.com/api/search?token=secret#result",
+        method="POST",
+        resource_type="xhr",
+    )
+
+    page.emit("response", FakeResponse(200, request))
+    page.emit("response", FakeResponse(503, request))
+    page.emit(
+        "requestfailed",
+        FakeRequest(
+            "https://example.com/video?id=secret",
+            resource_type="media",
+            failure="net::ERR_CONNECTION_RESET",
+        ),
+    )
+
+    assert collector.finish() == [
+        {
+            "event_type": "http_error",
+            "message": "POST xhr request returned HTTP 503",
+            "method": "POST",
+            "resource_type": "xhr",
+            "url": "https://example.com/api/search",
+            "status": 503,
+            "count": 1,
+        },
+        {
+            "event_type": "request_failed",
+            "message": (
+                "GET media request failed: net::ERR_CONNECTION_RESET"
+            ),
+            "method": "GET",
+            "resource_type": "media",
+            "url": "https://example.com/video",
+            "failure": "net::ERR_CONNECTION_RESET",
+            "count": 1,
+        },
+    ]
+
+
+def test_redacts_data_url_content() -> None:
+    page = FakePage()
+    collector = PlaywrightEventCollector(page, settle_ms=0)
+    collector.start()
+    page.emit(
+        "requestfailed",
+        FakeRequest(
+            "data:text/plain,private-content",
+            failure="net::ERR_FAILED",
+        ),
+    )
+
+    events = collector.finish()
+
+    assert events[0]["url"] == "data:"
+    assert "private-content" not in str(events)
 
 
 def test_caps_unique_events_and_reports_dropped_count() -> None:
@@ -110,11 +201,22 @@ def test_async_collector_waits_and_returns_events() -> None:
         collector = AsyncPlaywrightEventCollector(page, settle_ms=10)
         collector.start()
         page.emit("pageerror", RuntimeError("async player failed"))
+        page.emit(
+            "response",
+            FakeResponse(
+                429,
+                FakeRequest(
+                    "https://example.com/api?key=secret",
+                    resource_type="fetch",
+                ),
+            ),
+        )
 
         events = await collector.finish()
 
         assert page.waited_ms == [10]
         assert events[0]["message"] == "async player failed"
+        assert events[1]["message"] == "GET fetch request returned HTTP 429"
 
     asyncio.run(run())
 

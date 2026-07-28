@@ -29,45 +29,43 @@ class _PlaywrightEventCollectorBase:
         self._events: list[dict[str, object]] = []
         self._dropped_count = 0
         self._listening = False
+        self._active_listeners: tuple[tuple[str, object], ...] = ()
 
     def start(self) -> None:
         if self._listening:
             raise RuntimeError("browser event collection is already active")
         self._events = []
         self._dropped_count = 0
-        self.page.on(  # type: ignore[attr-defined]
-            "pageerror",
-            self._on_page_error,
-        )
+        registered: list[tuple[str, object]] = []
         try:
-            self.page.on(  # type: ignore[attr-defined]
-                "console",
-                self._on_console,
-            )
+            for event_name, handler in self._listeners():
+                self.page.on(event_name, handler)  # type: ignore[attr-defined]
+                registered.append((event_name, handler))
         except Exception:
-            self.page.remove_listener(  # type: ignore[attr-defined]
-                "pageerror",
-                self._on_page_error,
-            )
+            for event_name, handler in reversed(registered):
+                self.page.remove_listener(  # type: ignore[attr-defined]
+                    event_name,
+                    handler,
+                )
             raise
+        self._active_listeners = tuple(registered)
         self._listening = True
 
     def _stop(self) -> list[dict[str, object]]:
         if not self._listening:
             return []
-        try:
-            self.page.remove_listener(  # type: ignore[attr-defined]
-                "pageerror",
-                self._on_page_error,
-            )
-        finally:
+        removal_error: Exception | None = None
+        for event_name, handler in reversed(self._active_listeners):
             try:
                 self.page.remove_listener(  # type: ignore[attr-defined]
-                    "console",
-                    self._on_console,
+                    event_name,
+                    handler,
                 )
-            finally:
-                self._listening = False
+            except Exception as error:
+                if removal_error is None:
+                    removal_error = error
+        self._listening = False
+        self._active_listeners = ()
         events = [dict(event) for event in self._events]
         if self._dropped_count:
             events.append(
@@ -76,7 +74,17 @@ class _PlaywrightEventCollectorBase:
                     "count": self._dropped_count,
                 }
             )
+        if removal_error is not None:
+            raise removal_error
         return events
+
+    def _listeners(self) -> tuple[tuple[str, object], ...]:
+        return (
+            ("pageerror", self._on_page_error),
+            ("console", self._on_console),
+            ("requestfailed", self._on_request_failed),
+            ("response", self._on_response),
+        )
 
     def _on_page_error(self, error: object) -> None:
         self._add_event(
@@ -109,6 +117,50 @@ class _PlaywrightEventCollectorBase:
         if isinstance(column_number, int):
             event["column_number"] = column_number
         self._add_event(event)
+
+    def _on_request_failed(self, request: object) -> None:
+        metadata = _request_metadata(request)
+        failure = getattr(request, "failure", None)
+        if not isinstance(failure, str) or not failure:
+            failure = "unknown network error"
+        failure = _bounded_message(failure)
+        self._add_event(
+            {
+                "event_type": "request_failed",
+                "message": (
+                    f"{_request_label(metadata)} failed: {failure}"
+                ),
+                **metadata,
+                "failure": failure,
+                "count": 1,
+            }
+        )
+
+    def _on_response(self, response: object) -> None:
+        status = getattr(response, "status", None)
+        if (
+            not isinstance(status, int)
+            or isinstance(status, bool)
+            or status < 400
+            or status > 599
+        ):
+            return
+        request = getattr(response, "request", None)
+        metadata = _request_metadata(request)
+        response_url = _safe_url(getattr(response, "url", None))
+        if response_url:
+            metadata["url"] = response_url
+        self._add_event(
+            {
+                "event_type": "http_error",
+                "message": (
+                    f"{_request_label(metadata)} returned HTTP {status}"
+                ),
+                **metadata,
+                "status": status,
+                "count": 1,
+            }
+        )
 
     def _add_event(self, event: dict[str, object]) -> None:
         comparable = {key: value for key, value in event.items() if key != "count"}
@@ -159,10 +211,51 @@ def _safe_url(url: object) -> str:
         parts = urlsplit(url)
     except ValueError:
         return ""
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    if parts.scheme.lower() in {"data", "javascript"}:
+        return f"{parts.scheme.lower()}:"
+    hostname = parts.hostname or ""
+    if ":" in hostname:
+        hostname = f"[{hostname}]"
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    netloc = f"{hostname}:{port}" if port is not None else hostname
+    return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
 
 
 def _bounded_message(message: str, limit: int = 1_000) -> str:
     if len(message) <= limit:
         return message
     return f"{message[:limit]}…"
+
+
+def _request_metadata(request: object) -> dict[str, object]:
+    if request is None:
+        return {"method": "", "resource_type": "", "url": ""}
+    method = getattr(request, "method", "")
+    resource_type = getattr(request, "resource_type", "")
+    return {
+        "method": _bounded_label(method),
+        "resource_type": _bounded_label(resource_type),
+        "url": _safe_url(getattr(request, "url", None)),
+    }
+
+
+def _bounded_label(value: object, limit: int = 100) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value[:limit]
+
+
+def _request_label(metadata: dict[str, object]) -> str:
+    parts = [
+        value
+        for value in (
+            metadata.get("method"),
+            metadata.get("resource_type"),
+        )
+        if isinstance(value, str) and value
+    ]
+    parts.append("request")
+    return " ".join(parts)
