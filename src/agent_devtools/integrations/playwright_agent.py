@@ -16,8 +16,16 @@ from agent_devtools.integrations.playwright_task import TaskExpectation
 from agent_devtools.integrations.playwright_expectation_generation import (
     GeneratedTaskExpectation,
 )
+from agent_devtools.integrations.playwright_final_state import (
+    AsyncFinalStateVerifier,
+    FinalStateAssessment,
+    FinalStateVerifier,
+    observe_final_async_playwright_state,
+    observe_final_playwright_state,
+)
 from agent_devtools.integrations.playwright_task import validate_task_expectation
 from agent_devtools.tool_recorder import RecordedTools
+from agent_devtools.verification import VerificationResult
 
 
 AgentT = TypeVar("AgentT")
@@ -44,6 +52,7 @@ class ObservedPlaywrightAgent(Generic[AgentT, ToolT]):
         output_root: str | Path,
         *,
         expectation_generator: ExpectationGenerator | None = None,
+        final_state_verifier: FinalStateVerifier | None = None,
         methods: Iterable[str] | None = None,
         full_page_screenshots: bool = False,
         capture_browser_events: bool = True,
@@ -57,11 +66,24 @@ class ObservedPlaywrightAgent(Generic[AgentT, ToolT]):
             expectation_generator
         ):
             raise TypeError("expectation_generator must be callable or None")
+        if final_state_verifier is not None and not callable(
+            final_state_verifier
+        ):
+            raise TypeError("final_state_verifier must be callable or None")
+        if (
+            expectation_generator is not None
+            and final_state_verifier is not None
+        ):
+            raise ValueError(
+                "use either expectation_generator or final_state_verifier, "
+                "not both"
+            )
         self.agent = agent
         self.tools = tools
         self.page = page
         self.output_root = Path(output_root)
         self.expectation_generator = expectation_generator
+        self.final_state_verifier = final_state_verifier
         self.methods = methods
         self.full_page_screenshots = full_page_screenshots
         self.capture_browser_events = capture_browser_events
@@ -130,6 +152,13 @@ class ObservedPlaywrightAgent(Generic[AgentT, ToolT]):
                         "async agent run methods require "
                         "observe_async_playwright_agent()"
                     )
+                if self.final_state_verifier is not None:
+                    assessment = _verify_final_state_safely(
+                        self.final_state_verifier,
+                        user_request,
+                        self.page,
+                    )
+                    _store_final_state_assessment(trace.session, assessment)
                 return result
         finally:
             self._active = False
@@ -149,6 +178,7 @@ class ObservedAsyncPlaywrightAgent(Generic[AgentT, ToolT]):
         output_root: str | Path,
         *,
         expectation_generator: AsyncExpectationGenerator | None = None,
+        final_state_verifier: AsyncFinalStateVerifier | None = None,
         methods: Iterable[str] | None = None,
         full_page_screenshots: bool = False,
         capture_browser_events: bool = True,
@@ -162,11 +192,24 @@ class ObservedAsyncPlaywrightAgent(Generic[AgentT, ToolT]):
             expectation_generator
         ):
             raise TypeError("expectation_generator must be callable or None")
+        if final_state_verifier is not None and not callable(
+            final_state_verifier
+        ):
+            raise TypeError("final_state_verifier must be callable or None")
+        if (
+            expectation_generator is not None
+            and final_state_verifier is not None
+        ):
+            raise ValueError(
+                "use either expectation_generator or final_state_verifier, "
+                "not both"
+            )
         self.agent = agent
         self.tools = tools
         self.page = page
         self.output_root = Path(output_root)
         self.expectation_generator = expectation_generator
+        self.final_state_verifier = final_state_verifier
         self.methods = methods
         self.full_page_screenshots = full_page_screenshots
         self.capture_browser_events = capture_browser_events
@@ -232,7 +275,15 @@ class ObservedAsyncPlaywrightAgent(Generic[AgentT, ToolT]):
                         "observe_async_playwright_agent() requires an "
                         "async agent run method"
                     )
-                return await result
+                resolved = await result
+                if self.final_state_verifier is not None:
+                    assessment = await _verify_final_state_safely_async(
+                        self.final_state_verifier,
+                        user_request,
+                        self.page,
+                    )
+                    _store_final_state_assessment(trace.session, assessment)
+                return resolved
         finally:
             self._active = False
 
@@ -249,6 +300,7 @@ def observe_playwright_agent(
     output_root: str | Path,
     *,
     expectation_generator: ExpectationGenerator | None = None,
+    final_state_verifier: FinalStateVerifier | None = None,
     methods: Iterable[str] | None = None,
     full_page_screenshots: bool = False,
     capture_browser_events: bool = True,
@@ -261,6 +313,7 @@ def observe_playwright_agent(
         page,
         output_root,
         expectation_generator=expectation_generator,
+        final_state_verifier=final_state_verifier,
         methods=methods,
         full_page_screenshots=full_page_screenshots,
         capture_browser_events=capture_browser_events,
@@ -276,6 +329,7 @@ def observe_async_playwright_agent(
     output_root: str | Path,
     *,
     expectation_generator: AsyncExpectationGenerator | None = None,
+    final_state_verifier: AsyncFinalStateVerifier | None = None,
     methods: Iterable[str] | None = None,
     full_page_screenshots: bool = False,
     capture_browser_events: bool = True,
@@ -288,6 +342,7 @@ def observe_async_playwright_agent(
         page,
         output_root,
         expectation_generator=expectation_generator,
+        final_state_verifier=final_state_verifier,
         methods=methods,
         full_page_screenshots=full_page_screenshots,
         capture_browser_events=capture_browser_events,
@@ -389,9 +444,104 @@ def _store_generation_metadata(
     session.verification_note = generated.note  # type: ignore[attr-defined]
 
 
+def _verify_final_state_safely(
+    verifier: FinalStateVerifier,
+    user_request: str,
+    page: object,
+) -> FinalStateAssessment:
+    try:
+        final_state = observe_final_playwright_state(  # type: ignore[arg-type]
+            page
+        )
+        result = verifier(user_request, final_state)
+        if isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError(
+                "async final-state verifiers require "
+                "observe_async_playwright_agent()"
+            )
+        return _normalize_final_state_assessment(verifier, result)
+    except Exception as error:
+        return _unavailable_final_state_assessment(verifier, error)
+
+
+async def _verify_final_state_safely_async(
+    verifier: AsyncFinalStateVerifier,
+    user_request: str,
+    page: object,
+) -> FinalStateAssessment:
+    try:
+        final_state = await observe_final_async_playwright_state(
+            page  # type: ignore[arg-type]
+        )
+        result = verifier(user_request, final_state)
+        resolved = await result if isawaitable(result) else result
+        return _normalize_final_state_assessment(verifier, resolved)
+    except Exception as error:
+        return _unavailable_final_state_assessment(verifier, error)
+
+
+def _normalize_final_state_assessment(
+    verifier: object,
+    result: FinalStateAssessment | VerificationResult | None,
+) -> FinalStateAssessment:
+    if isinstance(result, FinalStateAssessment):
+        return result
+    source = _verifier_source(verifier)
+    if isinstance(result, VerificationResult):
+        return FinalStateAssessment(
+            verification=result,
+            source=source,
+        )
+    if result is None:
+        return FinalStateAssessment(
+            verification=None,
+            source=source,
+            note="The final page did not provide enough evidence to verify the task.",
+        )
+    raise TypeError(
+        "final_state_verifier must return FinalStateAssessment, "
+        "VerificationResult, or None"
+    )
+
+
+def _unavailable_final_state_assessment(
+    verifier: object,
+    error: Exception,
+) -> FinalStateAssessment:
+    return FinalStateAssessment(
+        verification=None,
+        source=_verifier_source(verifier),
+        note=(
+            "AI final-state assessment was unavailable "
+            f"({type(error).__name__}). Check provider setup and page access."
+        ),
+    )
+
+
+def _verifier_source(verifier: object) -> str:
+    declared_source = getattr(verifier, "source", None)
+    if isinstance(declared_source, str) and declared_source.strip():
+        return declared_source
+    return f"custom:{type(verifier).__name__}:final-state"
+
+
+def _store_final_state_assessment(
+    session: object,
+    assessment: FinalStateAssessment,
+) -> None:
+    session.verification = assessment.verification  # type: ignore[attr-defined]
+    session.verification_source = assessment.source  # type: ignore[attr-defined]
+    session.verification_note = assessment.note  # type: ignore[attr-defined]
+
+
 __all__ = [
     "AsyncExpectationGenerator",
+    "AsyncFinalStateVerifier",
     "ExpectationGenerator",
+    "FinalStateVerifier",
     "ObservedAsyncPlaywrightAgent",
     "ObservedPlaywrightAgent",
     "observe_async_playwright_agent",

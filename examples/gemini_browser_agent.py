@@ -10,7 +10,9 @@ from agent_devtools.integrations.gemini_agent import (
 )
 from agent_devtools.integrations.gemini_expectations import (
     DEFAULT_GEMINI_MODEL,
-    GeminiExpectationGenerator,
+)
+from agent_devtools.integrations.gemini_final_state import (
+    GeminiFinalStateVerifier,
 )
 from agent_devtools.playwright import observe_playwright_agent
 
@@ -157,14 +159,8 @@ def main() -> None:
 
     model, headed, user_request = parse_args()
     client = genai.Client()
-    context_description = (
-        "This is a local demo shop. Its allowed start URL is "
-        f"{START_URL}. A product detail page identifies its product in "
-        "h1#product-title."
-    )
-    expectation_generator = GeminiExpectationGenerator(
+    final_state_verifier = GeminiFinalStateVerifier(
         model=model,
-        application_context=context_description,
         client=client,
     )
     agent = GeminiToolAgent(
@@ -190,7 +186,7 @@ def main() -> None:
             BrowserTools(page, START_URL),
             page,
             TRACE_ROOT,
-            expectation_generator=expectation_generator,
+            final_state_verifier=final_state_verifier,
             methods=("navigate", "fill", "click"),
         )
         print("Running automatic verification and Gemini browser actions...", flush=True)

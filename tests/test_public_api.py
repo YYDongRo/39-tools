@@ -44,8 +44,22 @@ from agent_devtools.integrations.gemini_expectations import (
     async_gemini_expectations,
     gemini_expectations,
 )
+from agent_devtools.integrations.gemini_final_state import (
+    AsyncGeminiFinalStateVerifier,
+    GeminiFinalStateVerifier,
+    async_gemini_final_state_verifier,
+    gemini_final_state_verifier,
+)
 from agent_devtools.integrations.playwright_expectation_generation import (
     GeneratedTaskExpectation,
+)
+from agent_devtools.integrations.playwright_final_state import (
+    AsyncFinalStateVerifier,
+    FinalPageState,
+    FinalStateAssessment,
+    FinalStateVerifier,
+    observe_final_async_playwright_state,
+    observe_final_playwright_state,
 )
 from agent_devtools.integrations.playwright_task import (
     AllOf,
@@ -96,14 +110,20 @@ def test_playwright_public_api_exports_supported_types() -> None:
     expected_exports = {
         "AllOf": AllOf,
         "AsyncExpectationGenerator": AsyncExpectationGenerator,
+        "AsyncFinalStateVerifier": AsyncFinalStateVerifier,
+        "AsyncGeminiFinalStateVerifier": AsyncGeminiFinalStateVerifier,
         "AsyncGeminiExpectationGenerator": AsyncGeminiExpectationGenerator,
         "AsyncOpenAIExpectationGenerator": AsyncOpenAIExpectationGenerator,
         "DEFAULT_OPENAI_MODEL": DEFAULT_OPENAI_MODEL,
         "DEFAULT_GEMINI_MODEL": DEFAULT_GEMINI_MODEL,
         "ElementVisible": ElementVisible,
         "ExpectationGenerator": ExpectationGenerator,
+        "FinalPageState": FinalPageState,
+        "FinalStateAssessment": FinalStateAssessment,
+        "FinalStateVerifier": FinalStateVerifier,
         "GeneratedTaskExpectation": GeneratedTaskExpectation,
         "GeminiExpectationGenerator": GeminiExpectationGenerator,
+        "GeminiFinalStateVerifier": GeminiFinalStateVerifier,
         "GeminiToolAgent": GeminiToolAgent,
         "GeminiToolDefinition": GeminiToolDefinition,
         "InputValueExpectation": InputValueExpectation,
@@ -121,13 +141,17 @@ def test_playwright_public_api_exports_supported_types() -> None:
         "all_of": all_of,
         "async_openai_expectations": async_openai_expectations,
         "async_gemini_expectations": async_gemini_expectations,
+        "async_gemini_final_state_verifier": async_gemini_final_state_verifier,
         "element_visible": element_visible,
         "observe_async_playwright_agent": observe_async_playwright_agent,
         "observe_async_playwright_page": observe_async_playwright_page,
+        "observe_final_async_playwright_state": observe_final_async_playwright_state,
+        "observe_final_playwright_state": observe_final_playwright_state,
         "observe_playwright_agent": observe_playwright_agent,
         "observe_playwright_page": observe_playwright_page,
         "openai_expectations": openai_expectations,
         "gemini_expectations": gemini_expectations,
+        "gemini_final_state_verifier": gemini_final_state_verifier,
         "property_equals": property_equals,
         "record_async_playwright_tools": record_async_playwright_tools,
         "record_playwright_tools": record_playwright_tools,

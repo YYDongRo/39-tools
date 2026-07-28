@@ -8,6 +8,7 @@ import pytest
 
 from agent_devtools import ActionOutcome
 from agent_devtools.playwright import (
+    FinalPageState,
     GeneratedTaskExpectation,
     TaskExpectation,
     all_of,
@@ -17,6 +18,7 @@ from agent_devtools.playwright import (
     text_contains,
     url_matches,
 )
+from agent_devtools.verification import VerificationResult
 
 
 if TYPE_CHECKING:
@@ -163,6 +165,47 @@ def test_observed_agent_creates_a_report_when_agent_raises(
     assert observed_agent.last_trace.session.outcome is ActionOutcome.UNVERIFIED
     assert observed_agent.last_report_path is not None
     assert observed_agent.last_report_path.is_file()
+
+
+def test_observed_agent_automatically_assesses_the_real_final_page(
+    tmp_path: Path,
+) -> None:
+    captured_state: FinalPageState | None = None
+
+    def assess_final_state(
+        user_request: str,
+        state: FinalPageState,
+    ) -> VerificationResult:
+        nonlocal captured_state
+        captured_state = state
+        passed = "Browser action diagnostics" in state.visible_text
+        return VerificationResult(
+            expected_state=user_request,
+            observed_state="The diagnostics page is visible.",
+            passed=passed,
+            evidence={"assessment_type": "ai_final_state"},
+            failure_reason=None if passed else "The page was not visible.",
+        )
+
+    with sync_playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        observed_agent = observe_playwright_agent(
+            DemoAgent(),
+            BrowserTools(page),
+            page,
+            tmp_path / "runs",
+            final_state_verifier=assess_final_state,
+        )
+
+        observed_agent.run("Open the browser diagnostics page")
+        browser.close()
+
+    assert captured_state is not None
+    assert captured_state.url == TARGET_URL
+    assert "Browser action diagnostics" in captured_state.headings
+    assert observed_agent.last_trace is not None
+    assert observed_agent.last_trace.session.outcome is ActionOutcome.SUCCESS
 
 
 def test_observed_agent_creates_a_unique_trace_for_each_request(

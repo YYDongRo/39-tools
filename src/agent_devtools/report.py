@@ -71,13 +71,16 @@ def _verification_result_section(
     summarize_checks: bool = False,
 ) -> str:
     status = "passed" if verification.passed else "failed"
+    is_ai_assessment = (
+        verification.evidence.get("assessment_type") == "ai_final_state"
+    )
     evidence_section = _verification_evidence_section(
         verification,
         summarize_check=summarize_checks,
     )
 
     failure_section = ""
-    if verification.failure_reason is not None:
+    if verification.failure_reason is not None and not is_ai_assessment:
         category_section = ""
         if verification.failure_category is not None:
             category_section = (
@@ -91,11 +94,18 @@ def _verification_result_section(
         </div>"""
 
     if summarize_checks:
+        assessment_summary = ""
+        if is_ai_assessment:
+            assessment_summary = (
+                '<p class="assessment-summary">'
+                f"{escape(verification.observed_state)}</p>"
+            )
         overview = f"""
         <div class="verification-heading">
           <h2>{escape(title)}</h2>
           <span class="check-total check-total-{status}">{status}</span>
-        </div>"""
+        </div>
+        {assessment_summary}"""
     else:
         overview = f"""
         <h2>{escape(title)}</h2>
@@ -120,6 +130,29 @@ def _verification_evidence_section(
 ) -> str:
     if not verification.evidence:
         return ""
+
+    if verification.evidence.get("assessment_type") == "ai_final_state":
+        facts = verification.evidence.get("facts")
+        fact_items = ""
+        if isinstance(facts, list) and all(
+            isinstance(fact, str) for fact in facts
+        ):
+            fact_items = "".join(
+                f"<li>{escape(fact)}</li>" for fact in facts
+            )
+        final_page = verification.evidence.get("final_page")
+        final_page_json = escape(
+            json.dumps(final_page, ensure_ascii=False, indent=2)
+        )
+        return f"""
+        <div class="assessment-evidence">
+          <h3>Evidence used</h3>
+          <ul>{fact_items or '<li>No specific page fact was returned.</li>'}</ul>
+        </div>
+        <details class="verification-evidence">
+          <summary>Final page snapshot</summary>
+          <pre>{final_page_json}</pre>
+        </details>"""
 
     evidence = escape(
         json.dumps(verification.evidence, ensure_ascii=False, indent=2)
@@ -736,9 +769,15 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
         )
     task_verification_section = ""
     if session.verification is not None:
+        verification_title = (
+            "AI task assessment"
+            if session.verification.evidence.get("assessment_type")
+            == "ai_final_state"
+            else "Final checks"
+        )
         task_verification_section = _verification_result_section(
             session.verification,
-            "Final checks",
+            verification_title,
             summarize_checks=True,
         )
     findings_section = _trajectory_findings_section(session)
@@ -880,6 +919,11 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                                margin-top: 16px; padding: 16px; }}
       .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
       .verification-check-list {{ margin-top: 20px; }}
+      .assessment-summary {{ color: #334155; font-size: 16px; line-height: 1.55;
+                             margin: 14px 0 0; }}
+      .assessment-evidence {{ margin-top: 18px; }}
+      .assessment-evidence ul {{ color: #334155; line-height: 1.55;
+                                 margin-bottom: 0; padding-left: 22px; }}
       .verification-check-list ol {{ display: grid; gap: 10px;
                                      list-style: none; margin: 0; padding: 0; }}
       .verification-check {{ border: 1px solid #e2e8f0; border-left-width: 4px;

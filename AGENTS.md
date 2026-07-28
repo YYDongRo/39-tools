@@ -154,6 +154,9 @@ The repository currently includes:
 - a bounded Gemini function-calling adapter and local real-browser demo that
   records model-selected navigate, fill, and click actions without recording
   read-only observations as computer actions;
+- optional final-state Gemini assessment that automatically compares the
+  captured request with bounded final URL, title, heading, and rendered-text
+  evidence after an observed agent returns;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -183,6 +186,9 @@ matching, contained text, and scalar DOM property equality.
 Automatic trajectory analysis is intentionally limited to conservative
 stuck-loop and explicit browser/runtime error warnings and does not infer
 whether the user's task is correct.
+Final-state AI assessment is optional and probabilistic. It is stored and
+displayed separately from deterministic check semantics, may remain unverified,
+and receives bounded visible page text that can still be sensitive.
 Browser event evidence includes failed requests and HTTP 4xx/5xx responses but
 does not include successful request timelines, request or response bodies,
 headers, or cookies.

@@ -37,6 +37,7 @@ report after the agent run.
 - Automatic potential-issue warnings for repeated actions with no observed progress
 - Observed-agent wrappers that capture the user request and inject recorded tools
 - Optional OpenAI or Gemini generation of bounded final-state checks from that request
+- Optional Gemini assessment grounded in a bounded final snapshot of the real page
 - A Gemini function-calling demo where model-selected browser actions are recorded
 - Controlled replay for saved click actions with strict argument validation
 - A dependency-free simulated action example
@@ -292,9 +293,49 @@ with:
 uv run --extra browser python examples/observed_agent.py
 ```
 
+For an unfamiliar site where stable selectors are not known in advance, use a
+final-state verifier instead. It runs automatically after the agent returns and
+compares the captured user request with a bounded snapshot of the real final
+page:
+
+```python
+from agent_devtools.playwright import (
+    gemini_final_state_verifier,
+    observe_playwright_agent,
+)
+
+agent = observe_playwright_agent(
+    original_agent,
+    browser_tools,
+    page,
+    Path("trace/my-agent"),
+    final_state_verifier=gemini_final_state_verifier(),
+)
+
+agent.run(user_request)
+print(agent.last_report_path)
+```
+
+This is still a one-time integration: every normal run automatically captures
+the request, records calls made through the injected tools, reads the final
+page, runs the assessment, and updates the same report. The verifier receives
+the final URL, title, up to 20 headings, and at most 6,000 characters of rendered
+page text. It does not receive cookies, headers, password values, form values,
+the complete DOM, or screenshots. Visible page text can still be sensitive, so
+enable it only where sending that data to the configured provider is acceptable.
+
+The report labels this result `AI task assessment` and preserves `unverified`
+when the page lacks enough evidence or the provider is unavailable. AI
+assessment is less deterministic than declared checks. Configure either
+`final_state_verifier` or `expectation_generator` for one observer, not both.
+For passed or failed assessments, the bounded final snapshot and the model's
+cited facts are stored in the local JSON and HTML trace as evidence. Async
+agents use `async_gemini_final_state_verifier()`.
+
 #### Run a real Gemini-controlled local browser task
 
-Gemini can supply both the task decisions and the generated final-state checks.
+Gemini supplies the task decisions and then separately assesses the real final
+page state.
 Install the optional dependencies, keep the key in your shell, and run:
 
 ```bash
@@ -314,7 +355,7 @@ state, browser errors, and final verification in a new directory under
 The `observe` tool is deliberately excluded from the action timeline because it
 reads state without changing the computer.
 Pass `--task "..."` to send another natural-language request to the same local
-shop; that exact request becomes the report goal and the verification-generator
+shop; that exact request becomes the report goal and final-state assessment
 input.
 
 The default is the cost-oriented `gemini-3.5-flash-lite`. Override it with
@@ -324,9 +365,10 @@ this demo does send bounded visible page text, interactive element selectors and
 values, and bounded tool error messages to Gemini. Use only non-sensitive pages
 until an application-specific redaction policy is added.
 
-To add Gemini-generated verification to another observed agent without using
-the demo agent, pass `gemini_expectations()` as its expectation generator. The
-async equivalent is `async_gemini_expectations()`.
+To use the same final-page assessment with another observed agent, pass
+`gemini_final_state_verifier()` as its final-state verifier. Use
+`gemini_expectations()` instead when deterministic selector-based checks can be
+generated safely before execution.
 
 ### Verify the final browser task
 
@@ -1056,8 +1098,10 @@ sensitive content.
 - Browser runtime evidence records failed requests and HTTP 4xx/5xx responses,
   but not successful request timelines, redirects, headers, cookies, or bodies
 - Deterministic expected states can be supplied directly; the optional OpenAI
-  generator can propose bounded checks from the user request, but generated
-  checks are not ground truth
+  and Gemini generators can propose bounded checks from the user request, but
+  generated checks are not ground truth
+- Optional Gemini final-state assessment reads bounded rendered page text and
+  can handle unfamiliar selectors, but it is probabilistic and is not ground truth
 - Structured state changes are evidence only; they are not automatic verification
 - Automatic trajectory analysis currently covers browser/runtime errors and
   three or more identical consecutive actions with unchanged structured state;

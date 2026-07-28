@@ -8,8 +8,8 @@ from playwright.sync_api import sync_playwright
 
 from agent_devtools.action import ActionOutcome
 from agent_devtools.integrations.gemini_agent import GeminiToolAgent
-from agent_devtools.integrations.gemini_expectations import (
-    GeminiExpectationGenerator,
+from agent_devtools.integrations.gemini_final_state import (
+    GeminiFinalStateVerifier,
 )
 from agent_devtools.playwright import observe_playwright_agent
 
@@ -84,26 +84,14 @@ class Client:
         self.interactions = Interactions(responses)
 
 
-def _expectation_response() -> Response:
+def _assessment_response() -> Response:
     return Response(
         output_text=json.dumps(
             {
-                "inferred_goal": "Open the Wireless Headphones product",
-                "can_verify": True,
-                "reason": None,
-                "checks": [
-                    {
-                        "type": "text_equals",
-                        "selector": "h1#product-title",
-                        "expected_text": "Wireless Headphones",
-                        "host": None,
-                        "path_prefix": None,
-                        "scheme": None,
-                        "allow_subdomains": None,
-                        "property_name": None,
-                        "expected_value": None,
-                        "timeout_ms": 2_000,
-                    }
+                "verdict": "passed",
+                "summary": "The requested product page is open.",
+                "evidence": [
+                    "The final page heading is Wireless Headphones."
                 ],
             }
         )
@@ -130,7 +118,6 @@ def _function_call(
 def test_fake_gemini_drives_a_recorded_browser_task(tmp_path: Path) -> None:
     client = Client(
         [
-            _expectation_response(),
             _function_call("navigate", "1", {"url": START_URL}),
             _function_call(
                 "fill",
@@ -143,6 +130,7 @@ def test_fake_gemini_drives_a_recorded_browser_task(tmp_path: Path) -> None:
                 output_text="Opened the product.",
                 steps=[Step("model_output", text="Opened the product.")],
             ),
+            _assessment_response(),
         ]
     )
     agent = GeminiToolAgent(
@@ -151,7 +139,7 @@ def test_fake_gemini_drives_a_recorded_browser_task(tmp_path: Path) -> None:
         system_instruction="Complete the local browser task.",
         client=client,
     )
-    generator = GeminiExpectationGenerator(
+    verifier = GeminiFinalStateVerifier(
         model="gemini-test",
         client=client,
     )
@@ -164,7 +152,7 @@ def test_fake_gemini_drives_a_recorded_browser_task(tmp_path: Path) -> None:
             BrowserTools(page, START_URL),
             page,
             tmp_path,
-            expectation_generator=generator,
+            final_state_verifier=verifier,
             methods=("navigate", "fill", "click"),
         )
 
@@ -175,5 +163,11 @@ def test_fake_gemini_drives_a_recorded_browser_task(tmp_path: Path) -> None:
     assert observed.last_trace is not None
     assert observed.last_trace.session.action_count == 4
     assert observed.last_trace.session.outcome is ActionOutcome.SUCCESS
+    assert observed.last_trace.session.verification_source == (
+        "gemini:gemini-test:final-state"
+    )
     assert observed.last_report_path is not None
     assert observed.last_report_path.is_file()
+    report = observed.last_report_path.read_text(encoding="utf-8")
+    assert "AI task assessment" in report
+    assert "The final page heading is Wireless Headphones." in report
