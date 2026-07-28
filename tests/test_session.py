@@ -128,12 +128,25 @@ def test_session_rejects_task_verification_without_goal() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "field_name",
+    ["inferred_goal", "verification_source", "verification_note"],
+)
+def test_session_rejects_empty_generation_metadata(field_name: str) -> None:
+    with pytest.raises(ValueError, match=f"{field_name} cannot be empty"):
+        ActionSession(**{field_name: "  "})
+
+
 def test_session_json_round_trip(tmp_path: Path) -> None:
     session = ActionSession(
         actions=[
             make_action(ActionStatus.SUCCESS),
             make_action(ActionStatus.FAILURE, "target was not found"),
-        ]
+        ],
+        goal="Open the requested page",
+        inferred_goal="Reach the requested page",
+        verification_source="openai:gpt-test",
+        verification_note="Generated automatically.",
     )
     output_path = tmp_path / "session.json"
 
@@ -142,8 +155,11 @@ def test_session_json_round_trip(tmp_path: Path) -> None:
     loaded_session = read_session_json(output_path)
     data = json.loads(output_path.read_text(encoding="utf-8"))
     assert loaded_session == session
-    assert data["schema_version"] == 2
-    assert data["goal"] is None
+    assert data["schema_version"] == 3
+    assert data["goal"] == "Open the requested page"
+    assert data["inferred_goal"] == "Reach the requested page"
+    assert data["verification_source"] == "openai:gpt-test"
+    assert data["verification_note"] == "Generated automatically."
     assert data["verification"] is None
     assert len(data["actions"]) == 2
 
@@ -172,6 +188,9 @@ def test_load_session_schema_version_1_without_task_verification() -> None:
     )
     data["schema_version"] = 1
     del data["goal"]
+    del data["inferred_goal"]
+    del data["verification_source"]
+    del data["verification_note"]
     del data["verification"]
 
     session = session_from_dict(data)
@@ -182,9 +201,24 @@ def test_load_session_schema_version_1_without_task_verification() -> None:
     assert session.outcome is ActionOutcome.UNVERIFIED
 
 
+def test_load_session_schema_version_2_without_generation_metadata() -> None:
+    data = session_to_dict(ActionSession(goal="Open the page"))
+    data["schema_version"] = 2
+    del data["inferred_goal"]
+    del data["verification_source"]
+    del data["verification_note"]
+
+    session = session_from_dict(data)
+
+    assert session.goal == "Open the page"
+    assert session.inferred_goal is None
+    assert session.verification_source is None
+    assert session.verification_note is None
+
+
 def test_reject_unsupported_session_schema_version() -> None:
     data = session_to_dict(ActionSession())
-    data["schema_version"] = 3
+    data["schema_version"] = 4
 
-    with pytest.raises(ValueError, match="unsupported session schema_version: 3"):
+    with pytest.raises(ValueError, match="unsupported session schema_version: 4"):
         session_from_dict(data)

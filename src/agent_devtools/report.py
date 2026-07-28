@@ -651,9 +651,36 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
     goal_section = ""
     if session.goal is not None:
         goal_section = (
-            '<p class="goal"><strong>Goal:</strong> '
+            '<p class="goal"><strong>User request:</strong> '
             f"{escape(session.goal)}</p>"
         )
+    inferred_goal_section = ""
+    if session.inferred_goal is not None:
+        inferred_goal_section = (
+            '<p class="inferred-goal"><strong>Inferred goal:</strong> '
+            f"{escape(session.inferred_goal)}</p>"
+        )
+    automatic_verification_section = ""
+    if (
+        session.verification_source is not None
+        or session.verification_note is not None
+    ):
+        source = (
+            escape(session.verification_source)
+            if session.verification_source is not None
+            else "Unavailable"
+        )
+        note = (
+            f'<p class="verification-note">{escape(session.verification_note)}</p>'
+            if session.verification_note is not None
+            else ""
+        )
+        automatic_verification_section = f"""
+        <section class="automatic-verification">
+          <h2>Automatic verification</h2>
+          <p><strong>Source:</strong> {source}</p>
+          {note}
+        </section>"""
     task_verification_section = ""
     if session.verification is not None:
         task_verification_section = _verification_result_section(
@@ -681,7 +708,15 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                                     justify-content: space-between; gap: 16px; }}
       .title-row h1, .action-heading h2 {{ margin-bottom: 0; }}
       .goal {{ font-size: 18px; margin: 20px 0 0; }}
+      .inferred-goal {{ color: #334155; margin: 10px 0 0; }}
       .summary {{ color: #475569; margin: 16px 0 0; }}
+      .automatic-verification {{ background: #eff6ff; border: 1px solid #bfdbfe;
+                                  border-radius: 8px; margin-top: 20px;
+                                  padding: 16px; }}
+      .automatic-verification h2 {{ font-size: 16px; margin-bottom: 10px; }}
+      .automatic-verification p {{ margin-bottom: 0; }}
+      .automatic-verification .verification-note {{ color: #475569;
+                                                      margin-top: 8px; }}
       .failure-summary {{ background: #fff1f2; border: 1px solid #fecdd3;
                           border-radius: 8px; margin-top: 20px; padding: 16px; }}
       .failure-summary h2 {{ font-size: 16px; margin-bottom: 12px; }}
@@ -796,8 +831,10 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
           <span class="status status-{overall_status}">{overall_label}</span>
         </div>
         {goal_section}
+        {inferred_goal_section}
         <p class="summary">{session.action_count} {action_label} · {success_count} {success_label} · {failure_count} {failure_label} · {unverified_count} {unverified_label}</p>
 {failure_summary}
+{automatic_verification_section}
       </header>
 {findings_section}
 {task_verification_section}

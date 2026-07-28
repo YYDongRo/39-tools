@@ -18,6 +18,24 @@ from agent_devtools.integrations.playwright import (
     record_async_playwright_tools,
     record_playwright_tools,
 )
+from agent_devtools.integrations.playwright_agent import (
+    AsyncExpectationGenerator,
+    ExpectationGenerator,
+    ObservedAsyncPlaywrightAgent,
+    ObservedPlaywrightAgent,
+    observe_async_playwright_agent,
+    observe_playwright_agent,
+)
+from agent_devtools.integrations.openai_expectations import (
+    AsyncOpenAIExpectationGenerator,
+    DEFAULT_OPENAI_MODEL,
+    OpenAIExpectationGenerator,
+    async_openai_expectations,
+    openai_expectations,
+)
+from agent_devtools.integrations.playwright_expectation_generation import (
+    GeneratedTaskExpectation,
+)
 from agent_devtools.integrations.playwright_task import (
     AllOf,
     ElementVisible,
@@ -66,8 +84,16 @@ def test_core_public_api_exports_supported_types() -> None:
 def test_playwright_public_api_exports_supported_types() -> None:
     expected_exports = {
         "AllOf": AllOf,
+        "AsyncExpectationGenerator": AsyncExpectationGenerator,
+        "AsyncOpenAIExpectationGenerator": AsyncOpenAIExpectationGenerator,
+        "DEFAULT_OPENAI_MODEL": DEFAULT_OPENAI_MODEL,
         "ElementVisible": ElementVisible,
+        "ExpectationGenerator": ExpectationGenerator,
+        "GeneratedTaskExpectation": GeneratedTaskExpectation,
         "InputValueExpectation": InputValueExpectation,
+        "ObservedAsyncPlaywrightAgent": ObservedAsyncPlaywrightAgent,
+        "ObservedPlaywrightAgent": ObservedPlaywrightAgent,
+        "OpenAIExpectationGenerator": OpenAIExpectationGenerator,
         "PlaywrightAction": PlaywrightAction,
         "PropertyEquals": PropertyEquals,
         "RecordedPlaywrightExecutor": RecordedPlaywrightExecutor,
@@ -77,9 +103,13 @@ def test_playwright_public_api_exports_supported_types() -> None:
         "UrlMatch": UrlMatch,
         "VisibilityExpectation": VisibilityExpectation,
         "all_of": all_of,
+        "async_openai_expectations": async_openai_expectations,
         "element_visible": element_visible,
+        "observe_async_playwright_agent": observe_async_playwright_agent,
         "observe_async_playwright_page": observe_async_playwright_page,
+        "observe_playwright_agent": observe_playwright_agent,
         "observe_playwright_page": observe_playwright_page,
+        "openai_expectations": openai_expectations,
         "property_equals": property_equals,
         "record_async_playwright_tools": record_async_playwright_tools,
         "record_playwright_tools": record_playwright_tools,

@@ -12,8 +12,8 @@ from agent_devtools.verification import VerificationResult
 
 SCHEMA_VERSION = 5
 SUPPORTED_SCHEMA_VERSIONS = {1, 2, 3, 4, SCHEMA_VERSION}
-SESSION_SCHEMA_VERSION = 2
-SUPPORTED_SESSION_SCHEMA_VERSIONS = {1, SESSION_SCHEMA_VERSION}
+SESSION_SCHEMA_VERSION = 3
+SUPPORTED_SESSION_SCHEMA_VERSIONS = {1, 2, SESSION_SCHEMA_VERSION}
 
 
 def _write_json(data: dict[str, object], output_path: Path) -> None:
@@ -282,6 +282,9 @@ def session_to_dict(session: ActionSession) -> dict[str, object]:
     return {
         "schema_version": SESSION_SCHEMA_VERSION,
         "goal": session.goal,
+        "inferred_goal": session.inferred_goal,
+        "verification_source": session.verification_source,
+        "verification_note": session.verification_note,
         "verification": _verification_to_dict(session.verification),
         "actions": [action_to_dict(action) for action in session.actions],
     }
@@ -294,12 +297,19 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
 
     try:
         actions_value = data["actions"]
-        goal_value = (
-            data["goal"] if schema_version == SESSION_SCHEMA_VERSION else None
+        goal_value = data["goal"] if schema_version in {2, 3} else None
+        inferred_goal_value = (
+            data["inferred_goal"] if schema_version == 3 else None
+        )
+        verification_source_value = (
+            data["verification_source"] if schema_version == 3 else None
+        )
+        verification_note_value = (
+            data["verification_note"] if schema_version == 3 else None
         )
         verification_value = (
             data["verification"]
-            if schema_version == SESSION_SCHEMA_VERSION
+            if schema_version in {2, 3}
             else None
         )
     except KeyError as error:
@@ -308,6 +318,13 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         raise ValueError("actions must be an array")
     if goal_value is not None and not isinstance(goal_value, str):
         raise ValueError("goal must be a string or null")
+    for field_name, value in (
+        ("inferred_goal", inferred_goal_value),
+        ("verification_source", verification_source_value),
+        ("verification_note", verification_note_value),
+    ):
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{field_name} must be a string or null")
 
     actions: list[ActionRecord] = []
     for index, action_value in enumerate(actions_value):
@@ -322,6 +339,9 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
     return ActionSession(
         actions=actions,
         goal=goal_value,
+        inferred_goal=inferred_goal_value,
+        verification_source=verification_source_value,
+        verification_note=verification_note_value,
         verification=verification,
     )
 

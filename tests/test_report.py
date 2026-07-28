@@ -399,10 +399,31 @@ def test_session_report_displays_successful_task_verification(
 
     content = output_path.read_text(encoding="utf-8")
     assert 'class="status status-success">task successful</span>' in content
-    assert "<strong>Goal:</strong> Play the &lt;video&gt;" in content
+    assert "<strong>User request:</strong> Play the &lt;video&gt;" in content
     assert "Task verification" in content
     assert "<dt>Status</dt><dd>passed</dd>" in content
     assert "&lt;player-status&gt;" in content
+
+
+def test_session_report_displays_automatic_verification_metadata(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        goal="Open & inspect the page",
+        inferred_goal="Reach the expected page",
+        verification_source="openai:gpt-test",
+        verification_note="No reliable selector was available.",
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "<strong>User request:</strong> Open &amp; inspect the page" in content
+    assert "<strong>Inferred goal:</strong> Reach the expected page" in content
+    assert "Automatic verification" in content
+    assert "<strong>Source:</strong> openai:gpt-test" in content
+    assert "No reliable selector was available." in content
 
 
 def test_session_report_displays_failed_task_verification(tmp_path: Path) -> None:

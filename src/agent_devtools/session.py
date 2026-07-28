@@ -8,13 +8,16 @@ from agent_devtools.verification import VerificationResult
 class ActionSession:
     actions: list[ActionRecord] = field(default_factory=list)
     goal: str | None = None
+    inferred_goal: str | None = None
+    verification_source: str | None = None
+    verification_note: str | None = None
     verification: VerificationResult | None = None
 
     def __post_init__(self) -> None:
-        if self.goal is not None and (
-            not isinstance(self.goal, str) or not self.goal.strip()
-        ):
-            raise ValueError("goal cannot be empty")
+        _validate_optional_text(self.goal, "goal")
+        _validate_optional_text(self.inferred_goal, "inferred_goal")
+        _validate_optional_text(self.verification_source, "verification_source")
+        _validate_optional_text(self.verification_note, "verification_note")
         if self.verification is not None and not isinstance(
             self.verification, VerificationResult
         ):
@@ -42,3 +45,10 @@ class ActionSession:
         if self.verification.passed:
             return ActionOutcome.SUCCESS
         return ActionOutcome.FAILURE
+
+
+def _validate_optional_text(value: object, field_name: str) -> None:
+    if value is not None and (
+        not isinstance(value, str) or not value.strip()
+    ):
+        raise ValueError(f"{field_name} cannot be empty")

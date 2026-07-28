@@ -144,6 +144,13 @@ The repository currently includes:
 - composable synchronous and asynchronous Playwright task checks for URL
   components, element visibility, exact or contained text, and scalar DOM
   properties, with automatic verification and pytest-friendly assertions;
+- synchronous and asynchronous observed-agent entry points that capture the
+  user request as the goal, inject recorded Playwright tools, preserve the
+  agent result, create unique run directories, and retain reports on errors;
+- optional synchronous and asynchronous OpenAI expectation generation that
+  converts the captured request into bounded data-only Playwright task checks,
+  preserves provider failures as unverified report metadata, and never blocks
+  the agent run;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -158,11 +165,15 @@ Action and task verification results are stored in JSON, displayed in HTML
 reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
 No third-party agent integration exists beyond the Playwright runtime adapter.
+The observed-agent MVP requires an agent entry point shaped like
+`run(user_request, *, tools=...)`; other framework call shapes need adapters.
 Async tool recording intentionally rejects overlapping actions and uses
 synchronous local writes for JSON and HTML persistence.
 Action and session recorders can run caller-provided verification callbacks
-before persistence. Integrations must still choose expected states; the core
-does not infer intent.
+before persistence. The model-agnostic core does not infer intent. The optional
+OpenAI Playwright integration can propose conservative final-state checks from
+the captured request; generated checks are hypotheses and may remain unverified
+when context is insufficient.
 Action-level Playwright expectations support exact text and input values, plus
 single-element visibility. Task checks additionally support component URL
 matching, contained text, and scalar DOM property equality.

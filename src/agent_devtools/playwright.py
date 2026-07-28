@@ -9,6 +9,24 @@ from agent_devtools.integrations.playwright import (
     record_async_playwright_tools,
     record_playwright_tools,
 )
+from agent_devtools.integrations.playwright_agent import (
+    AsyncExpectationGenerator,
+    ExpectationGenerator,
+    ObservedAsyncPlaywrightAgent,
+    ObservedPlaywrightAgent,
+    observe_async_playwright_agent,
+    observe_playwright_agent,
+)
+from agent_devtools.integrations.openai_expectations import (
+    AsyncOpenAIExpectationGenerator,
+    DEFAULT_OPENAI_MODEL,
+    OpenAIExpectationGenerator,
+    async_openai_expectations,
+    openai_expectations,
+)
+from agent_devtools.integrations.playwright_expectation_generation import (
+    GeneratedTaskExpectation,
+)
 from agent_devtools.integrations.playwright_task import (
     AllOf,
     ElementVisible,
@@ -27,8 +45,16 @@ from agent_devtools.integrations.playwright_task import (
 
 __all__ = [
     "AllOf",
+    "AsyncExpectationGenerator",
+    "AsyncOpenAIExpectationGenerator",
+    "DEFAULT_OPENAI_MODEL",
     "ElementVisible",
+    "ExpectationGenerator",
+    "GeneratedTaskExpectation",
     "InputValueExpectation",
+    "ObservedAsyncPlaywrightAgent",
+    "ObservedPlaywrightAgent",
+    "OpenAIExpectationGenerator",
     "PlaywrightAction",
     "PropertyEquals",
     "RecordedPlaywrightExecutor",
@@ -38,9 +64,13 @@ __all__ = [
     "UrlMatch",
     "VisibilityExpectation",
     "all_of",
+    "async_openai_expectations",
     "element_visible",
+    "observe_async_playwright_agent",
     "observe_async_playwright_page",
+    "observe_playwright_agent",
     "observe_playwright_page",
+    "openai_expectations",
     "property_equals",
     "record_async_playwright_tools",
     "record_playwright_tools",

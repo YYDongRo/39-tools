@@ -199,6 +199,90 @@ async with trace as tools:
     await agent.run(task, tools=tools)
 ```
 
+### Observe a complete agent run
+
+For an agent with a `run(user_request, *, tools=...)` entry point, wrap the
+agent once. The user request is passed only to `agent.run(...)`; the observer
+automatically stores that same request as the session goal, injects recorded
+tools, creates a unique trace directory, and writes the report afterward:
+
+```python
+from agent_devtools.playwright import observe_playwright_agent
+
+agent = observe_playwright_agent(
+    original_agent,
+    browser_tools,
+    page,
+    Path("trace/my-agent"),
+)
+
+result = agent.run("Open the requested page and click the visible target")
+print(agent.last_report_path)
+```
+
+The wrapped run returns the original agent result. Every invocation gets a new
+subdirectory, so normal repeated use does not overwrite an earlier report. If
+the agent raises an exception, completed actions and the HTML report still
+remain available; task verification is skipped and the outcome is
+`unverified`.
+
+An optional `expectation_generator` receives the captured request before the
+agent starts and returns the data-only task checks described below. The package
+includes an optional OpenAI generator, so the caller does not repeat or hard-code
+the user's request:
+
+```python
+from agent_devtools.playwright import openai_expectations
+
+agent = observe_playwright_agent(
+    original_agent,
+    browser_tools,
+    page,
+    Path("trace/my-agent"),
+    expectation_generator=openai_expectations(),
+)
+
+agent.run(user_request)
+print(agent.last_report_path)
+```
+
+Install the optional dependency and provide your own API key through the
+standard environment variable before starting the program:
+
+```bash
+uv sync --extra browser --extra llm-openai
+export OPENAI_API_KEY="your-key"
+```
+
+The generator defaults to `gpt-5.6-terra`; pass `model="..."` to choose another
+model. It sends only the user request and optional `application_context` to the
+provider, requests strict structured output with API storage disabled, and
+accepts at most five data-only checks. It never executes model-generated code.
+The API key, raw provider response, and exception message are not written to the
+trace.
+
+No expectation is entered for each run. `application_context` is optional and
+only helps with private applications whose routes or stable selectors cannot be
+inferred from the request. Use `agent.assert_last_task_passed()` separately when
+a failed or unverified result should fail a CI test.
+
+Generation is deliberately fail-open for observability: if the dependency or
+key is missing, the provider call fails, or the model cannot derive a reliable
+check, the agent still runs and its actions are still recorded. The report shows
+the original user request, inferred goal when available, verification source,
+and a short reason for an `unverified` outcome. A provider-generated expectation
+is a useful test hypothesis, not ground truth; review important checks in the
+report. Without any generator, recording behaves as before and remains
+`unverified`.
+
+Async agents use `async_openai_expectations()` with
+`observe_async_playwright_agent`. Run the deterministic, API-free demonstration
+with:
+
+```bash
+uv run --extra browser python examples/observed_agent.py
+```
+
 ### Verify the final browser task
 
 For common browser tests, declare the final success conditions instead of
@@ -917,6 +1001,8 @@ sensitive content.
 - No general desktop screenshot capture
 - No built-in desktop or Android structured state observer
 - No CLI, dashboard, or recovery system
+- The observed-agent MVP requires `run(user_request, *, tools=...)`; other
+  framework call shapes need adapters
 - Playwright navigate, click, and fill recording are the only current runtime
   integration; structured failure diagnostics are limited to click and fill
 - Browser runtime evidence currently covers `pageerror` and `console.error`;
