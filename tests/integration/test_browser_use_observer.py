@@ -113,6 +113,7 @@ def test_real_browser_use_agent_records_initial_navigation(
             model = DeterministicModel(target_url)
             browser = Browser(
                 headless=True,
+                chromium_sandbox=False,
                 allowed_domains=["127.0.0.1"],
             )
             raw_agent = Agent(
