@@ -36,6 +36,8 @@ report after the agent run.
 - Optional automatic before-and-after structured state capture with changed paths
 - Automatic potential-issue warnings for repeated actions with no observed progress
 - Observed-agent wrappers that capture the user request and inject recorded tools
+- An optional Browser Use observer with one-time wrapping, automatic reports,
+  initial-navigation coverage, and Browser Use judge mapping
 - Optional OpenAI or Gemini generation of bounded final-state checks from that request
 - Optional Gemini assessment grounded in a bounded final snapshot of the real page
 - A Gemini function-calling demo where model-selected browser actions are recorded
@@ -88,6 +90,75 @@ It opens a local page, records and verifies one click, captures before-and-after
 screenshots, and prints the generated `report.html` path. Each run creates a new
 directory under `trace/quickstart/`, so it can be run repeatedly without
 overwriting earlier evidence.
+
+### Observe a Browser Use agent
+
+After a package release, install Agent DevTools with its Browser Use integration,
+then install Chromium:
+
+```bash
+uv add "agent-devtools[browser-use]"
+uv run playwright install chromium
+```
+
+A first-time integration adds one import and wraps the existing Browser Use
+agent once:
+
+```python
+from browser_use import Agent, Browser, ChatGoogle
+from agent_devtools.browser_use import observe_browser_use_agent
+
+task = "Open https://example.com and confirm the Example Domain page is open."
+browser = Browser(headless=False, allowed_domains=["example.com"])
+
+agent = observe_browser_use_agent(
+    Agent(
+        task=task,
+        llm=ChatGoogle(model="gemini-2.5-flash"),
+        browser=browser,
+        use_judge=True,
+    ),
+    task,
+)
+
+try:
+    await agent.run(max_steps=5)
+finally:
+    await browser.stop()
+
+print(agent.last_report_path)
+```
+
+The wrapper automatically connects the Browser Use callbacks, records one
+state-changing action per step, captures screenshots and compact page state,
+maps the Browser Use judge into task verification, and retains a report when
+the run raises. It also disables Browser Use's direct-URL shortcut so an initial
+model-selected navigation passes through the recorded action timeline. Existing
+step callbacks are preserved. A caller-provided `on_step_end` callback is also
+preserved when passed to `agent.run(...)`.
+
+Each run creates a unique directory under `trace/browser-use/` by default. Pass
+an `output_root` as the third argument to `observe_browser_use_agent(...)` to
+change it. Call `agent.assert_last_task_passed()` when a failed or unverified
+Browser Use judgment should fail a test.
+
+Keep provider credentials in environment variables supported by Browser Use;
+they are not arguments to Agent DevTools. Browser Use 0.13.7 pins older OpenAI
+and Google Gen AI SDK versions, so the `browser-use` extra cannot be installed
+together with Agent DevTools' `llm-openai` or `llm-gemini` extras. Use the model
+clients supplied by Browser Use in this environment.
+
+From this repository, run the complete example with:
+
+```bash
+uv sync --extra browser-use
+uv run --extra browser-use playwright install chromium
+uv run --extra browser-use python examples/browser_use_quickstart.py
+```
+
+The report can contain URLs, action arguments, screenshots, page titles, and
+bounded action error details. Use non-sensitive pages until the application has
+an appropriate trace retention and redaction policy.
 
 ### Wrap an existing agent tool object
 

@@ -51,13 +51,40 @@ jobs:
           enable-cache: true
 
       - name: Install project dependencies
-        run: uv sync --all-extras --locked
+        run: uv sync --extra browser --extra llm-openai --extra llm-gemini --locked
 
       - name: Install Chromium
         run: uv run playwright install --with-deps chromium
 
       - name: Run tests
         run: uv run pytest
+
+  browser-use-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install Browser Use integration
+        run: uv sync --extra browser-use --locked
+
+      - name: Install Chromium
+        run: uv run playwright install --with-deps chromium
+
+      - name: Run Browser Use tests
+        run: >-
+          uv run pytest
+          tests/test_browser_use_adapter.py
+          tests/test_public_api.py
+          tests/integration/test_browser_use_observer.py
 
   build:
     runs-on: ubuntu-latest

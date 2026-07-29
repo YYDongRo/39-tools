@@ -1,4 +1,5 @@
 import agent_devtools
+import agent_devtools.browser_use as public_browser_use
 import agent_devtools.playwright as public_playwright
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.analysis import TrajectoryFinding, analyze_session
@@ -7,6 +8,10 @@ from agent_devtools.async_tool_recorder import (
     record_async_tools,
 )
 from agent_devtools.failure import FailureCategory
+from agent_devtools.integrations.browser_use import (
+    ObservedBrowserUseAgent,
+    observe_browser_use_agent,
+)
 from agent_devtools.integrations.playwright import (
     InputValueExpectation,
     PlaywrightAction,
@@ -163,3 +168,14 @@ def test_playwright_public_api_exports_supported_types() -> None:
     assert set(public_playwright.__all__) == set(expected_exports)
     for name, implementation in expected_exports.items():
         assert getattr(public_playwright, name) is implementation
+
+
+def test_browser_use_public_api_exports_supported_types() -> None:
+    expected_exports = {
+        "ObservedBrowserUseAgent": ObservedBrowserUseAgent,
+        "observe_browser_use_agent": observe_browser_use_agent,
+    }
+
+    assert set(public_browser_use.__all__) == set(expected_exports)
+    for name, implementation in expected_exports.items():
+        assert getattr(public_browser_use, name) is implementation

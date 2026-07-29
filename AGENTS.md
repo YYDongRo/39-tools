@@ -157,6 +157,10 @@ The repository currently includes:
 - optional final-state Gemini assessment that automatically compares the
   captured request with bounded final URL, title, heading, and rendered-text
   evidence after an observed agent returns;
+- an optional Browser Use 0.13.x observer that wraps an existing agent once,
+  records state-changing steps with screenshots, prevents unobserved initial
+  actions, preserves existing callbacks, maps the framework judge into task
+  verification, and reports bounded provider-startup failures;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -170,7 +174,8 @@ The repository currently includes:
 Action and task verification results are stored in JSON, displayed in HTML
 reports, and included in derived action and session outcomes.
 Replay does not support complete sessions or action types other than click.
-No third-party agent integration exists beyond the Playwright runtime adapter.
+Browser Use 0.13.x is the first official third-party agent integration. Other
+agent frameworks still require dedicated adapters.
 The observed-agent MVP requires an agent entry point shaped like
 `run(user_request, *, tools=...)`; other framework call shapes need adapters.
 Async tool recording intentionally rejects overlapping actions and uses
@@ -222,8 +227,9 @@ Controlled replay of supported browser actions. Complete for synchronous click
 actions with explicit selector and timeout validation.
 
 Milestone 6:
-One external agent integration adapter. Complete for Playwright click recording
-and evidence-based failure diagnostics.
+One external agent integration adapter. Complete for Browser Use 0.13.x with
+one-time wrapping, action screenshots, final-judge mapping, and real-browser
+integration coverage.
 
 Do not jump directly to dashboards, LLM integration, OpenClaw integration,
 desktop automation, or complex replay before the foundations are tested.

@@ -4,7 +4,10 @@ import json
 import importlib.util
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+import pytest
+
+
+sync_playwright = pytest.importorskip("playwright.sync_api").sync_playwright
 
 from agent_devtools.action import ActionOutcome
 from agent_devtools.integrations.gemini_agent import GeminiToolAgent
