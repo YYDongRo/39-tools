@@ -2,22 +2,22 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version >= '3.13' and extra == 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini' and extra != 'extra-14-agent-devtools-llm-openai'",
-    "python_full_version < '3.13' and extra == 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini' and extra != 'extra-14-agent-devtools-llm-openai'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version >= '3.13' and extra == 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini' and extra != 'extra-8-39-tools-llm-openai'",
+    "python_full_version < '3.13' and extra == 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini' and extra != 'extra-8-39-tools-llm-openai'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 conflicts = [[
-    { package = "agent-devtools", extra = "browser-use" },
-    { package = "agent-devtools", extra = "llm-gemini" },
+    { package = "39-tools", extra = "browser-use" },
+    { package = "39-tools", extra = "llm-gemini" },
 ], [
-    { package = "agent-devtools", extra = "browser-use" },
-    { package = "agent-devtools", extra = "llm-openai" },
+    { package = "39-tools", extra = "browser-use" },
+    { package = "39-tools", extra = "llm-openai" },
 ]]
 
 [[package]]
-name = "agent-devtools"
+name = "39-tools"
 version = "0.1.0"
 source = { editable = "." }
 
@@ -224,8 +224,8 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "idna", marker = "extra == 'extra-14-agent-devtools-browser-use'" },
-    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and extra == 'extra-14-agent-devtools-browser-use') or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini') or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-openai')" },
+    { name = "idna", marker = "extra == 'extra-8-39-tools-browser-use'" },
+    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and extra == 'extra-8-39-tools-browser-use') or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini') or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-openai')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
 wheels = [
@@ -237,13 +237,13 @@ name = "anyio"
 version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 dependencies = [
-    { name = "idna", marker = "extra == 'extra-14-agent-devtools-llm-gemini' or extra == 'extra-14-agent-devtools-llm-openai' or extra != 'extra-14-agent-devtools-browser-use'" },
-    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and extra != 'extra-14-agent-devtools-browser-use') or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini') or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-openai')" },
+    { name = "idna", marker = "extra == 'extra-8-39-tools-llm-gemini' or extra == 'extra-8-39-tools-llm-openai' or extra != 'extra-8-39-tools-browser-use'" },
+    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and extra != 'extra-8-39-tools-browser-use') or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini') or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-openai')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176, upload-time = "2026-07-12T20:29:07.082Z" }
 wheels = [
@@ -934,7 +934,7 @@ resolution-markers = [
 dependencies = [
     { name = "anyio", version = "4.12.1", source = { registry = "https://pypi.org/simple" } },
     { name = "distro" },
-    { name = "google-auth", version = "2.48.0", source = { registry = "https://pypi.org/simple" }, extra = ["requests"], marker = "extra == 'extra-14-agent-devtools-browser-use'" },
+    { name = "google-auth", version = "2.48.0", source = { registry = "https://pypi.org/simple" }, extra = ["requests"], marker = "extra == 'extra-8-39-tools-browser-use'" },
     { name = "httpx" },
     { name = "pydantic", version = "2.12.5", source = { registry = "https://pypi.org/simple" } },
     { name = "requests", version = "2.33.0", source = { registry = "https://pypi.org/simple" } },
@@ -959,7 +959,7 @@ resolution-markers = [
 dependencies = [
     { name = "anyio", version = "4.14.2", source = { registry = "https://pypi.org/simple" } },
     { name = "distro" },
-    { name = "google-auth", version = "2.56.2", source = { registry = "https://pypi.org/simple" }, extra = ["requests"], marker = "extra == 'extra-14-agent-devtools-llm-gemini' or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-openai')" },
+    { name = "google-auth", version = "2.56.2", source = { registry = "https://pypi.org/simple" }, extra = ["requests"], marker = "extra == 'extra-8-39-tools-llm-gemini' or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-openai')" },
     { name = "httpx" },
     { name = "pydantic", version = "2.13.4", source = { registry = "https://pypi.org/simple" } },
     { name = "requests", version = "2.34.2", source = { registry = "https://pypi.org/simple" } },
@@ -1118,8 +1118,8 @@ name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", version = "4.12.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-browser-use'" },
-    { name = "anyio", version = "4.14.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-llm-gemini' or extra == 'extra-14-agent-devtools-llm-openai' or extra != 'extra-14-agent-devtools-browser-use'" },
+    { name = "anyio", version = "4.12.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-browser-use'" },
+    { name = "anyio", version = "4.14.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-llm-gemini' or extra == 'extra-8-39-tools-llm-openai' or extra != 'extra-8-39-tools-browser-use'" },
     { name = "certifi" },
     { name = "httpcore" },
     { name = "idna" },
@@ -1420,7 +1420,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pydantic", version = "2.12.5", source = { registry = "https://pypi.org/simple" } },
     { name = "pydantic-settings" },
-    { name = "pyjwt", extra = ["crypto"], marker = "extra == 'extra-14-agent-devtools-browser-use'" },
+    { name = "pyjwt", extra = ["crypto"], marker = "extra == 'extra-8-39-tools-browser-use'" },
     { name = "python-multipart" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "sse-starlette" },
@@ -1610,9 +1610,9 @@ name = "openai"
 version = "2.49.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 dependencies = [
     { name = "anyio", version = "4.14.2", source = { registry = "https://pypi.org/simple" } },
@@ -2023,9 +2023,9 @@ name = "pydantic"
 version = "2.13.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 dependencies = [
     { name = "annotated-types" },
@@ -2144,9 +2144,9 @@ name = "pydantic-core"
 version = "2.46.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 dependencies = [
     { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" } },
@@ -2265,8 +2265,8 @@ name = "pyee"
 version = "13.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-browser-use'" },
-    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-llm-gemini' or extra == 'extra-14-agent-devtools-llm-openai' or extra != 'extra-14-agent-devtools-browser-use'" },
+    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-browser-use'" },
+    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-llm-gemini' or extra == 'extra-8-39-tools-llm-openai' or extra != 'extra-8-39-tools-browser-use'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8b/04/e7c1fe4dc78a6fdbfd6c337b1c3732ff543b8a397683ab38378447baa331/pyee-13.0.1.tar.gz", hash = "sha256:0b931f7c14535667ed4c7e0d531716368715e860b988770fc7eb8578d1f67fc8", size = 31655, upload-time = "2026-02-14T21:12:28.044Z" }
 wheels = [
@@ -5115,7 +5115,7 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini') or (extra == 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-openai')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini') or (extra == 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-openai')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -5522,9 +5522,9 @@ name = "typing-extensions"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "python_full_version < '3.14' and extra != 'extra-14-agent-devtools-browser-use' and extra == 'extra-14-agent-devtools-llm-gemini'",
-    "extra != 'extra-14-agent-devtools-browser-use' and extra != 'extra-14-agent-devtools-llm-gemini'",
+    "python_full_version >= '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "python_full_version < '3.14' and extra != 'extra-8-39-tools-browser-use' and extra == 'extra-8-39-tools-llm-gemini'",
+    "extra != 'extra-8-39-tools-browser-use' and extra != 'extra-8-39-tools-llm-gemini'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5", size = 113555, upload-time = "2026-07-02T08:40:05.92Z" }
 wheels = [
@@ -5536,8 +5536,8 @@ name = "typing-inspection"
 version = "0.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-browser-use'" },
-    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-14-agent-devtools-llm-gemini' or extra == 'extra-14-agent-devtools-llm-openai' or extra != 'extra-14-agent-devtools-browser-use'" },
+    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-browser-use'" },
+    { name = "typing-extensions", version = "4.16.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-39-tools-llm-gemini' or extra == 'extra-8-39-tools-llm-openai' or extra != 'extra-8-39-tools-browser-use'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
 wheels = [

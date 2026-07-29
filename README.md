@@ -1,25 +1,37 @@
 # Agent DevTools
 
+[![Tests](https://github.com/YYDongRo/39-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/YYDongRo/39-tools/actions/workflows/tests.yml)
+
+> **Status:** Early alpha. The current codebase focuses on observable browser
+> agent runs; desktop, Android, and arbitrary agent interception are not yet
+> supported.
+
 Agent DevTools is an open-source Python library for making computer-use agents
 observable, debuggable, and easier to trust.
 
-Wrap an agent once, run it normally, and get a local HTML report of what it did,
-what changed, and why the task passed, failed, or could not be verified.
+Wrap a supported agent once, run it normally, and get a local HTML report of
+its state-changing actions, what changed, and why the task passed, failed, or
+could not be verified.
 
 ![Agent DevTools report showing a successful task, action totals, and final checks](docs/assets/report-overview.png)
 
 ## What it can do
 
-- Record an ordered trajectory of browser actions.
+- Record an ordered trajectory of supported browser actions.
 - Capture action arguments, timing, status, and failure details.
 - Save before-and-after screenshots and compact page state.
 - Separate action execution from action checks and final task verification.
 - Surface browser errors, network failures, and repeated no-progress actions.
-- Write versioned JSON traces and a standalone HTML report after every run.
+- Write versioned JSON traces and a standalone HTML report after every
+  observed run.
 
 The easiest current integration is
 [Browser Use](https://github.com/browser-use/browser-use). Lower-level
 Playwright and generic tool wrappers are also available.
+
+Today, the one-time observer experience applies to Browser Use `0.13.x`.
+Other agents must use the Playwright or generic tool wrappers, or provide a
+dedicated adapter.
 
 ## Quickstart: observe a Browser Use agent
 
@@ -27,15 +39,19 @@ Requirements:
 
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/)
+- Git, while installing the early alpha directly from GitHub
 - A model provider key supported by Browser Use
 
-After Agent DevTools is published, install the Browser Use integration and
-Chromium:
+The project is not yet published on PyPI. Install the early alpha directly from
+this GitHub repository, then install Chromium:
 
 ```bash
-uv add "agent-devtools[browser-use]"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
 ```
+
+The distribution is named `39-tools`; Python imports continue to use
+`agent_devtools`.
 
 Keep the provider key in an environment variable. For example, Browser Use's
 Google client reads `GOOGLE_API_KEY`:
@@ -174,6 +190,10 @@ Agent DevTools currently focuses on browser-based agents. It records calls that
 pass through a supported observer or wrapped tool object; it cannot intercept
 arbitrary direct browser, desktop, or Android operations.
 
+The Browser Use timeline intentionally omits read-only operations such as
+screenshots, extraction, state reads, and `done`. It does not record hidden
+model reasoning.
+
 Current limitations include:
 
 - no general desktop or Android recorder;
@@ -201,6 +221,12 @@ uv run pytest
 Browser integration tests and examples use optional dependency groups. See
 [the development guide](docs/development.md) for the commands and compatibility
 notes.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull-request
+guidance. Report vulnerabilities and review trace-safety guidance in
+[SECURITY.md](SECURITY.md).
 
 ## License
 

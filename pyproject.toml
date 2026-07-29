@@ -1,5 +1,5 @@
 [project]
-name = "agent-devtools"
+name = "39-tools"
 version = "0.1.0"
 description = "Action-level observability and debugging for computer-use agents"
 readme = "README.md"
@@ -10,6 +10,29 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = []
+keywords = [
+    "ai-agents",
+    "browser-automation",
+    "computer-use",
+    "debugging",
+    "observability",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Debuggers",
+]
+
+[project.urls]
+Homepage = "https://github.com/YYDongRo/39-tools"
+Repository = "https://github.com/YYDongRo/39-tools"
+Issues = "https://github.com/YYDongRo/39-tools/issues"
 
 [project.optional-dependencies]
 browser = [
@@ -41,6 +64,9 @@ conflicts = [
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "agent_devtools"
 
 [dependency-groups]
 dev = [

@@ -6,12 +6,15 @@ existing Browser Use agent. It connects recording to the agent once; normal
 
 ## Install
 
-After Agent DevTools is published:
+The early alpha is not yet published on PyPI. Install it directly from GitHub:
 
 ```bash
-uv add "agent-devtools[browser-use]"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
 ```
+
+The distribution is named `39-tools`; Python imports continue to use
+`agent_devtools`.
 
 From this repository:
 
