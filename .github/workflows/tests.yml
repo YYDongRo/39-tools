@@ -62,6 +62,9 @@ jobs:
   browser-use-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      TIMEOUT_BrowserStartEvent: "60"
+      TIMEOUT_BrowserLaunchEvent: "60"
 
     steps:
       - name: Check out repository
