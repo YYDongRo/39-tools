@@ -7,6 +7,7 @@ import pytest
 
 from agent_devtools import ActionOutcome, ActionStatus
 from agent_devtools.analysis import analyze_session
+from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
     expect_text,
     run_playwright_agent,
@@ -229,6 +230,65 @@ def test_executor_records_direct_playwright_actions(tmp_path: Path) -> None:
     assert search.verification.passed
     assert executor.report_path == trace_dir / "report.html"
     assert executor.report_path.is_file()
+
+
+def test_executor_records_press_and_scroll_actions(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "press-and-scroll"
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 800, "height": 500})
+        page.set_content(
+            """
+            <input id="search" onkeydown="document.body.dataset.key = event.key">
+            <div style="height: 2000px"></div>
+            """
+        )
+
+        with RecordedPlaywrightExecutor(page, trace_dir) as executor:
+            pressed = executor.press("#search", "Enter")
+            scrolled = executor.scroll(delta_y=600)
+
+        pressed_key = page.locator("body").get_attribute("data-key")
+        scroll_y = page.evaluate("() => window.scrollY")
+        browser.close()
+
+    assert pressed_key == "Enter"
+    assert scroll_y > 0
+    assert executor.session.actions == [pressed, scrolled]
+    assert pressed.arguments == {"selector": "#search", "key": "Enter"}
+    assert pressed.status is ActionStatus.SUCCESS
+    assert scrolled.arguments == {"delta_x": 0, "delta_y": 600}
+    assert scrolled.status is ActionStatus.SUCCESS
+    assert scrolled.observations["scroll_before"]["y"] == 0
+    assert scrolled.observations["scroll_after"]["y"] > 0
+    for action_number in range(1, 3):
+        action_dir = trace_dir / "actions" / f"{action_number:03d}"
+        assert (action_dir / "before.png").stat().st_size > 0
+        assert (action_dir / "after.png").stat().st_size > 0
+
+
+def test_executor_diagnoses_failed_press_target(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "failed-press"
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_content("<button id='available'>Available</button>")
+
+        with RecordedPlaywrightExecutor(page, trace_dir) as executor:
+            action = executor.press("#missing", "Enter", timeout_ms=100)
+
+        browser.close()
+
+    assert action.status is ActionStatus.FAILURE
+    assert action.failure_category is FailureCategory.TARGET_NOT_FOUND
+    assert action.failure_evidence == {
+        "selector": "#missing",
+        "selector_count": 0,
+        "target_visible": None,
+        "target_enabled": None,
+    }
 
 
 def test_playwright_tool_wrapper_records_calls_and_structured_state(

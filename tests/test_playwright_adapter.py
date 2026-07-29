@@ -232,6 +232,48 @@ def test_playwright_action_rejects_invalid_selector(selector: object) -> None:
         )
 
 
+@pytest.mark.parametrize("key", ["", "   ", None])
+def test_playwright_press_action_rejects_invalid_key(key: object) -> None:
+    with pytest.raises(ValueError, match="require a non-empty key"):
+        record_playwright_action(
+            FakePage(FakeLocator(count=1)),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "press",
+            {"selector": "#target", "key": key},
+        )
+
+
+@pytest.mark.parametrize("value", [True, "500", float("inf"), float("nan")])
+def test_playwright_scroll_action_rejects_invalid_delta(value: object) -> None:
+    with pytest.raises(ValueError, match="finite numeric"):
+        record_playwright_action(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "scroll",
+            {"delta_y": value},
+        )
+
+
+def test_playwright_scroll_action_rejects_zero_delta() -> None:
+    with pytest.raises(ValueError, match="non-zero delta"):
+        record_playwright_action(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "scroll",
+            {"delta_x": 0, "delta_y": 0},
+        )
+
+
+def test_playwright_scroll_action_rejects_timeout() -> None:
+    with pytest.raises(ValueError, match="do not support timeout_ms"):
+        record_playwright_action(
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+            "scroll",
+            {"delta_y": 500, "timeout_ms": 100},
+        )
+
+
 @pytest.mark.parametrize("url", ["", "   ", None])
 def test_playwright_navigate_action_rejects_invalid_url(url: object) -> None:
     with pytest.raises(ValueError, match="require a non-empty URL"):
@@ -269,7 +311,7 @@ def test_playwright_action_rejects_unsupported_action_type() -> None:
         record_playwright_action(
             FakePage(FakeLocator(count=1)),  # type: ignore[arg-type]
             object(),  # type: ignore[arg-type]
-            "scroll",
+            "hover",
             {"selector": "#target"},
         )
 

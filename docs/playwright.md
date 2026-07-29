@@ -36,6 +36,26 @@ For async tool objects, use `record_async_playwright_tools(...)` and
 `async with`. The current recorder requires actions to run sequentially and
 rejects overlapping calls.
 
+## Execute recorded browser actions
+
+`RecordedPlaywrightExecutor` provides a small synchronous action vocabulary for
+custom agents. Navigate, click, fill, press, and scroll all use the same session,
+screenshots, timing, page-state evidence, and HTML timeline:
+
+```python
+with RecordedPlaywrightExecutor(page, Path("trace/my-agent")) as executor:
+    executor.navigate(target_url)
+    executor.fill("#search", "computer use agents")
+    executor.press("#search", "Enter")
+    executor.scroll(delta_y=700)
+    executor.click("#result")
+```
+
+`press` targets one element and supports keys such as `Enter`, `Tab`, and
+`Escape`. `scroll` uses Playwright's mouse wheel and records the page's scroll
+position before and after execution. Dynamic agents can emit the same operations
+with `PlaywrightAction("press", ...)` and `PlaywrightAction("scroll", ...)`.
+
 ## Observe an agent run
 
 An agent with a `run(user_request, *, tools=...)` entry point can be wrapped at

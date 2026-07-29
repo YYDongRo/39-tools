@@ -123,7 +123,8 @@ The repository currently includes:
   expectations;
 - automatic before-and-after page URL observations for supported Playwright
   actions, displayed compactly in HTML reports;
-- a Playwright action entry point for traced navigate, click, and fill
+- a Playwright action entry point for traced navigate, click, fill, press, and
+  scroll
   trajectories;
 - a single recorded Playwright executor that owns session and screenshot
   lifecycle for supported actions;

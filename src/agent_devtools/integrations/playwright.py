@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
+from math import isfinite
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypeVar
@@ -596,11 +597,11 @@ def record_playwright_action(
             operation = lambda: page.goto(url)
         else:
             operation = lambda: page.goto(url, timeout=timeout_ms)
-    elif action_type in {"click", "fill"}:
+    elif action_type in {"click", "fill", "press"}:
         selector = arguments.get("selector")
         if not isinstance(selector, str) or not selector.strip():
             raise ValueError(
-                "click and fill actions require a non-empty selector"
+                "click, fill, and press actions require a non-empty selector"
             )
         locator = page.locator(selector)
         if action_type == "click":
@@ -608,7 +609,7 @@ def record_playwright_action(
                 operation = locator.click
             else:
                 operation = lambda: locator.click(timeout=timeout_ms)
-        else:
+        elif action_type == "fill":
             text = arguments.get("text")
             if not isinstance(text, str):
                 raise ValueError("fill actions require text")
@@ -637,6 +638,27 @@ def record_playwright_action(
                         ).__name__
 
             operation = execute_fill
+        else:
+            key = arguments.get("key")
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("press actions require a non-empty key")
+            if timeout_ms is None:
+                operation = lambda: locator.press(key)
+            else:
+                operation = lambda: locator.press(key, timeout=timeout_ms)
+    elif action_type == "scroll":
+        if timeout_ms is not None:
+            raise ValueError("scroll actions do not support timeout_ms")
+        delta_x = _scroll_delta(arguments, "delta_x")
+        delta_y = _scroll_delta(arguments, "delta_y")
+        if delta_x == 0 and delta_y == 0:
+            raise ValueError("scroll actions require a non-zero delta")
+
+        def execute_scroll() -> None:
+            page.mouse.wheel(delta_x, delta_y)
+            page.wait_for_timeout(50)
+
+        operation = execute_scroll
     else:
         raise ValueError(f"unsupported Playwright action: {action_type}")
 
@@ -644,9 +666,13 @@ def record_playwright_action(
 
     def execute_with_page_url_observations() -> None:
         _observe_page_url(page, observations, "page_url_before")
+        if action_type == "scroll":
+            _observe_scroll_position(page, observations, "scroll_before")
         try:
             browser_operation()
         finally:
+            if action_type == "scroll":
+                _observe_scroll_position(page, observations, "scroll_after")
             _observe_page_url(page, observations, "page_url_after")
 
     failure_diagnosis: Callable[[ActionRecord], ActionRecord] | None = None
@@ -660,6 +686,13 @@ def record_playwright_action(
             page,
             action,
         )
+    elif action_type == "press":
+        failure_diagnosis = lambda action: _diagnose_playwright_target_failure(
+            page,
+            action,
+            str(action.arguments["selector"]),
+            check_editable=False,
+        )
 
     return recorder.record(
         action_type,
@@ -671,6 +704,19 @@ def record_playwright_action(
     )
 
 
+def _scroll_delta(arguments: dict[str, object], key: str) -> int | float:
+    value = arguments.get(key, 0)
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not isfinite(value)
+    ):
+        raise ValueError(
+            "scroll actions require finite numeric delta_x and delta_y"
+        )
+    return value
+
+
 def _observe_page_url(
     page: Page,
     observations: dict[str, object],
@@ -678,6 +724,20 @@ def _observe_page_url(
 ) -> None:
     try:
         observations[key] = page.url
+    except Exception as error:
+        observations[f"{key}_error_type"] = type(error).__name__
+
+
+def _observe_scroll_position(
+    page: Page,
+    observations: dict[str, object],
+    key: str,
+) -> None:
+    try:
+        scroll = observe_playwright_page(page).get("scroll")
+        if not isinstance(scroll, dict):
+            raise TypeError("Playwright scroll observation must be an object")
+        observations[key] = dict(scroll)
     except Exception as error:
         observations[f"{key}_error_type"] = type(error).__name__
 
@@ -817,6 +877,47 @@ class RecordedPlaywrightExecutor:
             PlaywrightAction(
                 "fill",
                 arguments,
+                expectation=expectation,
+            )
+        )
+
+    def press(
+        self,
+        selector: str,
+        key: str,
+        *,
+        timeout_ms: int | None = None,
+        expectation: (
+            TextExpectation | VisibilityExpectation | None
+        ) = None,
+    ) -> ActionRecord:
+        arguments: dict[str, object] = {
+            "selector": selector,
+            "key": key,
+        }
+        if timeout_ms is not None:
+            arguments["timeout_ms"] = timeout_ms
+        return self.execute(
+            PlaywrightAction(
+                "press",
+                arguments,
+                expectation=expectation,
+            )
+        )
+
+    def scroll(
+        self,
+        delta_y: int | float,
+        *,
+        delta_x: int | float = 0,
+        expectation: (
+            TextExpectation | VisibilityExpectation | None
+        ) = None,
+    ) -> ActionRecord:
+        return self.execute(
+            PlaywrightAction(
+                "scroll",
+                {"delta_x": delta_x, "delta_y": delta_y},
                 expectation=expectation,
             )
         )
