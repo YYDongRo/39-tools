@@ -53,6 +53,16 @@ finally:
 print(agent.last_report_path)
 ```
 
+Open the latest report with the system's default browser when running locally:
+
+```python
+agent.open_last_report()
+```
+
+The method is explicit and is never called automatically in CI. It raises a
+clear error if the agent has not run, the report was removed, or the system
+cannot launch a browser.
+
 `observe_browser_use_agent(...)` returns an `ObservedBrowserUseAgent`. It
 forwards unknown attributes to the original agent, and `run(...)` returns the
 original Browser Use result.

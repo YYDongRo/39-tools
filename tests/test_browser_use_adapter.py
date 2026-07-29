@@ -179,6 +179,47 @@ def test_observer_records_navigation_with_one_setup_call(
     asyncio.run(run())
 
 
+def test_open_last_report_uses_default_browser(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[tuple[str, int]] = []
+
+    def open_browser(url: str, *, new: int) -> bool:
+        opened.append((url, new))
+        return True
+
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            tmp_path,
+        )
+        await agent.run()
+
+        monkeypatch.setattr(
+            "agent_devtools.integrations.browser_use.webbrowser.open",
+            open_browser,
+        )
+        report_path = agent.open_last_report()
+
+        assert report_path.is_absolute()
+        assert opened == [(report_path.as_uri(), 2)]
+
+    asyncio.run(run())
+
+
+def test_open_last_report_requires_a_completed_run(tmp_path: Path) -> None:
+    agent = observe_browser_use_agent(
+        Agent(),
+        "Open example.com",
+        tmp_path,
+    )
+
+    with pytest.raises(RuntimeError, match="has not run yet"):
+        agent.open_last_report()
+
+
 def test_observer_preserves_existing_callbacks(tmp_path: Path) -> None:
     async def run() -> None:
         callback_steps: list[int] = []

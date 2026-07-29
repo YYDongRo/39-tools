@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -368,6 +369,21 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
                 f"Task verification failed: {verification.failure_reason}. "
                 f"Report: {report_path}"
             )
+
+    def open_last_report(self) -> Path:
+        report_path = self.last_report_path
+        if report_path is None:
+            raise RuntimeError("the observed Browser Use agent has not run yet")
+
+        absolute_path = report_path.resolve()
+        if not absolute_path.is_file():
+            raise FileNotFoundError(f"report does not exist: {absolute_path}")
+        if not webbrowser.open(absolute_path.as_uri(), new=2):
+            raise RuntimeError(
+                "could not open the report with the default browser; "
+                f"open it manually: {absolute_path}"
+            )
+        return absolute_path
 
     async def _on_model_action(
         self,

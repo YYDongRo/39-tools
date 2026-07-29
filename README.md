@@ -93,11 +93,14 @@ trace/browser-use/<run-id>/
 ```
 
 Open the printed `report.html` path in any browser. From WSL, this opens the
-trace directory in Windows Explorer:
+latest report directly with the system's default browser:
 
-```bash
-explorer.exe "$(wslpath -w "$PWD/trace/browser-use")"
+```python
+agent.open_last_report()
 ```
+
+Opening is explicit, so a normal run or CI job never launches a browser unless
+the caller requests it.
 
 Call `agent.assert_last_task_passed()` when a failed or unverified final result
 should fail a test.
