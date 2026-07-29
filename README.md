@@ -92,6 +92,21 @@ trace/browser-use/<run-id>/
     └── ...
 ```
 
+At the end of the run, the observer prints a compact result before the full
+report is opened:
+
+```text
+Agent DevTools
+Task: Open example.com and confirm the page is open.
+Task result: SUCCESS
+Actions: 1 (1 succeeded, 0 failed)
+Final check: passed
+Report: /path/to/trace/browser-use/<run-id>/report.html
+```
+
+Pass `print_summary=False` to `observe_browser_use_agent(...)` when a host
+application handles its own console output.
+
 Open the printed `report.html` path in any browser. From WSL, this opens the
 latest report directly with the system's default browser:
 

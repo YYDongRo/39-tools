@@ -3,9 +3,71 @@ from pathlib import Path
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
-from agent_devtools.report import write_action_html, write_session_html
+from agent_devtools.report import (
+    format_session_summary,
+    write_action_html,
+    write_session_html,
+)
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
+
+
+def test_format_successful_session_summary(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Open the requested page",
+        actions=[
+            ActionRecord(
+                action_type="navigate",
+                arguments={},
+                start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+                duration_ms=32,
+                status=ActionStatus.SUCCESS,
+            )
+        ],
+        verification=VerificationResult(
+            expected_state="Page open",
+            observed_state="Page open",
+            passed=True,
+        ),
+    )
+    report_path = tmp_path / "report.html"
+
+    summary = format_session_summary(session, report_path)
+
+    assert summary == "\n".join(
+        (
+            "Agent DevTools",
+            "Task: Open the requested page",
+            "Task result: SUCCESS",
+            "Actions: 1 (1 succeeded, 0 failed)",
+            "Final check: passed",
+            f"Report: {report_path.resolve()}",
+        )
+    )
+
+
+def test_format_failed_action_summary_is_compact(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Fill the form",
+        actions=[
+            ActionRecord(
+                action_type="fill",
+                arguments={"selector": "#readonly"},
+                start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+                duration_ms=500,
+                status=ActionStatus.FAILURE,
+                failure_reason="a very detailed provider or browser error",
+                failure_category=FailureCategory.TARGET_NOT_EDITABLE,
+            )
+        ],
+    )
+
+    summary = format_session_summary(session, tmp_path / "report.html")
+
+    assert "Task result: UNVERIFIED" in summary
+    assert "Failed at: Action 1 — fill" in summary
+    assert "Likely cause: The target was not editable." in summary
+    assert "very detailed provider" not in summary
 
 
 def test_write_successful_action_report(tmp_path: Path) -> None:

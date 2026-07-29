@@ -75,6 +75,16 @@ agent = observe_browser_use_agent(raw_agent, task, Path("trace/my-agent"))
 
 Every run uses a new child directory, so an earlier report is not overwritten.
 
+After a run, the observer prints a short terminal summary containing the task
+result, execution totals, final-check status, the first failed action or
+verification reason when relevant, and the absolute report path. Detailed
+arguments and raw errors remain in the HTML report. Disable this output when a
+host application provides its own logging:
+
+```python
+agent = observe_browser_use_agent(raw_agent, task, print_summary=False)
+```
+
 ## What is recorded
 
 The integration records one state-changing action per Browser Use step. For

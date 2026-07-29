@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
-from agent_devtools.report import write_session_html
+from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
@@ -255,11 +255,15 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         agent: AgentT,
         goal: str,
         output_root: str | Path = Path("trace") / "browser-use",
+        *,
+        print_summary: bool = True,
     ) -> None:
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal cannot be empty")
         if not callable(getattr(agent, "run", None)):
             raise TypeError("agent must provide a callable async run method")
+        if not isinstance(print_summary, bool):
+            raise TypeError("print_summary must be a bool")
         if not hasattr(agent, "register_new_step_callback"):
             raise TypeError("agent must be a compatible Browser Use Agent")
         if not hasattr(agent, "directly_open_url"):
@@ -288,6 +292,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         self.agent = agent
         self.goal = goal
         self.output_root = Path(output_root)
+        self.print_summary = print_summary
         self.last_trace: _BrowserUseRecorder | None = None
         self._active_trace: _BrowserUseRecorder | None = None
         self._active = False
@@ -351,6 +356,8 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             raise
         finally:
             trace.finish(history, run_error=run_error)
+            if self.print_summary:
+                print(format_session_summary(trace.session, trace.report_path))
             self._active_trace = None
             self._active = False
 
@@ -410,8 +417,15 @@ def observe_browser_use_agent(
     agent: AgentT,
     goal: str,
     output_root: str | Path = Path("trace") / "browser-use",
+    *,
+    print_summary: bool = True,
 ) -> ObservedBrowserUseAgent[AgentT]:
-    return ObservedBrowserUseAgent(agent, goal, output_root)
+    return ObservedBrowserUseAgent(
+        agent,
+        goal,
+        output_root,
+        print_summary=print_summary,
+    )
 
 
 async def _call_callback(

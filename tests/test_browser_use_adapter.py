@@ -220,6 +220,46 @@ def test_open_last_report_requires_a_completed_run(tmp_path: Path) -> None:
         agent.open_last_report()
 
 
+def test_observer_prints_a_compact_run_summary(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            tmp_path,
+        )
+        await agent.run()
+
+        output = capsys.readouterr().out
+        assert "Agent DevTools\n" in output
+        assert "Task result: SUCCESS" in output
+        assert "Actions: 1 (1 succeeded, 0 failed)" in output
+        assert "Final check: passed" in output
+        assert f"Report: {agent.last_report_path.resolve()}" in output
+
+    asyncio.run(run())
+
+
+def test_observer_can_disable_the_run_summary(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            tmp_path,
+            print_summary=False,
+        )
+        await agent.run()
+
+        assert capsys.readouterr().out == ""
+
+    asyncio.run(run())
+
+
 def test_observer_preserves_existing_callbacks(tmp_path: Path) -> None:
     async def run() -> None:
         callback_steps: list[int] = []

@@ -34,6 +34,93 @@ _FIELD_LABELS = {
     "target_enabled": "Enabled",
     "target_visible": "Visible",
 }
+_FAILURE_SUMMARIES = {
+    FailureCategory.TIMEOUT: "The action timed out.",
+    FailureCategory.OPERATION_ERROR: "The action returned an operation error.",
+    FailureCategory.VERIFICATION_MISMATCH: (
+        "The observed state did not match the expected state."
+    ),
+    FailureCategory.TARGET_NOT_FOUND: "The target was not found.",
+    FailureCategory.TARGET_AMBIGUOUS: "More than one target matched.",
+    FailureCategory.TARGET_NOT_VISIBLE: "The target was not visible.",
+    FailureCategory.TARGET_DISABLED: "The target was disabled.",
+    FailureCategory.TARGET_NOT_EDITABLE: "The target was not editable.",
+    FailureCategory.UNKNOWN: (
+        "The available evidence does not identify a specific cause."
+    ),
+}
+
+
+def format_session_summary(
+    session: ActionSession,
+    report_path: str | Path,
+) -> str:
+    execution_failures = sum(
+        action.status is ActionStatus.FAILURE for action in session.actions
+    )
+    execution_successes = session.action_count - execution_failures
+    lines = ["Agent DevTools"]
+    if session.goal is not None:
+        lines.append(f"Task: {_compact_console_text(session.goal)}")
+    lines.extend(
+        (
+            f"Task result: {session.outcome.value.upper()}",
+            (
+                f"Actions: {session.action_count} "
+                f"({execution_successes} succeeded, "
+                f"{execution_failures} failed)"
+            ),
+            f"Final check: {_final_check_label(session)}",
+        )
+    )
+
+    failed_action = next(
+        (
+            (number, action)
+            for number, action in enumerate(session.actions, start=1)
+            if action.outcome is ActionOutcome.FAILURE
+        ),
+        None,
+    )
+    if failed_action is not None:
+        number, action = failed_action
+        lines.append(f"Failed at: Action {number} — {action.action_type}")
+        category = _outcome_failure_category(action)
+        if category is not None:
+            lines.append(f"Likely cause: {_FAILURE_SUMMARIES[category]}")
+    elif session.verification is not None and not session.verification.passed:
+        lines.append("Failed at: Final task check")
+        lines.append(
+            "Reason: "
+            + _compact_console_text(session.verification.failure_reason or "")
+        )
+    elif session.verification is None and session.verification_note is not None:
+        lines.append(
+            f"Reason: {_compact_console_text(session.verification_note)}"
+        )
+
+    findings = analyze_session(session)
+    if findings:
+        finding = findings[0]
+        action_label = ", ".join(str(number) for number in finding.action_numbers)
+        suffix = f" (actions {action_label})" if action_label else ""
+        lines.append(f"Potential issue: {finding.title}{suffix}")
+
+    lines.append(f"Report: {Path(report_path).resolve()}")
+    return "\n".join(lines)
+
+
+def _final_check_label(session: ActionSession) -> str:
+    if session.verification is None:
+        return "not run"
+    return "passed" if session.verification.passed else "failed"
+
+
+def _compact_console_text(value: str, *, limit: int = 160) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "…"
 
 
 def _screenshot_panel(title: str, screenshot_path: object) -> str:
