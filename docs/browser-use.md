@@ -1,8 +1,8 @@
 # Browser Use integration
 
-The Browser Use observer is the recommended high-level integration for an
-existing Browser Use agent. It connects recording to the agent once; normal
-`agent.run(...)` calls then create a new trace and HTML report automatically.
+Agent DevTools provides action-level visual debugging and task verification for
+existing Browser Use agents. Connect the observer once; normal `agent.run(...)`
+calls then create a new trace and HTML report automatically.
 
 ## Install
 

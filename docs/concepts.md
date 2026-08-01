@@ -1,8 +1,8 @@
 # Results, verification, and trace concepts
 
-Agent DevTools separates recording evidence from deciding whether behavior was
-correct. This avoids treating "the API call returned" as proof that the user's
-goal was satisfied.
+Agent DevTools separates browser-action evidence from deciding whether the
+complete task was correct. This avoids treating "the API call returned" as
+proof that the user's goal was satisfied.
 
 ## Three result levels
 

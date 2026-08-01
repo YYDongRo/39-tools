@@ -1,7 +1,8 @@
 # Playwright and tool integrations
 
-Use these lower-level integrations when the agent does not use Browser Use, or
-when direct control over tools and verification is required.
+Agent DevTools provides lower-level action recording and verification for
+Playwright-based agents that do not use Browser Use, or that need direct
+control over tools and checks.
 
 ## Wrap an existing Playwright tool object
 
