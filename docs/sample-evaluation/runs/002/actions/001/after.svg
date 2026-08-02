@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#f4f7fb"/>
+  <rect x="35" y="35" width="890" height="470" rx="18" fill="#fff" stroke="#cad5e3" stroke-width="2"/>
+  <rect x="35" y="35" width="890" height="58" rx="18" fill="#e5eaf1"/>
+  <rect x="120" y="52" width="760" height="27" rx="7" fill="#fff"/>
+  <text x="140" y="71" font-family="Arial, sans-serif" font-size="14" fill="#475569">https://shop.example.test/</text>
+  <text x="90" y="180" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#172033">Example Shop</text>
+  <text x="90" y="225" font-family="Arial, sans-serif" font-size="22" fill="#52657e">After action 1: navigate</text>
+  <rect x="90" y="285" width="780" height="120" rx="12" fill="#eef3f9"/>
+  <rect x="120" y="320" width="360" height="18" rx="5" fill="#c7d2e0"/>
+  <rect x="120" y="356" width="610" height="14" rx="5" fill="#d9e1ec"/>
+</svg>

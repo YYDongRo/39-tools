@@ -326,7 +326,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             raise TypeError("on_step_end must be callable or None")
 
         trace = _BrowserUseRecorder(
-            _new_trace_directory(self.output_root),
+            self._create_trace_directory(),
             self.goal,
         )
         trace.attach_browser_session(self.agent.browser_session)  # type: ignore[attr-defined]
@@ -360,6 +360,9 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
                 print(format_session_summary(trace.session, trace.report_path))
             self._active_trace = None
             self._active = False
+
+    def _create_trace_directory(self) -> Path:
+        return _new_trace_directory(self.output_root)
 
     def assert_last_task_passed(self) -> None:
         if self.last_trace is None:

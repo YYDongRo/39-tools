@@ -162,6 +162,10 @@ The repository currently includes:
   records state-changing steps with screenshots, prevents unobserved initial
   actions, preserves existing callbacks, maps the framework judge into task
   verification, and reports bounded provider-startup failures;
+- sequential repeated-run Browser Use stability evaluation with fresh Agent
+  lifecycle ownership, numbered per-run traces, versioned aggregate JSON,
+  deterministic trajectory divergence, conservative failure grouping, and a
+  static aggregate HTML report;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;

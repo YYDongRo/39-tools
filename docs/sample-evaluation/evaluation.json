@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "evaluation_id": "20260801T170000000000Z-sample01",
+  "task": "Find the wireless headphones and open the correct product page.",
+  "started_at": "2026-08-01T17:00:00+00:00",
+  "ended_at": "2026-08-01T17:07:00+00:00",
+  "requested_run_count": 6,
+  "summary": {
+    "attempted_run_count": 6,
+    "completed_run_count": 6,
+    "passed_count": 3,
+    "failed_count": 2,
+    "unverified_count": 1,
+    "errored_count": 0,
+    "empirical_pass_rate": 0.5,
+    "average_duration_ms": 1285.0,
+    "median_duration_ms": 1285.0,
+    "average_action_count": 2.8333333333333335,
+    "median_action_count": 3.0
+  },
+  "representative_success_run_number": 1,
+  "runs": [
+    {
+      "run_number": 1,
+      "status": "passed",
+      "started_at": "2026-08-01T17:01:00+00:00",
+      "ended_at": "2026-08-01T17:01:01.010000+00:00",
+      "duration_ms": 1010,
+      "action_count": 3,
+      "trace_directory": "runs/001",
+      "report_path": "runs/001/report.html",
+      "divergence": null,
+      "error_phase": null,
+      "error_type": null
+    },
+    {
+      "run_number": 2,
+      "status": "failed",
+      "started_at": "2026-08-01T17:02:00+00:00",
+      "ended_at": "2026-08-01T17:02:01.120000+00:00",
+      "duration_ms": 1120,
+      "action_count": 3,
+      "trace_directory": "runs/002",
+      "report_path": "runs/002/report.html",
+      "divergence": {
+        "kind": "arguments",
+        "action_number": 3,
+        "summary": "First observed divergence at action 3: action arguments differed.",
+        "baseline": {
+          "selector": "#wireless-headphones"
+        },
+        "observed": {
+          "selector": "#usb-c-cable"
+        }
+      },
+      "error_phase": null,
+      "error_type": null
+    },
+    {
+      "run_number": 3,
+      "status": "passed",
+      "started_at": "2026-08-01T17:03:00+00:00",
+      "ended_at": "2026-08-01T17:03:01.230000+00:00",
+      "duration_ms": 1230,
+      "action_count": 3,
+      "trace_directory": "runs/003",
+      "report_path": "runs/003/report.html",
+      "divergence": null,
+      "error_phase": null,
+      "error_type": null
+    },
+    {
+      "run_number": 4,
+      "status": "unverified",
+      "started_at": "2026-08-01T17:04:00+00:00",
+      "ended_at": "2026-08-01T17:04:01.340000+00:00",
+      "duration_ms": 1340,
+      "action_count": 2,
+      "trace_directory": "runs/004",
+      "report_path": "runs/004/report.html",
+      "divergence": {
+        "kind": "missing_action",
+        "action_number": 3,
+        "summary": "First observed divergence at action 3: the unsuccessful trajectory ended early.",
+        "baseline": {
+          "action_type": "click",
+          "arguments": {
+            "selector": "#wireless-headphones"
+          }
+        },
+        "observed": {
+          "action": "missing"
+        }
+      },
+      "error_phase": null,
+      "error_type": null
+    },
+    {
+      "run_number": 5,
+      "status": "failed",
+      "started_at": "2026-08-01T17:05:00+00:00",
+      "ended_at": "2026-08-01T17:05:01.450000+00:00",
+      "duration_ms": 1450,
+      "action_count": 3,
+      "trace_directory": "runs/005",
+      "report_path": "runs/005/report.html",
+      "divergence": {
+        "kind": "arguments",
+        "action_number": 3,
+        "summary": "First observed divergence at action 3: action arguments differed.",
+        "baseline": {
+          "selector": "#wireless-headphones"
+        },
+        "observed": {
+          "selector": "#usb-c-cable"
+        }
+      },
+      "error_phase": null,
+      "error_type": null
+    },
+    {
+      "run_number": 6,
+      "status": "passed",
+      "started_at": "2026-08-01T17:06:00+00:00",
+      "ended_at": "2026-08-01T17:06:01.560000+00:00",
+      "duration_ms": 1560,
+      "action_count": 3,
+      "trace_directory": "runs/006",
+      "report_path": "runs/006/report.html",
+      "divergence": null,
+      "error_phase": null,
+      "error_type": null
+    }
+  ],
+  "failure_patterns": [
+    {
+      "pattern_id": "pattern-001",
+      "summary": "First observed divergence at action 3: action arguments differed.",
+      "run_numbers": [
+        2,
+        5
+      ],
+      "representative_run_number": 2,
+      "divergence_kind": "arguments",
+      "action_number": 3,
+      "evidence": {
+        "baseline": {
+          "selector": "#wireless-headphones"
+        },
+        "observed": {
+          "selector": "#usb-c-cable"
+        },
+        "run_status": "failed",
+        "error_phase": null,
+        "error_type": null
+      }
+    },
+    {
+      "pattern_id": "pattern-002",
+      "summary": "First observed divergence at action 3: the unsuccessful trajectory ended early.",
+      "run_numbers": [
+        4
+      ],
+      "representative_run_number": 4,
+      "divergence_kind": "missing_action",
+      "action_number": 3,
+      "evidence": {
+        "baseline": {
+          "action_type": "click",
+          "arguments": {
+            "selector": "#wireless-headphones"
+          }
+        },
+        "observed": {
+          "action": "missing"
+        },
+        "run_status": "unverified",
+        "error_phase": null,
+        "error_type": null
+      }
+    }
+  ]
+}

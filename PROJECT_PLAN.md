@@ -21,6 +21,9 @@ trace with:
 - separate action checks and final task verification;
 - JSON persistence and a static HTML timeline;
 - Browser Use 0.13.x and lower-level Playwright integration paths.
+- sequential repeated-run Browser Use evaluation with fresh Agents, preserved
+  per-run traces, empirical pass-rate statistics, trajectory divergence, and a
+  static aggregate stability report.
 
 The original one-action MVP is complete. Current work focuses on making this
 browser-agent debugging workflow useful, understandable, and easy to adopt.
@@ -33,6 +36,7 @@ Browser Use or Playwright agent
     → action and session records
     → screenshots, JSON, and HTML report
     → action checks and final task verification
+    → optional repeated-run stability comparison
 ```
 
 ## Non-Goals for the Current Alpha
@@ -42,6 +46,7 @@ Browser Use or Playwright agent
 - Hosted dashboards or trace storage
 - Model training
 - General session replay or automatic recovery
+- Concurrent evaluation, retries, or probabilistic reliability guarantees
 - Recording hidden model reasoning
 
 ## Success Criteria

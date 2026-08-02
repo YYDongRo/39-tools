@@ -1,0 +1,104 @@
+{
+  "schema_version": 3,
+  "goal": "Find the wireless headphones and open the correct product page.",
+  "inferred_goal": null,
+  "verification_source": "deterministic sample judge",
+  "verification_note": null,
+  "verification": {
+    "expected_state": "the Wireless Headphones product page is open",
+    "observed_state": "the USB-C Cable product page is open",
+    "passed": false,
+    "evidence": {
+      "final_url": "https://shop.example.test/products/usb-c-cable"
+    },
+    "failure_reason": "The agent selected the wrong product result.",
+    "failure_category": "verification_mismatch"
+  },
+  "actions": [
+    {
+      "schema_version": 5,
+      "action_type": "navigate",
+      "arguments": {
+        "url": "https://shop.example.test/"
+      },
+      "start_time": "2026-08-01T17:02:01+00:00",
+      "duration_ms": 97,
+      "status": "success",
+      "screenshot_before": "actions/001/before.svg",
+      "screenshot_after": "actions/001/after.svg",
+      "failure_reason": null,
+      "failure_category": null,
+      "failure_evidence": {},
+      "observations": {
+        "page_url_before": "about:blank",
+        "page_url_after": "https://shop.example.test/",
+        "state_before": {
+          "url": "about:blank",
+          "title": "Example Shop"
+        },
+        "state_after": {
+          "url": "https://shop.example.test/",
+          "title": "Example Shop"
+        }
+      },
+      "verification": null
+    },
+    {
+      "schema_version": 5,
+      "action_type": "fill",
+      "arguments": {
+        "selector": "#product-search",
+        "text": "Wireless Headphones"
+      },
+      "start_time": "2026-08-01T17:02:02+00:00",
+      "duration_ms": 114,
+      "status": "success",
+      "screenshot_before": "actions/002/before.svg",
+      "screenshot_after": "actions/002/after.svg",
+      "failure_reason": null,
+      "failure_category": null,
+      "failure_evidence": {},
+      "observations": {
+        "page_url_before": "https://shop.example.test/",
+        "page_url_after": "https://shop.example.test/search?q=wireless-headphones",
+        "state_before": {
+          "url": "https://shop.example.test/",
+          "title": "Example Shop"
+        },
+        "state_after": {
+          "url": "https://shop.example.test/search?q=wireless-headphones",
+          "title": "Example Shop"
+        }
+      },
+      "verification": null
+    },
+    {
+      "schema_version": 5,
+      "action_type": "click",
+      "arguments": {
+        "selector": "#usb-c-cable"
+      },
+      "start_time": "2026-08-01T17:02:03+00:00",
+      "duration_ms": 131,
+      "status": "success",
+      "screenshot_before": "actions/003/before.svg",
+      "screenshot_after": "actions/003/after.svg",
+      "failure_reason": null,
+      "failure_category": null,
+      "failure_evidence": {},
+      "observations": {
+        "page_url_before": "https://shop.example.test/search?q=wireless-headphones",
+        "page_url_after": "https://shop.example.test/products/usb-c-cable",
+        "state_before": {
+          "url": "https://shop.example.test/search?q=wireless-headphones",
+          "title": "Example Shop"
+        },
+        "state_after": {
+          "url": "https://shop.example.test/products/usb-c-cable",
+          "title": "Example Shop"
+        }
+      },
+      "verification": null
+    }
+  ]
+}

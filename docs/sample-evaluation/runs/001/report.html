@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent action session</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; }
+      body { background: #f8fafc; color: #0f172a; margin: 0; }
+      main { margin: 0 auto; max-width: 1120px; padding: 48px 24px; }
+      header, .action-card, .empty-state { background: white; border: 1px solid #e2e8f0;
+                                           border-radius: 16px; }
+      header { box-shadow: 0 12px 36px rgba(15, 23, 42, .06);
+                margin-bottom: 28px; padding: 32px; }
+      h1, h2, h3, p { margin-top: 0; }
+      .eyebrow { color: #64748b; font-size: 13px; font-weight: 700;
+                  letter-spacing: .04em; text-transform: uppercase; }
+      .title-row, .action-heading { align-items: center; display: flex;
+                                    justify-content: space-between; gap: 16px; }
+      .title-row h1, .action-heading h2 { margin-bottom: 0; }
+      .goal { font-size: 17px; line-height: 1.55; margin: 20px 0 0; }
+      .result-hero { align-items: center; background: #f8fafc; border: 1px solid #e2e8f0;
+                      border-left: 6px solid #64748b; border-radius: 12px;
+                      display: flex; justify-content: space-between;
+                      margin-top: 24px; padding: 22px 24px; }
+      .result-hero-success { background: #f0fdf4; border-color: #86efac;
+                              border-left-color: #16a34a; }
+      .result-hero-failure { background: #fff1f2; border-color: #fda4af;
+                              border-left-color: #dc2626; }
+      .result-hero-unverified { background: #fffbeb; border-color: #fcd34d;
+                                 border-left-color: #d97706; }
+      .result-kicker { color: #64748b; display: block; font-size: 12px;
+                        font-weight: 800; letter-spacing: .08em;
+                        margin-bottom: 5px; text-transform: uppercase; }
+      .result-title { display: block; font-size: 30px; letter-spacing: -.02em;
+                       line-height: 1.15; }
+      .result-detail { color: #475569; margin: 8px 0 0; }
+      .result-mark { align-items: center; background: white; border-radius: 50%;
+                      color: #166534; display: flex; flex: 0 0 auto;
+                      font-size: 24px; font-weight: 900; height: 48px;
+                      justify-content: center; width: 48px; }
+      .result-hero-failure .result-mark { color: #991b1b; }
+      .result-hero-unverified .result-mark { color: #92400e; }
+      .run-stats { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
+                    margin-top: 16px; }
+      .run-stat { background: #f8fafc; border: 1px solid #e2e8f0;
+                   border-radius: 10px; padding: 14px 16px; }
+      .run-stat span { color: #64748b; display: block; font-size: 12px;
+                        font-weight: 700; margin-bottom: 5px; }
+      .run-stat strong { font-size: 16px; }
+      .verification-context { border-top: 1px solid #e2e8f0; color: #475569;
+                               margin-top: 18px; padding-top: 14px; }
+      .verification-context summary { cursor: pointer; font-weight: 700; }
+      .verification-context p { margin: 10px 0 0; }
+      .verification-note { background: #fffbeb; border: 1px solid #fcd34d;
+                            border-radius: 8px; color: #78350f;
+                            margin: 16px 0 0; padding: 12px 14px; }
+      .failure-summary { background: #fff1f2; border: 1px solid #fecdd3;
+                          border-radius: 8px; margin-top: 20px; padding: 16px; }
+      .failure-summary h2 { font-size: 16px; margin-bottom: 12px; }
+      .failure-summary ul { display: flex; flex-wrap: wrap; gap: 10px;
+                             list-style: none; margin: 0; padding: 0; }
+      .failure-summary li { background: white; border-radius: 999px;
+                             display: flex; gap: 8px; padding: 6px 12px; }
+      .trajectory-findings { background: #fffbeb; border: 2px solid #f59e0b;
+                              border-radius: 12px; margin-bottom: 24px;
+                              padding: 24px; }
+      .findings-heading { align-items: center; display: flex; gap: 16px;
+                           justify-content: space-between; }
+      .findings-heading h2 { margin-bottom: 0; }
+      .findings-count, .warning-label { background: #fef3c7; border-radius: 999px;
+                                        color: #92400e; font-size: 13px;
+                                        font-weight: 700; padding: 6px 10px; }
+      .findings-note { color: #78350f; margin: 12px 0 20px; }
+      .finding-list { display: grid; gap: 12px; }
+      .finding-card { background: white; border: 1px solid #fde68a;
+                       border-radius: 8px; padding: 18px; }
+      .finding-title-row { align-items: center; display: flex; gap: 10px; }
+      .finding-title-row h3 { margin-bottom: 0; }
+      .finding-summary { font-weight: 600; margin: 14px 0 10px; }
+      .likely-cause { background: #fef3c7; border-left: 4px solid #f59e0b;
+                       border-radius: 4px; margin: 12px 0; padding: 10px 12px; }
+      .finding-actions { color: #475569; margin-bottom: 0; }
+      .finding-actions a { color: #1d4ed8; }
+      .finding-details { margin-top: 14px; }
+      .finding-details summary { cursor: pointer; font-weight: 700; }
+      .finding-details pre { margin-bottom: 12px; }
+      .finding-details ul { margin-bottom: 0; }
+      .browser-evidence { border-top: 1px solid #e2e8f0; margin-top: 20px;
+                           padding-top: 16px; }
+      .browser-evidence summary { cursor: pointer; font-weight: 700; }
+      .browser-evidence pre { margin-bottom: 0; }
+      .status { border-radius: 999px; font-weight: 700; padding: 6px 12px; }
+      .status-success { background: #dcfce7; color: #166534; }
+      .status-failure { background: #fee2e2; color: #991b1b; }
+      .status-unverified { background: #fef3c7; color: #92400e; }
+      .status-neutral { background: #e0f2fe; color: #075985; }
+      .status-empty { background: #e2e8f0; color: #475569; }
+      .timeline { position: relative; }
+      .timeline::before { background: #cbd5e1; bottom: 0; content: "";
+                           left: 19px; position: absolute; top: 0; width: 2px; }
+      .timeline-item { align-items: flex-start; display: grid; gap: 20px;
+                        grid-template-columns: 40px minmax(0, 1fr);
+                        margin-bottom: 28px; position: relative; }
+      .marker { align-items: center; background: #2563eb; border: 4px solid #f8fafc;
+                 border-radius: 50%; color: white; display: flex; font-weight: 700;
+                 height: 32px; justify-content: center; width: 32px; z-index: 1; }
+      .action-card { box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 24px; }
+      dl { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }
+      dt { color: #64748b; font-size: 13px; font-weight: 700; }
+      dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+      pre { background: #0f172a; border-radius: 8px; color: #e2e8f0;
+             overflow-x: auto; padding: 16px; }
+      .failure { background: #fff1f2; border: 1px solid #fecdd3;
+                  border-radius: 8px; margin-top: 20px; padding: 16px; }
+      .failure p { margin: 8px 0 0; white-space: pre-wrap; }
+      .key-value-grid { background: rgba(255, 255, 255, .72);
+                         border-radius: 8px; grid-template-columns:
+                         repeat(auto-fit, minmax(140px, 1fr)); margin: 0;
+                         padding: 16px; }
+      .raw-error { margin-top: 16px; }
+      .raw-error summary { cursor: pointer; font-weight: 700; }
+      .raw-error pre { margin-bottom: 0; }
+      .verification { background: white; border: 1px solid #cbd5e1;
+                       border-radius: 12px; margin: 0 0 28px; padding: 22px; }
+      .action-card .verification { margin: 20px 0 0; }
+      .verification-heading { align-items: center; display: flex;
+                               justify-content: space-between; }
+      .verification-heading h2 { margin-bottom: 0; }
+      .check-total { border-radius: 999px; font-size: 12px; font-weight: 800;
+                      padding: 6px 10px; text-transform: uppercase; }
+      .check-total-passed { background: #dcfce7; color: #166534; }
+      .check-total-failed { background: #fee2e2; color: #991b1b; }
+      .verification-failure { background: #fff1f2; border-radius: 8px;
+                               margin-top: 16px; padding: 16px; }
+      .verification-failure p { margin-bottom: 0; white-space: pre-wrap; }
+      .verification-check-list { margin-top: 20px; }
+      .assessment-summary { color: #334155; font-size: 16px; line-height: 1.55;
+                             margin: 14px 0 0; }
+      .assessment-evidence { margin-top: 18px; }
+      .assessment-evidence ul { color: #334155; line-height: 1.55;
+                                 margin-bottom: 0; padding-left: 22px; }
+      .verification-check-list ol { display: grid; gap: 10px;
+                                     list-style: none; margin: 0; padding: 0; }
+      .verification-check { border: 1px solid #e2e8f0; border-left-width: 4px;
+                             border-radius: 8px; padding: 14px; }
+      .verification-check-passed { border-left-color: #22c55e; }
+      .verification-check-failed { border-left-color: #ef4444; }
+      .verification-check div { align-items: center; display: flex;
+                                 justify-content: space-between; }
+      .verification-check p { margin: 8px 0 4px; }
+      .verification-check small { color: #64748b; }
+      .check-status { font-size: 12px; font-weight: 700;
+                       text-transform: uppercase; }
+      .verification-check-passed .check-status { color: #166534; }
+      .verification-check-failed .check-status { color: #991b1b; }
+      .verification-evidence { margin-top: 16px; }
+      .verification-evidence summary { cursor: pointer; font-weight: 700; }
+      .verification-evidence pre { margin-bottom: 0; }
+      .action-screenshots { display: grid; gap: 16px;
+                             grid-template-columns: repeat(2, minmax(0, 1fr));
+                             margin-top: 20px; }
+      figure { margin: 0; }
+      figcaption { color: #64748b; font-size: 13px; font-weight: 700;
+                    margin-bottom: 8px; }
+      figure img { border: 1px solid #e2e8f0; border-radius: 8px;
+                    display: block; height: auto; width: 100%; }
+      .missing { color: #64748b; }
+      .empty-state { padding: 32px; text-align: center; }
+      @media (max-width: 800px) {
+        dl, .action-screenshots, .run-stats { grid-template-columns: 1fr; }
+        .title-row, .action-heading, .findings-heading { align-items: flex-start;
+                                                          flex-direction: column; }
+        .result-mark { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Agent DevTools · Session schema 3</p>
+        <div class="title-row">
+          <h1>Task run</h1>
+        </div>
+        <p class="goal"><strong>User request:</strong> Find the wireless headphones and open the correct product page.</p>
+        <section class="result-hero result-hero-success">
+          <div>
+            <span class="result-kicker">Final result</span>
+            <strong class="result-title">Successful</strong>
+            <p class="result-detail">the Wireless Headphones product page is open</p>
+          </div>
+          <span class="result-mark" aria-hidden="true">✓</span>
+        </section>
+        <section class="run-stats" aria-label="Run summary">
+          <div class="run-stat"><span>Actions</span><strong>3</strong></div>
+          <div class="run-stat"><span>Executed</span><strong>3 succeeded</strong></div>
+          <div class="run-stat"><span>Action failures</span><strong>0</strong></div>
+          <div class="run-stat"><span>Action checks</span><strong>Not configured</strong></div>
+        </section>
+
+
+
+
+        <details class="verification-context">
+          <summary>Verification context</summary>
+          <p><strong>Source:</strong> deterministic sample judge</p>
+        </details>
+      </header>
+
+
+      <section class="verification">
+
+        <div class="verification-heading">
+          <h2>Final checks</h2>
+          <span class="check-total check-total-passed">passed</span>
+        </div>
+
+
+
+        <div class="verification-check-list">
+          <h3>Checks</h3>
+          <ol>
+          <li class="verification-check verification-check-passed">
+            <div>
+              <strong>Check 1</strong>
+              <span class="check-status">passed</span>
+            </div>
+            <p>the Wireless Headphones product page is open</p>
+            <small>Observed: the Wireless Headphones product page is open</small>
+          </li>
+          </ol>
+        </div>
+        <details class="verification-evidence">
+          <summary>Full verification evidence</summary>
+          <pre>{
+  &quot;final_url&quot;: &quot;https://shop.example.test/products/wireless-headphones&quot;
+}</pre>
+        </details>
+      </section>
+      <div class="timeline">
+
+        <article class="timeline-item" id="action-1">
+          <div class="marker">1</div>
+          <div class="action-card">
+            <div class="action-heading">
+              <div>
+                <p class="eyebrow">Action 1</p>
+                <h2>navigate</h2>
+              </div>
+              <span class="status status-neutral">execution succeeded</span>
+            </div>
+            <dl>
+              <div><dt>Execution</dt><dd>success</dd></div>
+              <div><dt>Action check</dt><dd>not configured</dd></div>
+              <div><dt>Start time</dt><dd>2026-08-01T17:01:01+00:00</dd></div>
+              <div><dt>Duration</dt><dd>97 ms</dd></div>
+              <div><dt>Page URL before</dt><dd>about:blank</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/</dd></div>
+            </dl>
+            <h3>Arguments</h3>
+            <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/&quot;
+}</pre>
+      <section class="structured-state">
+        <h2>Structured state</h2>
+        <h3>Detected changes</h3>
+        <p class="missing">State changes unavailable.</p>
+
+
+        <details class="state-snapshot">
+          <summary>State before</summary>
+          <pre>{
+  &quot;url&quot;: &quot;about:blank&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+        <details class="state-snapshot">
+          <summary>State after</summary>
+          <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+      </section>
+            <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/001/before.svg">
+                  <img src="actions/001/before.svg" alt="Before action 1 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/001/after.svg">
+                  <img src="actions/001/after.svg" alt="After action 1 screenshot">
+                </a>
+              </figure>
+            </div>
+          </div>
+        </article>
+
+        <article class="timeline-item" id="action-2">
+          <div class="marker">2</div>
+          <div class="action-card">
+            <div class="action-heading">
+              <div>
+                <p class="eyebrow">Action 2</p>
+                <h2>fill</h2>
+              </div>
+              <span class="status status-neutral">execution succeeded</span>
+            </div>
+            <dl>
+              <div><dt>Execution</dt><dd>success</dd></div>
+              <div><dt>Action check</dt><dd>not configured</dd></div>
+              <div><dt>Start time</dt><dd>2026-08-01T17:01:02+00:00</dd></div>
+              <div><dt>Duration</dt><dd>114 ms</dd></div>
+              <div><dt>Page URL before</dt><dd>https://shop.example.test/</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div>
+            </dl>
+            <h3>Arguments</h3>
+            <pre>{
+  &quot;selector&quot;: &quot;#product-search&quot;,
+  &quot;text&quot;: &quot;Wireless Headphones&quot;
+}</pre>
+      <section class="structured-state">
+        <h2>Structured state</h2>
+        <h3>Detected changes</h3>
+        <p class="missing">State changes unavailable.</p>
+
+
+        <details class="state-snapshot">
+          <summary>State before</summary>
+          <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+        <details class="state-snapshot">
+          <summary>State after</summary>
+          <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/search?q=wireless-headphones&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+      </section>
+            <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/002/before.svg">
+                  <img src="actions/002/before.svg" alt="Before action 2 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/002/after.svg">
+                  <img src="actions/002/after.svg" alt="After action 2 screenshot">
+                </a>
+              </figure>
+            </div>
+          </div>
+        </article>
+
+        <article class="timeline-item" id="action-3">
+          <div class="marker">3</div>
+          <div class="action-card">
+            <div class="action-heading">
+              <div>
+                <p class="eyebrow">Action 3</p>
+                <h2>click</h2>
+              </div>
+              <span class="status status-neutral">execution succeeded</span>
+            </div>
+            <dl>
+              <div><dt>Execution</dt><dd>success</dd></div>
+              <div><dt>Action check</dt><dd>not configured</dd></div>
+              <div><dt>Start time</dt><dd>2026-08-01T17:01:03+00:00</dd></div>
+              <div><dt>Duration</dt><dd>131 ms</dd></div>
+              <div><dt>Page URL before</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/products/wireless-headphones</dd></div>
+            </dl>
+            <h3>Arguments</h3>
+            <pre>{
+  &quot;selector&quot;: &quot;#wireless-headphones&quot;
+}</pre>
+      <section class="structured-state">
+        <h2>Structured state</h2>
+        <h3>Detected changes</h3>
+        <p class="missing">State changes unavailable.</p>
+
+
+        <details class="state-snapshot">
+          <summary>State before</summary>
+          <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/search?q=wireless-headphones&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+        <details class="state-snapshot">
+          <summary>State after</summary>
+          <pre>{
+  &quot;url&quot;: &quot;https://shop.example.test/products/wireless-headphones&quot;,
+  &quot;title&quot;: &quot;Example Shop&quot;
+}</pre>
+        </details>
+      </section>
+            <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/003/before.svg">
+                  <img src="actions/003/before.svg" alt="Before action 3 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/003/after.svg">
+                  <img src="actions/003/after.svg" alt="After action 3 screenshot">
+                </a>
+              </figure>
+            </div>
+          </div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>

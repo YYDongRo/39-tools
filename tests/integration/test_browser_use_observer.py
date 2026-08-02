@@ -9,7 +9,10 @@ from typing import Iterator
 
 import pytest
 
-from agent_devtools.browser_use import observe_browser_use_agent
+from agent_devtools.browser_use import (
+    evaluate_browser_use_agent,
+    observe_browser_use_agent,
+)
 
 
 browser_use = pytest.importorskip("browser_use")
@@ -145,6 +148,60 @@ def test_real_browser_use_agent_records_initial_navigation(
         assert agent.last_session.verification.passed is True
         assert agent.last_report_path is not None
         assert agent.last_report_path.is_file()
+
+    import asyncio
+
+    asyncio.run(run())
+
+
+def test_real_browser_use_evaluation_uses_fresh_numbered_runs(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        with local_page() as target_url:
+            task = f"Open the local page at {target_url}"
+            agents: list[object] = []
+
+            def create_agent(factory_task: str) -> object:
+                assert factory_task == task
+                model = DeterministicModel(target_url)
+                agent = Agent(
+                    task=task,
+                    llm=model,
+                    judge_llm=model,
+                    browser=Browser(
+                        headless=True,
+                        chromium_sandbox=False,
+                        allowed_domains=["127.0.0.1"],
+                    ),
+                    use_judge=True,
+                    enable_planning=False,
+                    message_compaction=False,
+                    generate_gif=False,
+                )
+                agents.append(agent)
+                return agent
+
+            evaluation = await evaluate_browser_use_agent(
+                agent_factory=create_agent,
+                task=task,
+                runs=2,
+                max_steps=3,
+                output_root=tmp_path,
+            )
+
+        assert evaluation.passed_count == 2
+        assert len({id(agent) for agent in agents}) == 2
+        assert tuple(run.trace_directory.as_posix() for run in evaluation.runs) == (
+            "runs/001",
+            "runs/002",
+        )
+        for run in evaluation.runs:
+            trace_dir = evaluation.output_dir / run.trace_directory
+            assert (trace_dir / "session.json").is_file()
+            assert (trace_dir / "report.html").is_file()
+        assert (evaluation.output_dir / "evaluation.json").is_file()
+        assert evaluation.report_path.is_file()
 
     import asyncio
 

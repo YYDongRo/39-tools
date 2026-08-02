@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent stability evaluation</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
+      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f7fb; color: #172033; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 32px auto 64px; }
+    section { background: #fff; border: 1px solid #dfe6f0; border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(31, 50, 81, .07); margin-bottom: 20px;
+      padding: 24px; }
+    h1, h2 { margin: 0 0 14px; letter-spacing: -.02em; }
+    h1 { font-size: 2rem; } h2 { font-size: 1.2rem; }
+    .eyebrow { color: #42658f; font-size: .76rem; font-weight: 800;
+      letter-spacing: .08em; text-transform: uppercase; }
+    .task { font-size: 1.08rem; line-height: 1.55; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px; margin-top: 20px; }
+    .metric { background: #f7f9fc; border: 1px solid #e2e8f2;
+      border-radius: 12px; padding: 14px; }
+    .metric span { color: #64748b; display: block; font-size: .76rem;
+      font-weight: 700; margin-bottom: 5px; text-transform: uppercase; }
+    .metric strong { font-size: 1.25rem; }
+    .counts { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+    .pill { border-radius: 999px; font-size: .83rem; font-weight: 700;
+      padding: 7px 11px; }
+    .passed { background: #dcfce7; color: #166534; }
+    .failed { background: #fee2e2; color: #991b1b; }
+    .unverified { background: #fef3c7; color: #92400e; }
+    .errored { background: #ede9fe; color: #5b21b6; }
+    .baseline { border-left: 4px solid #2563eb; background: #eff6ff;
+      border-radius: 8px; margin-top: 20px; padding: 14px 16px; }
+    .pattern { border: 1px solid #fecaca; border-left: 4px solid #dc2626;
+      border-radius: 10px; margin-top: 12px; padding: 14px 16px; }
+    .muted { color: #64748b; } a { color: #1459b8; font-weight: 650; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #e4e9f1; padding: 13px 10px;
+      text-align: left; vertical-align: top; }
+    th { color: #53627a; font-size: .76rem; letter-spacing: .04em;
+      text-transform: uppercase; }
+    td { font-size: .9rem; }
+    .divergence { min-width: 280px; line-height: 1.4; }
+    .note { color: #64748b; font-size: .84rem; margin-top: 16px; }
+    @media (max-width: 760px) { .metrics { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <div class="eyebrow">Agent DevTools · evaluation schema 1</div>
+    <h1>Stability evaluation</h1>
+    <p class="task"><strong>Task:</strong> Find the wireless headphones and open the correct product page.</p>
+    <div class="metrics">
+      <div class="metric"><span>Requested runs</span><strong>6</strong></div>
+      <div class="metric"><span>Completed runs</span><strong>6</strong></div>
+      <div class="metric"><span>Empirical pass rate</span><strong>50.0%</strong></div>
+      <div class="metric"><span>Average duration</span><strong>1285.0 ms</strong></div>
+      <div class="metric"><span>Median duration</span><strong>1285.0 ms</strong></div>
+      <div class="metric"><span>Average actions</span><strong>2.8</strong></div>
+      <div class="metric"><span>Median actions</span><strong>3.0</strong></div>
+    </div>
+    <div class="counts">
+      <span class="pill passed">Passed: 3</span>
+      <span class="pill failed">Failed: 2</span>
+      <span class="pill unverified">Unverified: 1</span>
+      <span class="pill errored">Errored: 0</span>
+    </div>
+    <div class="baseline"><strong>Representative successful run:</strong>
+      <a href="runs/001/report.html">Run 1</a>
+    </div>
+    <p class="note">The empirical pass rate describes these observed attempts.
+      A small sample does not prove the agent's true reliability.</p>
+  </section>
+  <section>
+    <h2>Repeated unsuccessful patterns</h2>
+
+        <article class="pattern">
+          <div><strong>First observed divergence at action 3: action arguments differed.</strong></div>
+          <div class="muted">Runs 2, 5</div>
+          <a href="runs/002/report.html">
+            Inspect representative run 2
+          </a>
+        </article>
+
+  </section>
+  <section>
+    <h2>All runs</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Run</th><th>Result</th><th>Duration</th>
+          <th>Actions</th><th>First observed divergence</th><th>Trace</th></tr></thead>
+        <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td><span class="pill passed">Passed</span></td>
+        <td>1010 ms</td>
+        <td>3</td>
+        <td class="divergence">—</td>
+        <td><a href="runs/001/report.html">Open report</a></td>
+      </tr>
+
+      <tr>
+        <td><strong>2</strong></td>
+        <td><span class="pill failed">Failed</span></td>
+        <td>1120 ms</td>
+        <td>3</td>
+        <td class="divergence">First observed divergence at action 3: action arguments differed.</td>
+        <td><a href="runs/002/report.html">Open report</a></td>
+      </tr>
+
+      <tr>
+        <td><strong>3</strong></td>
+        <td><span class="pill passed">Passed</span></td>
+        <td>1230 ms</td>
+        <td>3</td>
+        <td class="divergence">—</td>
+        <td><a href="runs/003/report.html">Open report</a></td>
+      </tr>
+
+      <tr>
+        <td><strong>4</strong></td>
+        <td><span class="pill unverified">Unverified</span></td>
+        <td>1340 ms</td>
+        <td>2</td>
+        <td class="divergence">First observed divergence at action 3: the unsuccessful trajectory ended early.</td>
+        <td><a href="runs/004/report.html">Open report</a></td>
+      </tr>
+
+      <tr>
+        <td><strong>5</strong></td>
+        <td><span class="pill failed">Failed</span></td>
+        <td>1450 ms</td>
+        <td>3</td>
+        <td class="divergence">First observed divergence at action 3: action arguments differed.</td>
+        <td><a href="runs/005/report.html">Open report</a></td>
+      </tr>
+
+      <tr>
+        <td><strong>6</strong></td>
+        <td><span class="pill passed">Passed</span></td>
+        <td>1560 ms</td>
+        <td>3</td>
+        <td class="divergence">—</td>
+        <td><a href="runs/006/report.html">Open report</a></td>
+      </tr>
+    </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

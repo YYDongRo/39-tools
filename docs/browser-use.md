@@ -137,6 +137,11 @@ The caller still owns the `Browser` lifecycle and should stop it in `finally`.
 If the agent raises, completed actions and a report remain available before the
 exception is re-raised.
 
+For repeated stability evaluation, use `evaluate_browser_use_agent(...)`
+instead of manually reusing this wrapper. That evaluator requires a factory
+that returns a fresh Agent for every attempt and owns each returned Agent's
+`close()` lifecycle. See [Repeated-run stability evaluation](evaluation.md).
+
 ## Compatibility
 
 The current integration supports Browser Use `0.13.x`. Browser Use `0.13.7`
