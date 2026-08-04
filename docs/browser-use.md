@@ -192,6 +192,20 @@ instead of manually reusing this wrapper. That evaluator requires a factory
 that returns a fresh Agent for every attempt and owns each returned Agent's
 `close()` lifecycle. See [Repeated-run stability evaluation](evaluation.md).
 
+## Controlled failure demo
+
+After configuring a Browser Use provider, run:
+
+```bash
+uv run --extra browser-use python examples/browser_use_failure.py
+```
+
+This is an intentional acceptance test, not a flaky-site test. The agent opens
+the public `example.com` page, so the browser action succeeds, but the example
+adds a title check for text that is deliberately absent. The resulting report
+should therefore show successful action execution and a failed final task
+verification, including the reason and final-state evidence.
+
 ## Compatibility
 
 The current integration supports Browser Use `0.13.x`. Browser Use `0.13.7`

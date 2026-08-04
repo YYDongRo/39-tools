@@ -129,6 +129,12 @@ See the [complete runnable example](examples/browser_use_quickstart.py) and
 [Browser Use guide](docs/browser-use.md) for setup, cleanup, output paths, and
 integration limits.
 
+To see the debugger's failure case with a real Browser Use run, use
+[`examples/browser_use_failure.py`](examples/browser_use_failure.py). It opens
+the public example page successfully, then applies an intentionally impossible
+final title check. The report should show successful action execution beside a
+failed overall task result.
+
 ## Evaluate repeated-run stability
 
 Run the same Browser Use task sequentially with a fresh Agent each time:
