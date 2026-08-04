@@ -109,8 +109,29 @@ actions arrive. A non-empty trace directory is never overwritten implicitly.
 Interrupted runs retain their completed evidence, and an existing session can
 be resumed explicitly.
 
-Current replay support is intentionally narrow: one saved synchronous click can
-be replayed through a caller-provided executor after strict argument validation.
+Current replay support is intentionally narrow: one saved synchronous `click` or
+`fill` action can be replayed through a caller-provided executor after strict
+argument validation. Replay is post-run and developer-triggered; it does not
+rerun an Agent or retry an action automatically.
+
+For example, a loaded `fill` record can be replayed without rebuilding the
+original agent:
+
+```python
+from agent_devtools import replay_fill
+
+
+def execute_fill(selector, text, timeout_ms):
+    locator = page.locator(selector)
+    if timeout_ms is None:
+        return locator.fill(text)
+    return locator.fill(text, timeout=timeout_ms)
+
+
+result = replay_fill(source_action, execute_fill)
+print(result.outcome_matches)
+```
+
 General trajectory replay and recovery are not implemented.
 
 Browser Use reports keep planning and file-management operations in a separate

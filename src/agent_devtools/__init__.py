@@ -13,6 +13,7 @@ from agent_devtools.async_tool_recorder import (
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import read_action_json, read_session_json
+from agent_devtools.replay import ReplayResult, replay_click, replay_fill
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.tool_recorder import RecordedTools, record_tools
@@ -30,6 +31,7 @@ __all__ = [
     "ObservedAsyncAgent",
     "RecordedAsyncTools",
     "RecordedTools",
+    "ReplayResult",
     "SessionRecorder",
     "TrajectoryFinding",
     "VerificationResult",
@@ -40,4 +42,6 @@ __all__ = [
     "observe_async_agent",
     "record_async_tools",
     "record_tools",
+    "replay_click",
+    "replay_fill",
 ]
