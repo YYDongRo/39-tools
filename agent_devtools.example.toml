@@ -1,0 +1,22 @@
+# Agent DevTools configuration for the Browser Use observer.
+#
+# Copy this file to agent_devtools.toml and pass that path to
+# observe_browser_use_agent(..., config="agent_devtools.toml").
+# The task still comes from the Browser Use Agent's task=... value.
+
+[agent_devtools]
+
+# Set to false to run the agent without creating traces or reports.
+enabled = true
+
+# Set to false to keep action/state evidence but skip before/after images.
+screenshots = true
+
+# Set to false when the host application has its own terminal logging.
+terminal_summary = true
+
+# Set to true for local development. Keep false in CI and headless jobs.
+open_report = false
+
+# Relative to the current working directory unless an absolute path is used.
+trace_directory = "trace/browser-use"

@@ -70,6 +70,22 @@ once. It forwards unknown attributes to the original agent, and `run(...)`
 returns the original Browser Use result. For compatible agents that do not
 expose `task`, pass the goal explicitly as the second argument.
 
+### Optional configuration
+
+Copy the repository's [`agent_devtools.example.toml`](../agent_devtools.example.toml)
+to `agent_devtools.toml` and pass it explicitly:
+
+```python
+agent = observe_browser_use_agent(raw_agent, config="agent_devtools.toml")
+```
+
+The switches control whether recording is enabled, whether screenshots are
+captured, whether a compact terminal summary is printed, whether the report is
+opened automatically, and where traces are stored. The task is still read
+from `Agent(task=...)`; API keys remain environment variables. If no config is
+passed, the existing defaults remain in effect. A disabled configuration
+passes the call through to the original Agent and creates no report.
+
 Pass an output directory when the default `trace/browser-use/` is not suitable:
 
 ```python

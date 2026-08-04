@@ -85,6 +85,22 @@ Use `agent.assert_last_task_passed()` when failed or unverified tasks should
 fail a test. An explicit goal is still supported for agents that do not expose
 their task as `agent.task`.
 
+### Optional configuration
+
+To keep setup in one human-readable file, copy
+[`agent_devtools.example.toml`](agent_devtools.example.toml) to
+`agent_devtools.toml`, toggle the values you want, and pass it when wrapping:
+
+```python
+agent = observe_browser_use_agent(raw_agent, config="agent_devtools.toml")
+```
+
+The file controls recording, screenshots, terminal summaries, automatic report
+opening, and the trace directory. It does not contain the task or provider
+keys: the task remains on `Agent(task=...)`, and credentials stay in the
+environment variables expected by Browser Use. Without `config=...`, the
+current recording behavior is unchanged.
+
 For a stronger final result without relying only on the Browser Use judge, add
 an optional deterministic check:
 

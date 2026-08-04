@@ -26,6 +26,8 @@ trace with:
   static aggregate stability report.
 - optional deterministic Browser Use final-state checks for URL/title
   components, with the framework judge retained as supporting evidence.
+- optional explicit TOML configuration for enabling recording, screenshots,
+  summaries, report opening, and trace output.
 
 The original one-action MVP is complete. Current work focuses on making this
 browser-agent debugging workflow useful, understandable, and easy to adopt.

@@ -1,3 +1,4 @@
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     BrowserUseFinalStateCheck,
@@ -12,6 +13,7 @@ from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
 
 __all__ = [
     "AgentEvaluation",
+    "AgentDevToolsConfig",
     "BrowserUseFinalCheck",
     "BrowserUseFinalStateCheck",
     "EvaluationRunStatus",

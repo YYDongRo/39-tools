@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from agent_devtools import ActionOutcome, ActionStatus, read_session_json
+from agent_devtools import (
+    ActionOutcome,
+    ActionStatus,
+    AgentDevToolsConfig,
+    read_session_json,
+)
 from agent_devtools.browser_use import observe_browser_use_agent
 
 
@@ -277,6 +282,93 @@ def test_observer_can_disable_the_run_summary(
         await agent.run()
 
         assert capsys.readouterr().out == ""
+
+    asyncio.run(run())
+
+
+def test_observer_reads_configured_trace_root_and_can_skip_screenshots(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def run() -> None:
+        trace_root = tmp_path / "configured-trace"
+        config = AgentDevToolsConfig(
+            screenshots=False,
+            terminal_summary=False,
+            trace_directory=trace_root,
+        )
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            config=config,
+        )
+
+        await agent.run()
+
+        report = agent.last_report_path
+        assert report is not None
+        assert report.parent.parent == trace_root
+        session = read_session_json(report.parent / "session.json")
+        assert session.actions[0].screenshot_before is None
+        assert session.actions[0].screenshot_after is None
+        assert not list(report.parent.rglob("*.png"))
+        assert capsys.readouterr().out == ""
+
+    asyncio.run(run())
+
+
+def test_disabled_config_passes_through_without_creating_a_trace(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_agent = ProviderFailureAgent()
+        agent = observe_browser_use_agent(
+            raw_agent,
+            "Open example.com",
+            config=AgentDevToolsConfig(
+                enabled=False,
+                trace_directory=tmp_path / "should-not-exist",
+            ),
+        )
+
+        await agent.run(on_step_end=None)
+
+        assert agent.last_report_path is None
+        assert raw_agent.directly_open_url is True
+        assert raw_agent.initial_actions is not None
+        assert raw_agent.settings.max_actions_per_step == 5
+        assert not (tmp_path / "should-not-exist").exists()
+
+    asyncio.run(run())
+
+
+def test_config_can_open_the_report_automatically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[tuple[str, int]] = []
+
+    def open_browser(url: str, *, new: int) -> bool:
+        opened.append((url, new))
+        return True
+
+    monkeypatch.setattr(
+        "agent_devtools.integrations.browser_use.webbrowser.open",
+        open_browser,
+    )
+
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            output_root=tmp_path,
+            config=AgentDevToolsConfig(open_report=True),
+        )
+        await agent.run()
+
+        report = agent.last_report_path
+        assert report is not None
+        assert opened == [(report.resolve().as_uri(), 2)]
 
     asyncio.run(run())
 

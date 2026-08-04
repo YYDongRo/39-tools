@@ -7,6 +7,7 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
 from agent_devtools.integrations.browser_use import (
@@ -99,6 +100,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionRecord": ActionRecord,
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
+        "AgentDevToolsConfig": AgentDevToolsConfig,
         "FailureCategory": FailureCategory,
         "RecordedAsyncTools": RecordedAsyncTools,
         "RecordedTools": RecordedTools,
@@ -179,6 +181,7 @@ def test_playwright_public_api_exports_supported_types() -> None:
 def test_browser_use_public_api_exports_supported_types() -> None:
     expected_exports = {
         "AgentEvaluation": AgentEvaluation,
+        "AgentDevToolsConfig": AgentDevToolsConfig,
         "BrowserUseFinalCheck": BrowserUseFinalCheck,
         "BrowserUseFinalStateCheck": BrowserUseFinalStateCheck,
         "EvaluationRunStatus": EvaluationRunStatus,

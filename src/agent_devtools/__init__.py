@@ -4,6 +4,7 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
@@ -17,6 +18,7 @@ __all__ = [
     "ActionRecord",
     "ActionSession",
     "ActionStatus",
+    "AgentDevToolsConfig",
     "FailureCategory",
     "RecordedAsyncTools",
     "RecordedTools",

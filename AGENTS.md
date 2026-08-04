@@ -172,6 +172,8 @@ The repository currently includes:
 - optional deterministic Browser Use final-state checks for URL and title,
   with the model judge retained as supporting evidence;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
+- an optional human-readable TOML configuration for Browser Use recording,
+  screenshots, summaries, report opening, and trace output;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
 - a bounded observe-decide-act Playwright loop with typed action decisions and

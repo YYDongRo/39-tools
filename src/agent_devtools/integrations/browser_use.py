@@ -13,6 +13,7 @@ from typing import Awaitable, Generic, TypeAlias, TypeVar
 from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.serialization import write_session_json
@@ -142,10 +143,17 @@ class _PendingAction:
 
 
 class _BrowserUseRecorder:
-    def __init__(self, output_dir: Path, goal: str) -> None:
+    def __init__(
+        self,
+        output_dir: Path,
+        goal: str,
+        *,
+        capture_screenshots: bool = True,
+    ) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=False)
         self.session = ActionSession(goal=goal)
+        self.capture_screenshots = capture_screenshots
         self._pending: _PendingAction | None = None
         self._pending_auxiliary_index: int | None = None
         self._browser_session: object | None = None
@@ -194,11 +202,13 @@ class _BrowserUseRecorder:
             return
 
         action_dir = Path("actions") / f"{self.session.action_count + 1:03d}"
-        screenshot_before = _save_screenshot(
-            self.output_dir,
-            action_dir / "before.png",
-            await self._capture_screenshot(browser_state),
-        )
+        screenshot_before = None
+        if self.capture_screenshots:
+            screenshot_before = _save_screenshot(
+                self.output_dir,
+                action_dir / "before.png",
+                await self._capture_screenshot(browser_state),
+            )
         arguments["browser_use_step"] = step_number
         self._pending = _PendingAction(
             action_type=action_type,
@@ -227,11 +237,12 @@ class _BrowserUseRecorder:
                 self._persist()
                 return
             action_dir = Path("actions") / f"{self.session.action_count + 1:03d}"
-            screenshot_after = _save_screenshot(
-                self.output_dir,
-                action_dir / "after.png",
-                await self._capture_screenshot(browser_state),
-            )
+            if self.capture_screenshots:
+                screenshot_after = _save_screenshot(
+                    self.output_dir,
+                    action_dir / "after.png",
+                    await self._capture_screenshot(browser_state),
+                )
         except Exception as error:
             observation_error = type(error).__name__
             if pending is None:
@@ -420,16 +431,20 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         self,
         agent: AgentT,
         goal: str | None = None,
-        output_root: str | Path = Path("trace") / "browser-use",
+        output_root: str | Path | None = None,
         *,
-        print_summary: bool = True,
+        print_summary: bool | None = None,
         final_check: BrowserUseFinalCheck | None = None,
+        config: AgentDevToolsConfig | str | Path | None = None,
     ) -> None:
+        config_settings = _resolve_config(config)
         goal = _resolve_agent_goal(agent, goal)
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal cannot be empty")
         if not callable(getattr(agent, "run", None)):
             raise TypeError("agent must provide a callable async run method")
+        if print_summary is None:
+            print_summary = config_settings.terminal_summary
         if not isinstance(print_summary, bool):
             raise TypeError("print_summary must be a bool")
         if final_check is not None and not callable(final_check):
@@ -438,8 +453,11 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             raise TypeError("agent must be a compatible Browser Use Agent")
         if not hasattr(agent, "directly_open_url"):
             raise TypeError("agent must be a compatible Browser Use Agent")
-        settings = getattr(agent, "settings", None)
-        if settings is None or not hasattr(settings, "max_actions_per_step"):
+        agent_settings = getattr(agent, "settings", None)
+        if agent_settings is None or not hasattr(
+            agent_settings,
+            "max_actions_per_step",
+        ):
             raise TypeError("agent must be a compatible Browser Use Agent")
         browser_session = getattr(agent, "browser_session", None)
         if not callable(
@@ -447,34 +465,44 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         ):
             raise TypeError("agent must be a compatible Browser Use Agent")
 
-        initial_actions = getattr(agent, "initial_actions", None)
-        initial_url = getattr(agent, "initial_url", None)
-        if initial_actions and initial_url is None:
-            raise ValueError(
-                "Browser Use initial_actions run before observable steps; "
-                "create the Agent without initial_actions"
-            )
-
         existing_callback = getattr(agent, "register_new_step_callback")
         if existing_callback is not None and not callable(existing_callback):
             raise TypeError("agent step callback must be callable or None")
 
         self.agent = agent
         self.goal = goal
-        self.output_root = Path(output_root)
+        self.config = config_settings
+        self.output_root = (
+            Path(output_root)
+            if output_root is not None
+            else config_settings.trace_directory
+        )
         self.print_summary = print_summary
         self.final_check = final_check
+        self._recording_enabled = config_settings.enabled
+        self._open_report = config_settings.open_report
         self.last_trace: _BrowserUseRecorder | None = None
         self._active_trace: _BrowserUseRecorder | None = None
         self._active = False
         self._existing_step_callback = existing_callback
+
+        initial_actions = getattr(agent, "initial_actions", None)
+        initial_url = getattr(agent, "initial_url", None)
+        if self._recording_enabled and initial_actions and initial_url is None:
+            raise ValueError(
+                "Browser Use initial_actions run before observable steps; "
+                "create the Agent without initial_actions"
+            )
+
+        if not self._recording_enabled:
+            return
 
         setattr(agent, "register_new_step_callback", self._on_model_action)
         setattr(agent, "directly_open_url", False)
         if initial_url is not None:
             setattr(agent, "initial_actions", None)
             setattr(agent, "initial_url", None)
-        settings.max_actions_per_step = 1
+        agent_settings.max_actions_per_step = 1
 
     @property
     def last_report_path(self) -> Path | None:
@@ -492,6 +520,12 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         if self._active:
             raise RuntimeError("an observed Browser Use run is already active")
 
+        if not self._recording_enabled:
+            result = self.agent.run(*args, **kwargs)  # type: ignore[attr-defined]
+            if not isawaitable(result):
+                raise TypeError("Browser Use agent run method must be async")
+            return await result
+
         user_step_end = kwargs.pop("on_step_end", None)
         if user_step_end is not None and not callable(user_step_end):
             raise TypeError("on_step_end must be callable or None")
@@ -499,6 +533,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         trace = _BrowserUseRecorder(
             self._create_trace_directory(),
             self.goal,
+            capture_screenshots=self.config.screenshots,
         )
         trace.attach_browser_session(self.agent.browser_session)  # type: ignore[attr-defined]
         self.last_trace = trace
@@ -547,6 +582,15 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
                 deterministic_verification=deterministic_verification,
                 deterministic_error_type=deterministic_error_type,
             )
+            if self._open_report:
+                try:
+                    self.open_last_report()
+                except Exception as error:
+                    if self.print_summary:
+                        print(
+                            "Report could not be opened automatically: "
+                            f"{type(error).__name__}"
+                        )
             if self.print_summary:
                 print(format_session_summary(trace.session, trace.report_path))
             self._active_trace = None
@@ -610,10 +654,11 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
 def observe_browser_use_agent(
     agent: AgentT,
     goal: str | None = None,
-    output_root: str | Path = Path("trace") / "browser-use",
+    output_root: str | Path | None = None,
     *,
-    print_summary: bool = True,
+    print_summary: bool | None = None,
     final_check: BrowserUseFinalCheck | None = None,
+    config: AgentDevToolsConfig | str | Path | None = None,
 ) -> ObservedBrowserUseAgent[AgentT]:
     return ObservedBrowserUseAgent(
         agent,
@@ -621,6 +666,21 @@ def observe_browser_use_agent(
         output_root,
         print_summary=print_summary,
         final_check=final_check,
+        config=config,
+    )
+
+
+def _resolve_config(
+    config: AgentDevToolsConfig | str | Path | None,
+) -> AgentDevToolsConfig:
+    if config is None:
+        return AgentDevToolsConfig()
+    if isinstance(config, AgentDevToolsConfig):
+        return config
+    if isinstance(config, (str, Path)):
+        return AgentDevToolsConfig.from_file(config)
+    raise TypeError(
+        "config must be an AgentDevToolsConfig, a TOML path, or None"
     )
 
 
