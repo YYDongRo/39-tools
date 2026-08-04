@@ -419,12 +419,13 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
     def __init__(
         self,
         agent: AgentT,
-        goal: str,
+        goal: str | None = None,
         output_root: str | Path = Path("trace") / "browser-use",
         *,
         print_summary: bool = True,
         final_check: BrowserUseFinalCheck | None = None,
     ) -> None:
+        goal = _resolve_agent_goal(agent, goal)
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal cannot be empty")
         if not callable(getattr(agent, "run", None)):
@@ -608,7 +609,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
 
 def observe_browser_use_agent(
     agent: AgentT,
-    goal: str,
+    goal: str | None = None,
     output_root: str | Path = Path("trace") / "browser-use",
     *,
     print_summary: bool = True,
@@ -620,6 +621,20 @@ def observe_browser_use_agent(
         output_root,
         print_summary=print_summary,
         final_check=final_check,
+    )
+
+
+def _resolve_agent_goal(agent: object, goal: str | None) -> str:
+    if goal is not None:
+        return goal
+
+    task = getattr(agent, "task", None)
+    if isinstance(task, str) and task.strip():
+        return task
+
+    raise ValueError(
+        "goal was not provided and the Browser Use agent has no non-empty task; "
+        "create the agent with task=... or pass goal explicitly"
     )
 
 

@@ -38,15 +38,13 @@ from agent_devtools.browser_use import observe_browser_use_agent
 task = "Open example.com and confirm the page is open."
 browser = Browser(headless=False)
 
-agent = observe_browser_use_agent(
-    Agent(
-        task=task,
-        llm=ChatGoogle(model="gemini-2.5-flash"),
-        browser=browser,
-        use_judge=True,
-    ),
-    task,
+raw_agent = Agent(
+    task=task,
+    llm=ChatGoogle(model="gemini-2.5-flash"),
+    browser=browser,
+    use_judge=True,
 )
+agent = observe_browser_use_agent(raw_agent)
 
 try:
     await agent.run(max_steps=5)
@@ -66,14 +64,16 @@ The method is explicit and is never called automatically in CI. It raises a
 clear error if the agent has not run, the report was removed, or the system
 cannot launch a browser.
 
-`observe_browser_use_agent(...)` returns an `ObservedBrowserUseAgent`. It
-forwards unknown attributes to the original agent, and `run(...)` returns the
-original Browser Use result.
+`observe_browser_use_agent(...)` returns an `ObservedBrowserUseAgent`. It reads
+the task from `agent.task`, so the developer enters the user's request only
+once. It forwards unknown attributes to the original agent, and `run(...)`
+returns the original Browser Use result. For compatible agents that do not
+expose `task`, pass the goal explicitly as the second argument.
 
 Pass an output directory when the default `trace/browser-use/` is not suitable:
 
 ```python
-agent = observe_browser_use_agent(raw_agent, task, Path("trace/my-agent"))
+agent = observe_browser_use_agent(raw_agent, output_root=Path("trace/my-agent"))
 ```
 
 Every run uses a new child directory, so an earlier report is not overwritten.
@@ -85,7 +85,7 @@ arguments and raw errors remain in the HTML report. Disable this output when a
 host application provides its own logging:
 
 ```python
-agent = observe_browser_use_agent(raw_agent, task, print_summary=False)
+agent = observe_browser_use_agent(raw_agent, print_summary=False)
 ```
 
 ## What is recorded
@@ -136,7 +136,6 @@ from agent_devtools.browser_use import BrowserUseFinalStateCheck
 
 agent = observe_browser_use_agent(
     raw_agent,
-    task,
     final_check=BrowserUseFinalStateCheck(
         url_contains="/products/wireless-headphones",
         title_contains="Wireless Headphones",
@@ -151,6 +150,10 @@ it, the existing Browser Use judge behavior is unchanged. Custom synchronous or
 asynchronous checks may also be supplied when URL and title are insufficient;
 they receive the bounded final state dictionary and must return a
 `VerificationResult`.
+
+When the wrapped Agent uses `use_judge=True`, Browser Use already evaluates the
+task supplied to `Agent(task=...)`. Agent DevTools reuses that judgment instead
+of asking the developer to repeat the task or making a second LLM request.
 
 ## Lifecycle behavior
 

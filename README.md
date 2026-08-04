@@ -65,25 +65,25 @@ from agent_devtools.browser_use import observe_browser_use_agent
 
 task = "Open example.com and confirm the Example Domain page is open."
 browser = Browser(headless=False)
-agent = observe_browser_use_agent(
-    Agent(
-        task=task,
-        llm=ChatGoogle(model="gemini-2.5-flash"),
-        browser=browser,
-        use_judge=True,
-    ),
-    task,
+raw_agent = Agent(
+    task=task,
+    llm=ChatGoogle(model="gemini-2.5-flash"),
+    browser=browser,
+    use_judge=True,
 )
+agent = observe_browser_use_agent(raw_agent)
 
 await agent.run(max_steps=5)
 agent.open_last_report()
 await browser.stop()
 ```
 
-The agent keeps its normal task and tools. The observer creates a unique local
+The agent keeps its normal task and tools. The observer reads that task from the
+wrapped Agent, so you do not enter it a second time. It creates a unique local
 directory containing `session.json`, `report.html`, and per-action screenshots.
 Use `agent.assert_last_task_passed()` when failed or unverified tasks should
-fail a test.
+fail a test. An explicit goal is still supported for agents that do not expose
+their task as `agent.task`.
 
 For a stronger final result without relying only on the Browser Use judge, add
 an optional deterministic check:
@@ -96,7 +96,6 @@ from agent_devtools.browser_use import (
 
 agent = observe_browser_use_agent(
     raw_agent,
-    task,
     final_check=BrowserUseFinalStateCheck(
         url_contains="/products/wireless-headphones",
         title_contains="Wireless Headphones",
@@ -106,7 +105,9 @@ agent = observe_browser_use_agent(
 
 The report uses these checks for the final result and keeps the model judge in
 collapsed evidence for comparison. If no check is provided, the existing judge
-behavior is unchanged.
+behavior is unchanged. With `use_judge=True`, Browser Use already evaluates the
+same task with its model; Agent DevTools reuses that result instead of asking
+the developer to write a second goal or making another LLM request.
 
 See the [complete runnable example](examples/browser_use_quickstart.py) and
 [Browser Use guide](docs/browser-use.md) for setup, cleanup, output paths, and

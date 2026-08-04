@@ -160,7 +160,8 @@ The repository currently includes:
   evidence after an observed agent returns;
 - an optional Browser Use 0.13.x observer that wraps an existing agent once,
   records state-changing steps with screenshots, prevents unobserved initial
-  actions, preserves existing callbacks, maps the framework judge into task
+  actions, preserves existing callbacks, reads the task from `agent.task` when
+  no duplicate goal is supplied, maps the framework judge into task
   verification, and reports bounded provider-startup failures;
 - Browser Use planning and file-management operations are retained as
   collapsed auxiliary events instead of inflating the browser action timeline;

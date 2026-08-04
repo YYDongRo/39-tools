@@ -179,6 +179,27 @@ def test_observer_records_navigation_with_one_setup_call(
     asyncio.run(run())
 
 
+def test_observer_reads_goal_from_wrapped_agent_task(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_agent = Agent()
+        raw_agent.task = "Open the product page"
+        agent = observe_browser_use_agent(
+            raw_agent,
+            output_root=tmp_path,
+            print_summary=False,
+        )
+
+        await agent.run()
+
+        assert agent.goal == "Open the product page"
+        assert agent.last_session is not None
+        assert agent.last_session.goal == "Open the product page"
+
+    asyncio.run(run())
+
+
 def test_open_last_report_uses_default_browser(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -376,6 +397,9 @@ def test_provider_failure_is_clear_without_storing_secret_details(
 def test_observer_validates_agent_and_goal(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="goal cannot be empty"):
         observe_browser_use_agent(Agent(), "  ", tmp_path)
+
+    with pytest.raises(ValueError, match="no non-empty task"):
+        observe_browser_use_agent(Agent(), output_root=tmp_path)
 
     with pytest.raises(TypeError, match="callable async run method"):
         observe_browser_use_agent(object(), "Open example.com", tmp_path)
