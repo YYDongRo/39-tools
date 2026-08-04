@@ -94,6 +94,10 @@ Current replay support is intentionally narrow: one saved synchronous click can
 be replayed through a caller-provided executor after strict argument validation.
 General trajectory replay and recovery are not implemented.
 
+Browser Use reports keep planning and file-management operations in a separate
+collapsed auxiliary-event section. The main timeline and action statistics only
+count browser actions.
+
 ## Privacy
 
 Even local debugging evidence can be sensitive. Traces may contain:

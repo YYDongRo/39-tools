@@ -398,6 +398,31 @@ def _browser_events_section(action: ActionRecord) -> str:
       </section>"""
 
 
+def _auxiliary_events_section(session: ActionSession) -> str:
+    if not session.auxiliary_events:
+        return ""
+
+    event_items = []
+    for event in session.auxiliary_events:
+        action_type = escape(str(event.get("action_type", "unknown")))
+        status = escape(str(event.get("status", "observed")))
+        arguments = escape(
+            json.dumps(event.get("arguments", {}), ensure_ascii=False, indent=2)
+        )
+        event_items.append(
+            f"""<li><div><strong>{action_type}</strong>
+              <span class="auxiliary-status">{status}</span></div>
+              <pre>{arguments}</pre></li>"""
+        )
+
+    return f"""
+        <details class="auxiliary-events">
+          <summary>Agent auxiliary events ({len(session.auxiliary_events)})</summary>
+          <p>Planning and file operations are kept outside the browser action timeline.</p>
+          <ol>{''.join(event_items)}</ol>
+        </details>"""
+
+
 def _key_value_grid(values: dict[str, object]) -> str:
     items = "".join(
         "<div><dt>"
@@ -871,6 +896,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             summarize_checks=True,
         )
     findings_section = _trajectory_findings_section(session)
+    auxiliary_events_section = _auxiliary_events_section(session)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -964,6 +990,18 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                            padding-top: 16px; }}
       .browser-evidence summary {{ cursor: pointer; font-weight: 700; }}
       .browser-evidence pre {{ margin-bottom: 0; }}
+      .auxiliary-events {{ border-top: 1px solid #e2e8f0; color: #475569;
+                           margin-top: 18px; padding-top: 14px; }}
+      .auxiliary-events summary {{ cursor: pointer; font-weight: 700; }}
+      .auxiliary-events p {{ margin: 10px 0; }}
+      .auxiliary-events ol {{ margin: 0; padding-left: 24px; }}
+      .auxiliary-events li {{ margin: 10px 0; }}
+      .auxiliary-events li div {{ align-items: center; display: flex;
+                                  gap: 8px; justify-content: space-between; }}
+      .auxiliary-events pre {{ margin: 8px 0 0; }}
+      .auxiliary-status {{ background: #e2e8f0; border-radius: 999px;
+                           color: #475569; font-size: 12px; font-weight: 700;
+                           padding: 4px 8px; text-transform: uppercase; }}
       .status {{ border-radius: 999px; font-weight: 700; padding: 6px 12px; }}
       .status-success {{ background: #dcfce7; color: #166534; }}
       .status-failure {{ background: #fee2e2; color: #991b1b; }}
@@ -1075,6 +1113,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
 {verification_note_section}
 {inferred_goal_section}
 {automatic_verification_section}
+{auxiliary_events_section}
       </header>
 {findings_section}
 {task_verification_section}

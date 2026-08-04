@@ -12,8 +12,17 @@ class ActionSession:
     verification_source: str | None = None
     verification_note: str | None = None
     verification: VerificationResult | None = None
+    auxiliary_events: list[dict[str, object]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        for index, event in enumerate(self.auxiliary_events):
+            if not isinstance(event, dict) or not all(
+                isinstance(key, str) for key in event
+            ):
+                raise TypeError(
+                    "auxiliary event at index "
+                    f"{index} must be an object with string keys"
+                )
         _validate_optional_text(self.goal, "goal")
         _validate_optional_text(self.inferred_goal, "inferred_goal")
         _validate_optional_text(self.verification_source, "verification_source")

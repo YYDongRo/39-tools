@@ -162,6 +162,8 @@ The repository currently includes:
   records state-changing steps with screenshots, prevents unobserved initial
   actions, preserves existing callbacks, maps the framework judge into task
   verification, and reports bounded provider-startup failures;
+- Browser Use planning and file-management operations are retained as
+  collapsed auxiliary events instead of inflating the browser action timeline;
 - sequential repeated-run Browser Use stability evaluation with fresh Agent
   lifecycle ownership, numbered per-run traces, versioned aggregate JSON,
   deterministic trajectory divergence, conservative failure grouping, and a

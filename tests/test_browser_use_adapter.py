@@ -309,6 +309,39 @@ def test_done_step_is_not_recorded_as_a_computer_action(
     asyncio.run(run())
 
 
+def test_auxiliary_file_actions_are_separate_from_browser_timeline(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(
+                action_type="write_file",
+                arguments={"file_name": "todo.md", "content": "done"},
+            ),
+            "Complete the task",
+            tmp_path,
+            print_summary=False,
+        )
+
+        await agent.run()
+
+        assert agent.last_session is not None
+        assert agent.last_session.action_count == 0
+        assert len(agent.last_session.auxiliary_events) == 1
+        assert (
+            agent.last_session.auxiliary_events[0]["action_type"]
+            == "write_file"
+        )
+        report = agent.last_report_path
+        assert report is not None
+        report_text = report.read_text(encoding="utf-8")
+        assert "Agent auxiliary events (1)" in report_text
+        assert "write_file" in report_text
+        assert "No actions recorded." in report_text
+
+    asyncio.run(run())
+
+
 def test_provider_failure_is_clear_without_storing_secret_details(
     tmp_path: Path,
 ) -> None:

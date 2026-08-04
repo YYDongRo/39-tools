@@ -111,6 +111,26 @@ def test_session_without_task_verification_is_unverified() -> None:
     assert session.outcome is ActionOutcome.UNVERIFIED
 
 
+def test_session_preserves_auxiliary_events_without_counting_them() -> None:
+    session = ActionSession(
+        auxiliary_events=[
+            {
+                "event_type": "agent_auxiliary",
+                "action_type": "write_file",
+                "status": "success",
+            }
+        ]
+    )
+
+    assert session.action_count == 0
+    assert session.auxiliary_events[0]["action_type"] == "write_file"
+
+
+def test_session_rejects_invalid_auxiliary_events() -> None:
+    with pytest.raises(TypeError, match="auxiliary event"):
+        ActionSession(auxiliary_events=["write_file"])  # type: ignore[list-item]
+
+
 @pytest.mark.parametrize("goal", ["", "   "])
 def test_session_rejects_empty_goal(goal: str) -> None:
     with pytest.raises(ValueError, match="goal cannot be empty"):
@@ -162,6 +182,28 @@ def test_session_json_round_trip(tmp_path: Path) -> None:
     assert data["verification_note"] == "Generated automatically."
     assert data["verification"] is None
     assert len(data["actions"]) == 2
+
+
+def test_auxiliary_events_json_round_trip(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Open the requested page",
+        auxiliary_events=[
+            {
+                "event_type": "agent_auxiliary",
+                "action_type": "write_file",
+                "arguments": {"file_name": "todo.md"},
+                "status": "success",
+            }
+        ],
+    )
+    output_path = tmp_path / "session.json"
+
+    write_session_json(session, output_path)
+
+    loaded_session = read_session_json(output_path)
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert loaded_session == session
+    assert data["auxiliary_events"] == session.auxiliary_events
 
 
 def test_task_verification_json_round_trip(tmp_path: Path) -> None:

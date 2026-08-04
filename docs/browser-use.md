@@ -103,6 +103,11 @@ each action it can preserve:
 Read-only operations such as `done`, extraction, screenshots, and state reads
 are not added to the state-changing action timeline.
 
+Browser Use planning and file operations such as `write_file` and
+`replace_file` are recorded separately as collapsed auxiliary events. They do
+not inflate the browser action count, but remain available in `session.json`
+and the report for debugging.
+
 ## Verification
 
 Browser Use's judge is mapped to the final task verification. This is separate

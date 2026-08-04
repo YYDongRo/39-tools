@@ -40,6 +40,15 @@ _READ_ONLY_ACTIONS = {
     "search_page",
     "wait",
 }
+_AUXILIARY_ACTIONS = {
+    "append_file",
+    "copy_file",
+    "create_folder",
+    "delete_file",
+    "move_file",
+    "replace_file",
+    "write_file",
+}
 
 
 @dataclass(frozen=True)
@@ -138,6 +147,7 @@ class _BrowserUseRecorder:
         self.output_dir.mkdir(parents=True, exist_ok=False)
         self.session = ActionSession(goal=goal)
         self._pending: _PendingAction | None = None
+        self._pending_auxiliary_index: int | None = None
         self._browser_session: object | None = None
         self._last_state: dict[str, object] | None = None
         self._persist()
@@ -166,6 +176,20 @@ class _BrowserUseRecorder:
 
         action_type, arguments = _action_from_model_output(model_output)
         self._last_state = _page_state(browser_state)
+        if action_type in _AUXILIARY_ACTIONS:
+            self.session.auxiliary_events.append(
+                {
+                    "event_type": "agent_auxiliary",
+                    "action_type": action_type,
+                    "arguments": arguments,
+                    "browser_use_step": step_number,
+                }
+            )
+            self._pending_auxiliary_index = (
+                len(self.session.auxiliary_events) - 1
+            )
+            self._persist()
+            return
         if action_type in _READ_ONLY_ACTIONS:
             return
 
@@ -188,6 +212,8 @@ class _BrowserUseRecorder:
     async def on_step_end(self, agent: object) -> None:
         pending = self._pending
         self._pending = None
+        auxiliary_index = self._pending_auxiliary_index
+        self._pending_auxiliary_index = None
         state_after: dict[str, object] = {}
         screenshot_after: Path | None = None
         observation_error: str | None = None
@@ -197,6 +223,8 @@ class _BrowserUseRecorder:
             state_after = _page_state(browser_state)
             self._last_state = dict(state_after)
             if pending is None:
+                self._finish_auxiliary_event(auxiliary_index, agent)
+                self._persist()
                 return
             action_dir = Path("actions") / f"{self.session.action_count + 1:03d}"
             screenshot_after = _save_screenshot(
@@ -207,11 +235,19 @@ class _BrowserUseRecorder:
         except Exception as error:
             observation_error = type(error).__name__
             if pending is None:
+                self._finish_auxiliary_event(auxiliary_index, agent)
+                self._persist()
                 return
 
         duration_ms = max(0, (monotonic_ns() - pending.start_ns) // 1_000_000)
 
         errors, reported_failure = _latest_action_result(agent)
+        self._finish_auxiliary_event(
+            auxiliary_index,
+            agent,
+            errors=errors,
+            reported_failure=reported_failure,
+        )
         failed = bool(errors) or reported_failure
         failure_reason = None
         failure_evidence: dict[str, object] = {}
@@ -250,6 +286,23 @@ class _BrowserUseRecorder:
         self.session.actions.append(action)
         self.session.verification = None
         self._persist()
+
+    def _finish_auxiliary_event(
+        self,
+        index: int | None,
+        agent: object,
+        *,
+        errors: list[str] | None = None,
+        reported_failure: bool = False,
+    ) -> None:
+        if index is None or not (0 <= index < len(self.session.auxiliary_events)):
+            return
+        if errors is None:
+            errors, reported_failure = _latest_action_result(agent)
+        event = self.session.auxiliary_events[index]
+        event["status"] = "failure" if errors or reported_failure else "success"
+        if errors:
+            event["failure_reason"] = errors[0]
 
     async def final_state(self) -> dict[str, object]:
         if self._browser_session is None:

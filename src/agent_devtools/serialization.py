@@ -279,7 +279,7 @@ def read_action_json(input_path: Path) -> ActionRecord:
 
 
 def session_to_dict(session: ActionSession) -> dict[str, object]:
-    return {
+    data: dict[str, object] = {
         "schema_version": SESSION_SCHEMA_VERSION,
         "goal": session.goal,
         "inferred_goal": session.inferred_goal,
@@ -288,6 +288,9 @@ def session_to_dict(session: ActionSession) -> dict[str, object]:
         "verification": _verification_to_dict(session.verification),
         "actions": [action_to_dict(action) for action in session.actions],
     }
+    if session.auxiliary_events:
+        data["auxiliary_events"] = session.auxiliary_events
+    return data
 
 
 def session_from_dict(data: dict[str, object]) -> ActionSession:
@@ -312,10 +315,21 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
             if schema_version in {2, 3}
             else None
         )
+        auxiliary_events_value = data.get("auxiliary_events", [])
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
     if not isinstance(actions_value, list):
         raise ValueError("actions must be an array")
+    if not isinstance(auxiliary_events_value, list):
+        raise ValueError("auxiliary_events must be an array")
+    for index, event_value in enumerate(auxiliary_events_value):
+        if not isinstance(event_value, dict) or not all(
+            isinstance(key, str) for key in event_value
+        ):
+            raise ValueError(
+                "auxiliary event at index "
+                f"{index} must be an object with string keys"
+            )
     if goal_value is not None and not isinstance(goal_value, str):
         raise ValueError("goal must be a string or null")
     for field_name, value in (
@@ -338,6 +352,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
     verification = _verification_from_dict(verification_value)
     return ActionSession(
         actions=actions,
+        auxiliary_events=[dict(event) for event in auxiliary_events_value],
         goal=goal_value,
         inferred_goal=inferred_goal_value,
         verification_source=verification_source_value,
