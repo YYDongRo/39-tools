@@ -13,15 +13,13 @@ async def main() -> None:
         headless=False,
         allowed_domains=["example.com"],
     )
-    agent = observe_browser_use_agent(
-        Agent(
-            task=task,
-            llm=ChatGoogle(model="gemini-2.5-flash"),
-            browser=browser,
-            use_judge=True,
-        ),
-        task,
+    raw_agent = Agent(
+        task=task,
+        llm=ChatGoogle(model="gemini-2.5-flash"),
+        browser=browser,
+        use_judge=True,
     )
+    agent = observe_browser_use_agent(raw_agent)
 
     try:
         await agent.run(max_steps=5)
