@@ -4,6 +4,7 @@ from pathlib import Path
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.report import (
+    ReplayReportSummary,
     format_session_summary,
     write_action_html,
     write_session_html,
@@ -526,6 +527,83 @@ def test_session_report_displays_automatic_verification_metadata(
     assert "<strong>Source:</strong> openai:gpt-test" in content
     assert "<strong>Verification note:</strong>" in content
     assert "No reliable selector was available." in content
+
+
+def test_session_report_displays_reproduced_replay_verdict(
+    tmp_path: Path,
+) -> None:
+    source_action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    replayed_action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    output_path = tmp_path / "replay.html"
+
+    write_session_html(
+        ActionSession(actions=[replayed_action]),
+        output_path,
+        replay_summary=ReplayReportSummary(
+            target_action_number=2,
+            source_action=source_action,
+            replayed_action=replayed_action,
+            reproduced=True,
+        ),
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<strong class="replay-verdict">Reproduced</strong>' in content
+    assert "The replay matched the original target outcome." in content
+    assert "Original target" in content
+    assert "Replay target" in content
+    assert "1 preceding action rebuilt." in content
+
+
+def test_session_report_displays_unreproduced_replay_verdict(
+    tmp_path: Path,
+) -> None:
+    source_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    replayed_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    output_path = tmp_path / "replay.html"
+
+    write_session_html(
+        ActionSession(actions=[replayed_action]),
+        output_path,
+        replay_summary=ReplayReportSummary(
+            target_action_number=2,
+            source_action=source_action,
+            replayed_action=replayed_action,
+            reproduced=False,
+        ),
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<strong class="replay-verdict">Not reproduced</strong>' in content
+    assert "The replay did not match the original target outcome." in content
+    assert "failure · target_not_found" in content
+    assert "1 preceding action rebuilt." in content
 
 
 def test_session_report_displays_agent_run_failure(

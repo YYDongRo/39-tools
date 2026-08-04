@@ -25,7 +25,11 @@ from agent_devtools.integrations.playwright_task import (
 )
 from agent_devtools.replay import ReplayResult, _outcome_matches
 from agent_devtools.recorder import record_action
-from agent_devtools.report import write_action_html
+from agent_devtools.report import (
+    ReplayReportSummary,
+    write_action_html,
+    write_session_html,
+)
 from agent_devtools.serialization import write_action_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
@@ -1034,6 +1038,26 @@ def replay_playwright_session_action(
                 )
 
         replayed_session = executor.session
+
+    write_session_html(
+        replayed_session,
+        output_dir / "report.html",
+        replay_summary=ReplayReportSummary(
+            target_action_number=target_action_number,
+            source_action=target_source_action,
+            replayed_action=(
+                target_result.replayed_action
+                if target_result is not None
+                else None
+            ),
+            reproduced=(
+                target_result is not None
+                and target_result.outcome_matches
+                and context_failure_action_number is None
+            ),
+            context_failure_action_number=context_failure_action_number,
+        ),
+    )
 
     return PlaywrightSessionReplayResult(
         source_session=source_session,

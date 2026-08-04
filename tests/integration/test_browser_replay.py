@@ -191,6 +191,8 @@ def test_replays_browser_fill_with_navigation_context(tmp_path: Path) -> None:
         "navigate",
         "fill",
     ]
+    report_content = (replay_dir / "report.html").read_text(encoding="utf-8")
+    assert '<strong class="replay-verdict">Reproduced</strong>' in report_content
     assert (replay_dir / "report.html").is_file()
     assert (replay_dir / "actions/001/before.png").is_file()
     assert (replay_dir / "actions/002/after.png").is_file()

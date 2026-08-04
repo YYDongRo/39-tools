@@ -143,7 +143,8 @@ number. It replays the preceding `navigate`, `click`, `fill`, `press`, or
 `scroll` actions first, then runs the target and writes a new session report.
 If a context action fails, the target is not run and the report explains where
 reconstruction stopped. General trajectory replay and recovery are not
-implemented.
+implemented. The replay report also shows a clear `Reproduced` or `Not
+reproduced` verdict, with the original and replay target outcomes side by side.
 
 Browser Use reports keep planning and file-management operations in a separate
 collapsed auxiliary-event section. The main timeline and action statistics only

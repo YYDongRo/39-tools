@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 
@@ -49,6 +50,17 @@ _FAILURE_SUMMARIES = {
         "The available evidence does not identify a specific cause."
     ),
 }
+
+
+@dataclass(frozen=True)
+class ReplayReportSummary:
+    """Comparison details shown at the top of a replay session report."""
+
+    target_action_number: int
+    source_action: ActionRecord
+    replayed_action: ActionRecord | None
+    reproduced: bool
+    context_failure_action_number: int | None = None
 
 
 def format_session_summary(
@@ -748,7 +760,80 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
         </article>"""
 
 
-def write_session_html(session: ActionSession, output_path: Path) -> None:
+def _replay_action_label(action: ActionRecord | None) -> str:
+    if action is None:
+        return "not run"
+    if action.status is ActionStatus.SUCCESS:
+        return "success"
+
+    category = action.failure_category
+    if category is None and action.verification is not None:
+        category = action.verification.failure_category
+    if category is None:
+        return "failure"
+    return f"failure · {category.value}"
+
+
+def _replay_summary_section(summary: ReplayReportSummary) -> str:
+    verdict = "Reproduced" if summary.reproduced else "Not reproduced"
+    verdict_class = "reproduced" if summary.reproduced else "not-reproduced"
+    verdict_detail = (
+        "The replay matched the original target outcome."
+        if summary.reproduced
+        else "The replay did not match the original target outcome."
+    )
+    if summary.context_failure_action_number is not None:
+        context_detail = (
+            "Stopped before target action "
+            f"{summary.target_action_number} at context action "
+            f"{summary.context_failure_action_number}."
+        )
+    else:
+        context_count = max(summary.target_action_number - 1, 0)
+        context_detail = (
+            f"{context_count} preceding action"
+            f"{'s' if context_count != 1 else ''} rebuilt."
+        )
+
+    return f"""
+        <section class="replay-summary replay-summary-{verdict_class}">
+          <div class="replay-summary-heading">
+            <div>
+              <span class="result-kicker">Replay verdict</span>
+              <strong class="replay-verdict">{verdict}</strong>
+              <p class="result-detail">{verdict_detail}</p>
+            </div>
+            <span class="replay-verdict-mark" aria-hidden="true">
+              {'✓' if summary.reproduced else '!'}
+            </span>
+          </div>
+          <dl class="replay-comparison">
+            <div>
+              <dt>Target action</dt>
+              <dd>Action {summary.target_action_number}</dd>
+            </div>
+            <div>
+              <dt>Original target</dt>
+              <dd>{escape(_replay_action_label(summary.source_action))}</dd>
+            </div>
+            <div>
+              <dt>Replay target</dt>
+              <dd>{escape(_replay_action_label(summary.replayed_action))}</dd>
+            </div>
+            <div>
+              <dt>Context</dt>
+              <dd>{escape(context_detail)}</dd>
+            </div>
+          </dl>
+        </section>"""
+
+
+def write_session_html(
+    session: ActionSession,
+    output_path: Path,
+    *,
+    replay_summary: ReplayReportSummary | None = None,
+) -> None:
     execution_success_count = sum(
         action.status is ActionStatus.SUCCESS for action in session.actions
     )
@@ -905,6 +990,11 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             verification_title,
             summarize_checks=True,
         )
+    replay_summary_section = (
+        _replay_summary_section(replay_summary)
+        if replay_summary is not None
+        else ""
+    )
     findings_section = _trajectory_findings_section(session)
     auxiliary_events_section = _auxiliary_events_section(session)
 
@@ -951,6 +1041,20 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
                       justify-content: center; width: 48px; }}
       .result-hero-failure .result-mark {{ color: #991b1b; }}
       .result-hero-unverified .result-mark {{ color: #92400e; }}
+      .replay-summary {{ border: 2px solid #cbd5e1; border-radius: 12px;
+                         margin-top: 18px; padding: 20px; }}
+      .replay-summary-reproduced {{ background: #f0fdf4; border-color: #86efac; }}
+      .replay-summary-not-reproduced {{ background: #fffbeb; border-color: #fcd34d; }}
+      .replay-summary-heading {{ align-items: center; display: flex;
+                                 gap: 16px; justify-content: space-between; }}
+      .replay-verdict {{ display: block; font-size: 24px; line-height: 1.2; }}
+      .replay-verdict-mark {{ align-items: center; background: white;
+                              border-radius: 50%; color: #166534; display: flex;
+                              flex: 0 0 auto; font-size: 22px; font-weight: 900;
+                              height: 44px; justify-content: center; width: 44px; }}
+      .replay-summary-not-reproduced .replay-verdict-mark {{ color: #92400e; }}
+      .replay-comparison {{ gap: 14px; margin: 18px 0 0; }}
+      .replay-comparison dd {{ font-weight: 600; }}
       .run-stats {{ display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
                     margin-top: 16px; }}
       .run-stat {{ background: #f8fafc; border: 1px solid #e2e8f0;
@@ -1090,7 +1194,9 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
       .missing {{ color: #64748b; }}
       .empty-state {{ padding: 32px; text-align: center; }}
       @media (max-width: 800px) {{
-        dl, .action-screenshots, .run-stats {{ grid-template-columns: 1fr; }}
+        dl, .action-screenshots, .replay-comparison, .run-stats {{
+          grid-template-columns: 1fr;
+        }}
         .title-row, .action-heading, .findings-heading {{ align-items: flex-start;
                                                           flex-direction: column; }}
         .result-mark {{ display: none; }}
@@ -1113,6 +1219,7 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
           </div>
           <span class="result-mark" aria-hidden="true">{result_mark}</span>
         </section>
+{replay_summary_section}
         <section class="run-stats" aria-label="Run summary">
           <div class="run-stat"><span>Actions</span><strong>{session.action_count}</strong></div>
           <div class="run-stat"><span>Executed</span><strong>{execution_success_count} succeeded</strong></div>
