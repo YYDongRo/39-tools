@@ -132,6 +132,11 @@ result = replay_fill(source_action, execute_fill)
 print(result.outcome_matches)
 ```
 
+To try this against a real local Chromium page, install the browser extra and
+run `uv run --extra browser python examples/browser_fill_replay.py`. The script
+writes an original action, a replay action, screenshots, and `report.html` under
+`trace/browser-fill-replay/`.
+
 General trajectory replay and recovery are not implemented.
 
 Browser Use reports keep planning and file-management operations in a separate

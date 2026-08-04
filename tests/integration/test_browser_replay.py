@@ -6,7 +6,7 @@ import pytest
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import diagnose_playwright_click_failure
-from agent_devtools.replay import replay_click
+from agent_devtools.replay import replay_click, replay_fill
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import read_action_json, write_action_json
 
@@ -65,6 +65,70 @@ def test_replays_saved_browser_click(tmp_path: Path) -> None:
     assert result.outcome_matches
     assert result.replayed_action.status is ActionStatus.SUCCESS
     assert status_text == "The browser click succeeded."
+    assert before_path.stat().st_size > 0
+    assert after_path.stat().st_size > 0
+    assert before_path.read_bytes() != after_path.read_bytes()
+    assert read_action_json(replay_path) == result.replayed_action
+    assert report_path.is_file()
+
+
+def test_replays_saved_browser_fill(tmp_path: Path) -> None:
+    source_path = tmp_path / "original.json"
+    replay_path = tmp_path / "replay.json"
+    report_path = tmp_path / "report.html"
+    before_path = tmp_path / "before.png"
+    after_path = tmp_path / "after.png"
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve()
+    source_action = ActionRecord(
+        action_type="fill",
+        arguments={
+            "selector": "#visible-input",
+            "text": "Agent debugging",
+            "timeout_ms": 500,
+        },
+        start_time=datetime(2026, 7, 20, 12, 0, tzinfo=UTC),
+        duration_ms=25,
+        status=ActionStatus.SUCCESS,
+    )
+    write_action_json(source_action, source_path)
+    loaded_action = read_action_json(source_path)
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1000, "height": 650})
+        page.goto(page_path.as_uri())
+        page.screenshot(path=str(before_path), full_page=True)
+
+        def execute_fill(
+            selector: str,
+            text: str,
+            timeout_ms: int | None,
+        ) -> None:
+            locator = page.locator(selector)
+            if timeout_ms is None:
+                locator.fill(text)
+            else:
+                locator.fill(text, timeout=timeout_ms)
+
+        result = replay_fill(
+            loaded_action,
+            execute_fill,
+            screenshot_before=Path("before.png"),
+            screenshot_after=Path("after.png"),
+        )
+
+        page.screenshot(path=str(after_path), full_page=True)
+        input_value = page.locator("#visible-input").input_value()
+        browser.close()
+
+    write_action_json(result.replayed_action, replay_path)
+    write_action_html(result.replayed_action, report_path)
+
+    assert result.outcome_matches
+    assert result.replayed_action.status is ActionStatus.SUCCESS
+    assert input_value == "Agent debugging"
     assert before_path.stat().st_size > 0
     assert after_path.stat().st_size > 0
     assert before_path.read_bytes() != after_path.read_bytes()
