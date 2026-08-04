@@ -13,6 +13,7 @@ from agent_devtools.async_tool_recorder import (
     record_async_tools,
 )
 from agent_devtools.events import ActionEventCollector
+from agent_devtools.failure import record_agent_run_failure
 from agent_devtools.tool_recorder import RecordedTools, record_tools
 from agent_devtools.verification import VerificationResult
 
@@ -94,21 +95,25 @@ class ObservedAgent(Generic[AgentT, ToolT]):
             )
             self.last_trace = trace
             with trace as recorded_tools:
-                result = self.agent.run(  # type: ignore[attr-defined]
-                    task,
-                    *args,
-                    tools=recorded_tools,
-                    **kwargs,
-                )
-                if isawaitable(result):
-                    close = getattr(result, "close", None)
-                    if callable(close):
-                        close()
-                    raise TypeError(
-                        "async agent run methods require "
-                        "observe_async_agent()"
+                try:
+                    result = self.agent.run(  # type: ignore[attr-defined]
+                        task,
+                        *args,
+                        tools=recorded_tools,
+                        **kwargs,
                     )
-                return result
+                    if isawaitable(result):
+                        close = getattr(result, "close", None)
+                        if callable(close):
+                            close()
+                        raise TypeError(
+                            "async agent run methods require "
+                            "observe_async_agent()"
+                        )
+                    return result
+                except BaseException as error:
+                    record_agent_run_failure(trace.session, error)
+                    raise
         finally:
             self._active = False
 
@@ -188,18 +193,22 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
             )
             self.last_trace = trace
             async with trace as recorded_tools:
-                result = self.agent.run(  # type: ignore[attr-defined]
-                    task,
-                    *args,
-                    tools=recorded_tools,
-                    **kwargs,
-                )
-                if not isawaitable(result):
-                    raise TypeError(
-                        "observe_async_agent() requires an async agent "
-                        "run method"
+                try:
+                    result = self.agent.run(  # type: ignore[attr-defined]
+                        task,
+                        *args,
+                        tools=recorded_tools,
+                        **kwargs,
                     )
-                return await result
+                    if not isawaitable(result):
+                        raise TypeError(
+                            "observe_async_agent() requires an async agent "
+                            "run method"
+                        )
+                    return await result
+                except BaseException as error:
+                    record_agent_run_failure(trace.session, error)
+                    raise
         finally:
             self._active = False
 

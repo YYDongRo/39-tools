@@ -528,6 +528,24 @@ def test_session_report_displays_automatic_verification_metadata(
     assert "No reliable selector was available." in content
 
 
+def test_session_report_displays_agent_run_failure(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        goal="Open the product page",
+        verification_source="agent-run",
+        verification_note="Agent run failed (RuntimeError).",
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<strong class="result-title">Agent run failed</strong>' in content
+    assert "<strong>Agent run failure:</strong>" in content
+    assert "Agent run failed (RuntimeError)." in content
+
+
 def test_session_report_displays_failed_task_verification(tmp_path: Path) -> None:
     session = ActionSession(
         goal="Play the video",

@@ -143,6 +143,16 @@ class ProviderFailureAgent(Agent):
         return self.finished_history
 
 
+class RunFailureAgent(Agent):
+    async def run(
+        self,
+        *,
+        on_step_end: object,
+        max_steps: int = 3,
+    ) -> History:
+        raise RuntimeError("secret-browser-use-agent-detail")
+
+
 class IncompatibleAsyncAgent:
     async def run(self) -> None:
         pass
@@ -517,6 +527,36 @@ def test_provider_failure_is_clear_without_storing_secret_details(
         trace_text = (report.parent / "session.json").read_text(encoding="utf-8")
         trace_text += report.read_text(encoding="utf-8")
         assert "secret-provider-detail" not in trace_text
+
+    asyncio.run(run())
+
+
+def test_agent_run_failure_is_clear_without_storing_secret_details(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            RunFailureAgent(),
+            "Open example.com",
+            tmp_path,
+            print_summary=False,
+        )
+
+        with pytest.raises(RuntimeError, match="secret-browser-use-agent-detail"):
+            await agent.run()
+
+        assert agent.last_session is not None
+        assert agent.last_session.verification_source == "agent-run"
+        assert agent.last_session.verification_note == (
+            "Browser Use agent run failed (RuntimeError)."
+        )
+        report = agent.last_report_path
+        assert report is not None
+        report_text = report.read_text(encoding="utf-8")
+        session_text = (report.parent / "session.json").read_text(encoding="utf-8")
+        assert "Agent run failure" in report_text
+        assert "secret-browser-use-agent-detail" not in report_text
+        assert "secret-browser-use-agent-detail" not in session_text
 
     asyncio.run(run())
 

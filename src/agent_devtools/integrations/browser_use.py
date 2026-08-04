@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.config import AgentDevToolsConfig
-from agent_devtools.failure import FailureCategory
+from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
@@ -361,10 +361,10 @@ class _BrowserUseRecorder:
         deterministic_error_type: str | None = None,
     ) -> None:
         if run_error is not None:
-            self.session.verification_source = "browser-use"
-            self.session.verification_note = (
-                "Browser Use ended before final judgment "
-                f"({type(run_error).__name__})."
+            record_agent_run_failure(
+                self.session,
+                run_error,
+                runtime_name="Browser Use agent",
             )
             self._persist()
             return

@@ -80,7 +80,8 @@ print(agent.last_report_path)
 
 The wrapper stores the exact user request, injects the recorded tools, and
 writes a report after each run. If the agent raises, completed actions remain
-available and the final task result stays `unverified`.
+available and the final task result stays `unverified`, with an **Agent run
+failed** note showing the sanitized exception type.
 
 ## Deterministic final checks
 

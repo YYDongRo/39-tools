@@ -24,6 +24,7 @@ from agent_devtools.integrations.playwright_final_state import (
     observe_final_playwright_state,
 )
 from agent_devtools.integrations.playwright_task import validate_task_expectation
+from agent_devtools.failure import record_agent_run_failure
 from agent_devtools.tool_recorder import RecordedTools
 from agent_devtools.verification import VerificationResult
 
@@ -138,20 +139,24 @@ class ObservedPlaywrightAgent(Generic[AgentT, ToolT]):
             _store_generation_metadata(trace.session, generated_expectation)
             self.last_trace = trace
             with trace as recorded_tools:
-                result = self.agent.run(  # type: ignore[attr-defined]
-                    user_request,
-                    *args,
-                    tools=recorded_tools,
-                    **kwargs,
-                )
-                if isawaitable(result):
-                    close = getattr(result, "close", None)
-                    if callable(close):
-                        close()
-                    raise TypeError(
-                        "async agent run methods require "
-                        "observe_async_playwright_agent()"
+                try:
+                    result = self.agent.run(  # type: ignore[attr-defined]
+                        user_request,
+                        *args,
+                        tools=recorded_tools,
+                        **kwargs,
                     )
+                    if isawaitable(result):
+                        close = getattr(result, "close", None)
+                        if callable(close):
+                            close()
+                        raise TypeError(
+                            "async agent run methods require "
+                            "observe_async_playwright_agent()"
+                        )
+                except BaseException as error:
+                    record_agent_run_failure(trace.session, error)
+                    raise
                 if self.final_state_verifier is not None:
                     assessment = _verify_final_state_safely(
                         self.final_state_verifier,
@@ -264,18 +269,22 @@ class ObservedAsyncPlaywrightAgent(Generic[AgentT, ToolT]):
             _store_generation_metadata(trace.session, generated_expectation)
             self.last_trace = trace
             async with trace as recorded_tools:
-                result = self.agent.run(  # type: ignore[attr-defined]
-                    user_request,
-                    *args,
-                    tools=recorded_tools,
-                    **kwargs,
-                )
-                if not isawaitable(result):
-                    raise TypeError(
-                        "observe_async_playwright_agent() requires an "
-                        "async agent run method"
+                try:
+                    result = self.agent.run(  # type: ignore[attr-defined]
+                        user_request,
+                        *args,
+                        tools=recorded_tools,
+                        **kwargs,
                     )
-                resolved = await result
+                    if not isawaitable(result):
+                        raise TypeError(
+                            "observe_async_playwright_agent() requires an "
+                            "async agent run method"
+                        )
+                    resolved = await result
+                except BaseException as error:
+                    record_agent_run_failure(trace.session, error)
+                    raise
                 if self.final_state_verifier is not None:
                     assessment = await _verify_final_state_safely_async(
                         self.final_state_verifier,

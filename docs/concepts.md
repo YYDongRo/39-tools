@@ -34,6 +34,10 @@ The session outcome is:
 Intermediate failures remain visible even if the agent recovered and the final
 task passed.
 
+If the agent itself raises during a run, the session remains `unverified`—it is
+not a claim that the task failed—but the report marks **Agent run failed** and
+stores only the exception type, not the raw exception message.
+
 ## Action records
 
 An action record includes:

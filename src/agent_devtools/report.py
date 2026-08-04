@@ -797,6 +797,12 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             and session.verification.failure_reason is not None
             else "The final task checks did not pass."
         )
+    elif session.verification_source == "agent-run":
+        result_title = "Agent run failed"
+        result_detail = (
+            session.verification_note
+            or "The agent stopped before final task verification."
+        )
     elif session.action_count == 0:
         result_title = "No actions"
         result_detail = "Nothing was recorded in this run."
@@ -875,8 +881,13 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
         inferred_goal_section = ""
     verification_note_section = ""
     if session.verification_note is not None:
+        note_label = (
+            "Agent run failure"
+            if session.verification_source == "agent-run"
+            else "Verification note"
+        )
         verification_note_section = (
-            '<p class="verification-note"><strong>Verification note:</strong> '
+            f'<p class="verification-note"><strong>{note_label}:</strong> '
             f"{escape(session.verification_note)}</p>"
         )
     task_verification_section = ""

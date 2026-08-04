@@ -186,7 +186,8 @@ observable timeline.
 
 The caller still owns the `Browser` lifecycle and should stop it in `finally`.
 If the agent raises, completed actions and a report remain available before the
-exception is re-raised.
+exception is re-raised. The report marks **Agent run failed** and stores only
+the sanitized exception type.
 
 For repeated stability evaluation, use `evaluate_browser_use_agent(...)`
 instead of manually reusing this wrapper. That evaluator requires a factory

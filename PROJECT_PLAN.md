@@ -17,6 +17,7 @@ Agent DevTools can record supported browser actions into a versioned session
 trace with:
 
 - action arguments, timing, execution status, and bounded failure evidence;
+- sanitized Agent-run failures when the wrapped Agent raises;
 - before-and-after screenshots and compact page-state observations;
 - separate action checks and final task verification;
 - JSON persistence and a static HTML timeline;

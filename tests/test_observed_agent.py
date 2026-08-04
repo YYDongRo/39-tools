@@ -40,6 +40,11 @@ class AsyncAgent:
         return f"handled: {user_request}"
 
 
+class FailingAsyncAgent:
+    async def run(self, user_request: str, *, tools: object) -> None:
+        raise RuntimeError("secret-playwright-agent-detail")
+
+
 class AsyncPage:
     async def evaluate(
         self,
@@ -235,5 +240,33 @@ def test_async_observed_agent_automatically_verifies_the_final_page(
         assert observed_agent.last_trace is not None
         assert observed_agent.last_trace.session.verification is not None
         assert observed_agent.last_trace.session.verification.passed is True
+
+    asyncio.run(run())
+
+
+def test_async_playwright_agent_records_agent_run_failure(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        observed_agent = observe_async_playwright_agent(
+            FailingAsyncAgent(),
+            object(),
+            AsyncPage(),
+            tmp_path,
+            capture_browser_events=False,
+        )
+
+        with pytest.raises(RuntimeError, match="secret-playwright-agent-detail"):
+            await observed_agent.run("Complete the task")
+
+        assert observed_agent.last_trace is not None
+        session = observed_agent.last_trace.session
+        assert session.verification_source == "agent-run"
+        assert session.verification_note == "Agent run failed (RuntimeError)."
+        report = observed_agent.last_report_path
+        assert report is not None
+        report_text = report.read_text(encoding="utf-8")
+        assert "Agent run failure" in report_text
+        assert "secret-playwright-agent-detail" not in report_text
 
     asyncio.run(run())

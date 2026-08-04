@@ -54,6 +54,22 @@ class AgentWithoutTask:
         return tools.click(user_request)
 
 
+class FailingAgent:
+    task = "Click the target"
+
+    def run(self, user_request: str, *, tools: Tools) -> None:
+        tools.click("#target")
+        raise RuntimeError("secret-agent-detail")
+
+
+class FailingAsyncAgent:
+    task = "Click the target asynchronously"
+
+    async def run(self, user_request: str, *, tools: AsyncTools) -> None:
+        await tools.click("#target")
+        raise RuntimeError("secret-async-agent-detail")
+
+
 def test_observed_agent_reads_task_once_and_records_tool_actions(
     tmp_path: Path,
 ) -> None:
@@ -97,6 +113,27 @@ def test_observed_agent_reads_task_once_and_records_tool_actions(
     observed.assert_last_task_passed()
     assert observed.last_report_path is not None
     assert observed.last_report_path.is_file()
+
+
+def test_observed_agent_records_sanitized_agent_run_failure(
+    tmp_path: Path,
+) -> None:
+    observed = observe_agent(FailingAgent(), Tools(), tmp_path / "trace")
+
+    with pytest.raises(RuntimeError, match="secret-agent-detail"):
+        observed.run()
+
+    assert observed.last_trace is not None
+    session = observed.last_trace.session
+    assert session.verification_source == "agent-run"
+    assert session.verification_note == "Agent run failed (RuntimeError)."
+    assert session.outcome.value == "unverified"
+    report = observed.last_report_path
+    assert report is not None
+    report_text = report.read_text(encoding="utf-8")
+    assert "Agent run failed" in report_text
+    assert "Agent run failure" in report_text
+    assert "secret-agent-detail" not in report_text
 
 
 def test_observed_agent_accepts_explicit_task_for_agent_without_task(
@@ -145,9 +182,34 @@ def test_observed_async_agent_reads_task_and_records_async_actions(
     asyncio.run(run())
 
 
+def test_observed_async_agent_records_sanitized_agent_run_failure(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        observed = observe_async_agent(
+            FailingAsyncAgent(),
+            AsyncTools(),
+            tmp_path / "trace",
+        )
+
+        with pytest.raises(RuntimeError, match="secret-async-agent-detail"):
+            await observed.run()
+
+        assert observed.last_trace is not None
+        session = observed.last_trace.session
+        assert session.verification_source == "agent-run"
+        assert session.verification_note == "Agent run failed (RuntimeError)."
+        report = observed.last_report_path
+        assert report is not None
+        report_text = report.read_text(encoding="utf-8")
+        assert "Agent run failed" in report_text
+        assert "secret-async-agent-detail" not in report_text
+
+    asyncio.run(run())
+
+
 def test_observed_agent_owns_tools_argument(tmp_path: Path) -> None:
     observed = observe_agent(Agent("Run once"), Tools(), tmp_path / "trace")
 
     with pytest.raises(ValueError, match="owns the tools argument"):
         observed.run(tools=Tools())
-

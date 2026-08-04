@@ -163,8 +163,14 @@ def test_observed_agent_creates_a_report_when_agent_raises(
     assert observed_agent.last_trace is not None
     assert observed_agent.last_trace.session.action_count == 1
     assert observed_agent.last_trace.session.outcome is ActionOutcome.UNVERIFIED
+    assert observed_agent.last_trace.session.verification_source == "agent-run"
+    assert observed_agent.last_trace.session.verification_note == (
+        "Agent run failed (RuntimeError)."
+    )
     assert observed_agent.last_report_path is not None
-    assert observed_agent.last_report_path.is_file()
+    report = observed_agent.last_report_path.read_text(encoding="utf-8")
+    assert "Agent run failure" in report
+    assert "agent failed while handling" not in report
 
 
 def test_observed_agent_automatically_assesses_the_real_final_page(

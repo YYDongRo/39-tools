@@ -40,6 +40,7 @@ and one unverified early ending.
 - Arguments, timing, execution status, failure category, and failure reason
 - Before-and-after screenshots, URLs, and compact structured state
 - Action-level checks and final task verification as different result levels
+- Agent-run exceptions shown as `unverified` with a sanitized exception type
 - Browser page errors, console errors, failed requests, and HTTP error responses
 - Versioned JSON sessions and a static HTML report after each observed run
 
