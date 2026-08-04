@@ -139,6 +139,7 @@ class _BrowserUseRecorder:
         self.session = ActionSession(goal=goal)
         self._pending: _PendingAction | None = None
         self._browser_session: object | None = None
+        self._last_state: dict[str, object] | None = None
         self._persist()
 
     @property
@@ -164,6 +165,7 @@ class _BrowserUseRecorder:
             raise RuntimeError("Browser Use actions must not overlap")
 
         action_type, arguments = _action_from_model_output(model_output)
+        self._last_state = _page_state(browser_state)
         if action_type in _READ_ONLY_ACTIONS:
             return
 
@@ -186,10 +188,6 @@ class _BrowserUseRecorder:
     async def on_step_end(self, agent: object) -> None:
         pending = self._pending
         self._pending = None
-        if pending is None:
-            return
-
-        duration_ms = max(0, (monotonic_ns() - pending.start_ns) // 1_000_000)
         state_after: dict[str, object] = {}
         screenshot_after: Path | None = None
         observation_error: str | None = None
@@ -197,6 +195,9 @@ class _BrowserUseRecorder:
             browser_session = getattr(agent, "browser_session")
             browser_state = await browser_session.get_browser_state_summary()
             state_after = _page_state(browser_state)
+            self._last_state = dict(state_after)
+            if pending is None:
+                return
             action_dir = Path("actions") / f"{self.session.action_count + 1:03d}"
             screenshot_after = _save_screenshot(
                 self.output_dir,
@@ -205,6 +206,10 @@ class _BrowserUseRecorder:
             )
         except Exception as error:
             observation_error = type(error).__name__
+            if pending is None:
+                return
+
+        duration_ms = max(0, (monotonic_ns() - pending.start_ns) // 1_000_000)
 
         errors, reported_failure = _latest_action_result(agent)
         failed = bool(errors) or reported_failure
@@ -249,8 +254,15 @@ class _BrowserUseRecorder:
     async def final_state(self) -> dict[str, object]:
         if self._browser_session is None:
             raise RuntimeError("Browser Use browser session is not attached")
-        browser_state = await self._browser_session.get_browser_state_summary()
-        return _page_state(browser_state)
+        try:
+            browser_state = await self._browser_session.get_browser_state_summary()
+            state = _page_state(browser_state)
+            self._last_state = dict(state)
+            return state
+        except Exception:
+            if self._last_state is not None:
+                return dict(self._last_state)
+            raise
 
     def finish(
         self,

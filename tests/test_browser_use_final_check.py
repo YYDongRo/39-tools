@@ -32,6 +32,18 @@ class _BrowserSession:
         return self.state
 
 
+class _ClosingBrowserSession(_BrowserSession):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    async def get_browser_state_summary(self) -> _State:
+        self.calls += 1
+        if self.calls > 1:
+            raise ValueError("browser session already closed")
+        return self.state
+
+
 class _Action:
     def model_dump(self, *, exclude_none: bool) -> dict[str, object]:
         return {"navigate": {"url": "https://example.com"}}
@@ -82,6 +94,12 @@ class _Agent:
         assert callable(on_step_end)
         await on_step_end(self)
         return self.history
+
+
+class _AgentWithClosingSession(_Agent):
+    def __init__(self) -> None:
+        super().__init__()
+        self.browser_session = _ClosingBrowserSession()
 
 
 def test_final_state_check_passes_url_and_title() -> None:
@@ -165,5 +183,29 @@ def test_deterministic_failure_overrides_a_passing_judge(tmp_path: Path) -> None
         assert observed.last_session.verification is not None
         assert observed.last_session.verification.passed is False
         assert observed.last_session.outcome.value == "failure"
+
+    asyncio.run(run())
+
+
+def test_final_check_uses_last_observed_state_after_session_closes(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        observed = observe_browser_use_agent(
+            _AgentWithClosingSession(),
+            "Open example.com",
+            tmp_path,
+            final_check=BrowserUseFinalStateCheck(
+                url_contains="example.com",
+                title_contains="Example Domain",
+            ),
+            print_summary=False,
+        )
+
+        await observed.run()
+
+        assert observed.last_session is not None
+        assert observed.last_session.verification is not None
+        assert observed.last_session.verification.passed is True
 
     asyncio.run(run())
