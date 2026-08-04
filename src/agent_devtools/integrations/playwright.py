@@ -23,6 +23,7 @@ from agent_devtools.integrations.playwright_task import (
     verify_async_playwright_task,
     verify_playwright_task,
 )
+from agent_devtools.replay import ReplayResult, _outcome_matches
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_action_html
 from agent_devtools.serialization import write_action_json
@@ -937,6 +938,111 @@ class RecordedPlaywrightExecutor:
 
     def _capture_screenshot(self, path: Path) -> None:
         self.page.screenshot(path=str(path), full_page=True)
+
+
+@dataclass(frozen=True)
+class PlaywrightSessionReplayResult:
+    source_session: ActionSession
+    replayed_session: ActionSession
+    target_action_number: int
+    target_result: ReplayResult | None
+    context_failure_action_number: int | None
+    report_path: Path
+
+    @property
+    def reproduced(self) -> bool:
+        return (
+            self.context_failure_action_number is None
+            and self.target_result is not None
+            and self.target_result.outcome_matches
+        )
+
+
+def replay_playwright_session_action(
+    page: Page,
+    source_session: ActionSession,
+    *,
+    target_action_number: int,
+    output_dir: Path,
+) -> PlaywrightSessionReplayResult:
+    """Replay a target Playwright action after rebuilding its prior context."""
+
+    if not isinstance(source_session, ActionSession):
+        raise TypeError("source_session must be an ActionSession")
+    if (
+        not isinstance(target_action_number, int)
+        or isinstance(target_action_number, bool)
+        or target_action_number <= 0
+        or target_action_number > source_session.action_count
+    ):
+        raise ValueError(
+            "target_action_number must be within the recorded session"
+        )
+
+    supported_action_types = {"navigate", "click", "fill", "press", "scroll"}
+    source_actions = source_session.actions[:target_action_number]
+    for action in source_actions:
+        if action.action_type not in supported_action_types:
+            raise ValueError(
+                "unsupported Playwright replay action: "
+                f"{action.action_type}"
+            )
+
+    target_source_action = source_actions[-1]
+    target_result: ReplayResult | None = None
+    context_failure_action_number: int | None = None
+
+    with RecordedPlaywrightExecutor(
+        page,
+        output_dir,
+        goal=source_session.goal,
+    ) as executor:
+        executor.session.inferred_goal = source_session.inferred_goal
+        for action_number, source_action in enumerate(source_actions, start=1):
+            replayed_action = executor.execute(
+                PlaywrightAction(
+                    source_action.action_type,
+                    dict(source_action.arguments),
+                )
+            )
+
+            if (
+                action_number < target_action_number
+                and replayed_action.status is ActionStatus.FAILURE
+            ):
+                context_failure_action_number = action_number
+                failure_label = (
+                    replayed_action.failure_category.value
+                    if replayed_action.failure_category is not None
+                    else replayed_action.status.value
+                )
+                executor.session.verification_note = (
+                    "Replay stopped before target action "
+                    f"{target_action_number}: context action "
+                    f"{action_number} failed ({failure_label})."
+                )
+                break
+
+            if action_number == target_action_number:
+                target_result = ReplayResult(
+                    source_action=target_source_action,
+                    replayed_action=replayed_action,
+                    outcome_matches=_outcome_matches(
+                        target_source_action,
+                        replayed_action,
+                    ),
+                )
+
+        replayed_session = executor.session
+
+    return PlaywrightSessionReplayResult(
+        source_session=source_session,
+        replayed_session=replayed_session,
+        target_action_number=target_action_number,
+        target_result=target_result,
+        context_failure_action_number=context_failure_action_number,
+        report_path=output_dir / "report.html",
+    )
 
 
 def run_playwright_agent(

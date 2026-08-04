@@ -134,10 +134,16 @@ print(result.outcome_matches)
 
 To try this against a real local Chromium page, install the browser extra and
 run `uv run --extra browser python examples/browser_fill_replay.py`. The script
-writes an original action, a replay action, screenshots, and `report.html` under
-`trace/browser-fill-replay/`.
+writes an original session, a replay session, screenshots, and `report.html`
+under `trace/browser-fill-replay/`.
 
-General trajectory replay and recovery are not implemented.
+For a bounded Playwright session replay, use
+`replay_playwright_session_action(...)` with a fresh page and a target action
+number. It replays the preceding `navigate`, `click`, `fill`, `press`, or
+`scroll` actions first, then runs the target and writes a new session report.
+If a context action fails, the target is not run and the report explains where
+reconstruction stopped. General trajectory replay and recovery are not
+implemented.
 
 Browser Use reports keep planning and file-management operations in a separate
 collapsed auxiliary-event section. The main timeline and action statistics only

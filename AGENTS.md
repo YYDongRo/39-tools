@@ -111,8 +111,9 @@ package.
 - Optional OpenAI/Gemini expectation and final-state integrations remain
   bounded, provider-specific, and probabilistic. They must not silently
   replace deterministic verification semantics.
-- Replay is intentionally limited to validated click and fill actions; it is
-  not full session replay or recovery.
+- Replay is intentionally limited to validated click and fill actions plus a
+  bounded Playwright session-context replay; it is not full session replay or
+  recovery.
 
 ### User-facing entry points
 
