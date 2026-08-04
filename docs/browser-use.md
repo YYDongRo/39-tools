@@ -80,10 +80,11 @@ agent = observe_browser_use_agent(raw_agent, config="agent_devtools.toml")
 ```
 
 The switches control whether recording is enabled, whether screenshots are
-captured, whether a compact terminal summary is printed, whether the report is
-opened automatically, and where traces are stored. The task is still read
-from `Agent(task=...)`; API keys remain environment variables. If no config is
-passed, the existing defaults remain in effect. A disabled configuration
+captured, whether common credential-shaped metadata is redacted, whether a
+compact terminal summary is printed, whether the report is opened automatically,
+and where single-run and repeated-evaluation output is stored. The task is
+still read from `Agent(task=...)`; API keys remain environment variables. If no
+config is passed, the defaults remain in effect. A disabled configuration
 passes the call through to the original Agent and creates no report.
 
 Pass an output directory when the default `trace/browser-use/` is not suitable:
@@ -216,6 +217,8 @@ extras. Use the model clients supplied by Browser Use in this environment.
 ## Privacy
 
 Reports can contain URLs, action arguments, screenshots, page titles, and
-bounded error details. Browser Use may separately send task and page context to
-the configured model provider. Review both projects' data policies before using
-private applications.
+bounded error details. Metadata redaction is enabled by default for common
+credential-shaped keys, tokens, and URL query values; screenshots are not
+modified and arbitrary sensitive text may still be present. Browser Use may
+separately send task and page context to the configured model provider. Review
+both projects' data policies before using private applications.

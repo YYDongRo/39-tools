@@ -18,6 +18,10 @@ _STATUS_LABELS = {
 }
 
 
+def _evaluation_label(evaluation: AgentEvaluation) -> str:
+    return "All runs passed" if evaluation.all_runs_passed else "Runs need attention"
+
+
 def render_evaluation_html(evaluation: AgentEvaluation) -> str:
     representative = evaluation.representative_success_run_number
     baseline_html = (
@@ -80,6 +84,10 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
     .errored {{ background: #ede9fe; color: #5b21b6; }}
     .baseline {{ border-left: 4px solid #2563eb; background: #eff6ff;
       border-radius: 8px; margin-top: 20px; padding: 14px 16px; }}
+    .evaluation-status {{ border-radius: 10px; display: inline-block;
+      font-size: .88rem; font-weight: 800; margin: 0 0 14px; padding: 8px 12px; }}
+    .evaluation-status.passed {{ background: #dcfce7; color: #166534; }}
+    .evaluation-status.attention {{ background: #fee2e2; color: #991b1b; }}
     .pattern {{ border: 1px solid #fecaca; border-left: 4px solid #dc2626;
       border-radius: 10px; margin-top: 12px; padding: 14px 16px; }}
     .muted {{ color: #64748b; }} a {{ color: #1459b8; font-weight: 650; }}
@@ -100,6 +108,9 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
   <section>
     <div class="eyebrow">Agent DevTools · evaluation schema 1</div>
     <h1>Stability evaluation</h1>
+    <div class="evaluation-status {"passed" if evaluation.all_runs_passed else "attention"}">
+      {_evaluation_label(evaluation)}
+    </div>
     <p class="task"><strong>Task:</strong> {escape(evaluation.task)}</p>
     <div class="metrics">
       {_metric("Requested runs", str(evaluation.requested_run_count))}

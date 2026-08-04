@@ -184,6 +184,41 @@ def test_observer_records_navigation_with_one_setup_call(
     asyncio.run(run())
 
 
+def test_observer_redacts_common_credentials_from_trace_metadata(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_agent = Agent(
+            arguments={
+                "url": "https://example.com/?token=private-token",
+                "headers": {"authorization": "Bearer private-token"},
+            }
+        )
+        agent = observe_browser_use_agent(
+            raw_agent,
+            "Open example.com with token=private-token",
+            tmp_path,
+            config=AgentDevToolsConfig(redact_sensitive_data=True),
+        )
+
+        await agent.run(max_steps=3)
+
+        report_path = agent.last_report_path
+        assert report_path is not None
+        session_path = report_path.parent / "session.json"
+        session = read_session_json(session_path)
+        serialized = session_path.read_text(encoding="utf-8")
+        assert session.actions[0].arguments["url"] == (
+            "https://example.com/?token=[REDACTED]"
+        )
+        assert session.actions[0].arguments["headers"] == {
+            "authorization": "[REDACTED]"
+        }
+        assert "private-token" not in serialized
+
+    asyncio.run(run())
+
+
 def test_observer_reads_goal_from_wrapped_agent_task(
     tmp_path: Path,
 ) -> None:

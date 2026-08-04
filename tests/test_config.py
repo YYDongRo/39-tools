@@ -10,9 +10,11 @@ def test_config_defaults_preserve_observer_behavior() -> None:
 
     assert config.enabled is True
     assert config.screenshots is True
+    assert config.redact_sensitive_data is True
     assert config.terminal_summary is True
     assert config.open_report is False
     assert config.trace_directory == Path("trace") / "browser-use"
+    assert config.evaluation_directory == Path("evaluations") / "browser-use"
 
 
 def test_config_reads_human_editable_toml(tmp_path: Path) -> None:
@@ -22,9 +24,11 @@ def test_config_reads_human_editable_toml(tmp_path: Path) -> None:
 [agent_devtools]
 enabled = false
 screenshots = false
+redact_sensitive_data = false
 terminal_summary = false
 open_report = true
 trace_directory = "custom-trace"
+evaluation_directory = "custom-evaluations"
 """,
         encoding="utf-8",
     )
@@ -34,9 +38,11 @@ trace_directory = "custom-trace"
     assert config == AgentDevToolsConfig(
         enabled=False,
         screenshots=False,
+        redact_sensitive_data=False,
         terminal_summary=False,
         open_report=True,
         trace_directory=Path("custom-trace"),
+        evaluation_directory=Path("custom-evaluations"),
     )
 
 
@@ -51,6 +57,11 @@ def test_config_rejects_wrong_option_types() -> None:
     with pytest.raises(TypeError, match="must be a boolean"):
         AgentDevToolsConfig.from_mapping(
             {"agent_devtools": {"screenshots": "yes"}}
+        )
+
+    with pytest.raises(TypeError, match="must be a boolean"):
+        AgentDevToolsConfig.from_mapping(
+            {"agent_devtools": {"redact_sensitive_data": "yes"}}
         )
 
     with pytest.raises(TypeError, match="must be a path"):

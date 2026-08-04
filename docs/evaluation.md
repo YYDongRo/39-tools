@@ -36,6 +36,37 @@ evaluation = await evaluate_browser_use_agent(
 evaluation.open_report()
 ```
 
+## Run the provided workflow
+
+For a first real run, use the included product-shaped example. It creates a
+fresh Browser Use Agent for each attempt, keeps the individual reports, and
+returns exit code `1` when any requested run is failed, unverified, or errored.
+
+```bash
+cp agent_devtools.example.toml agent_devtools.toml
+# Set GOOGLE_API_KEY in the shell; never put it in the TOML file.
+uv run --extra browser-use python examples/browser_use_evaluation.py \
+  --runs 3 --open-report
+```
+
+The aggregate report is written below `evaluations/browser-use/` by default.
+Set `evaluation_directory` in `agent_devtools.toml` to change that root. The
+same `open_report` setting opens the aggregate report after an evaluation;
+individual run reports remain linked from it. All output is local unless the
+developer explicitly copies or uploads it.
+
+Metadata redaction is enabled by default. Common credential-shaped keys,
+tokens, and URL query values are replaced with `[REDACTED]`; screenshots are
+kept as captured and must still be reviewed before sharing.
+
+Use `--headed` when you want to watch the browser. Leave it off for a faster
+headless run or CI. A failed evaluation still writes every available trace
+before returning the non-zero status.
+
+When calling the Python API from a test, use
+`evaluation.assert_all_passed()` for the same CI-friendly behavior. The
+assertion includes the aggregate report path.
+
 The factory may be synchronous or asynchronous. It must return a new compatible
 Browser Use Agent for every call. The evaluator calls and awaits `close()` on
 every returned Agent, including attempts that fail during setup or execution.

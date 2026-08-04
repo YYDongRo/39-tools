@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -149,11 +150,13 @@ class _BrowserUseRecorder:
         goal: str,
         *,
         capture_screenshots: bool = True,
+        redact_sensitive_data: bool = True,
     ) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=False)
         self.session = ActionSession(goal=goal)
         self.capture_screenshots = capture_screenshots
+        self.redact_sensitive_data = redact_sensitive_data
         self._pending: _PendingAction | None = None
         self._pending_auxiliary_index: int | None = None
         self._browser_session: object | None = None
@@ -182,8 +185,14 @@ class _BrowserUseRecorder:
         if self._pending is not None:
             raise RuntimeError("Browser Use actions must not overlap")
 
-        action_type, arguments = _action_from_model_output(model_output)
-        self._last_state = _page_state(browser_state)
+        action_type, arguments = _action_from_model_output(
+            model_output,
+            redact_sensitive_data=self.redact_sensitive_data,
+        )
+        self._last_state = _page_state(
+            browser_state,
+            redact_sensitive_data=self.redact_sensitive_data,
+        )
         if action_type in _AUXILIARY_ACTIONS:
             self.session.auxiliary_events.append(
                 {
@@ -216,7 +225,10 @@ class _BrowserUseRecorder:
             start_time=datetime.now(UTC),
             start_ns=monotonic_ns(),
             screenshot_before=screenshot_before,
-            state_before=_page_state(browser_state),
+            state_before=_page_state(
+                browser_state,
+                redact_sensitive_data=self.redact_sensitive_data,
+            ),
         )
 
     async def on_step_end(self, agent: object) -> None:
@@ -230,7 +242,10 @@ class _BrowserUseRecorder:
         try:
             browser_session = getattr(agent, "browser_session")
             browser_state = await browser_session.get_browser_state_summary()
-            state_after = _page_state(browser_state)
+            state_after = _page_state(
+                browser_state,
+                redact_sensitive_data=self.redact_sensitive_data,
+            )
             self._last_state = dict(state_after)
             if pending is None:
                 self._finish_auxiliary_event(auxiliary_index, agent)
@@ -252,7 +267,10 @@ class _BrowserUseRecorder:
 
         duration_ms = max(0, (monotonic_ns() - pending.start_ns) // 1_000_000)
 
-        errors, reported_failure = _latest_action_result(agent)
+        errors, reported_failure = _latest_action_result(
+            agent,
+            redact_sensitive_data=self.redact_sensitive_data,
+        )
         self._finish_auxiliary_event(
             auxiliary_index,
             agent,
@@ -309,7 +327,10 @@ class _BrowserUseRecorder:
         if index is None or not (0 <= index < len(self.session.auxiliary_events)):
             return
         if errors is None:
-            errors, reported_failure = _latest_action_result(agent)
+            errors, reported_failure = _latest_action_result(
+                agent,
+                redact_sensitive_data=self.redact_sensitive_data,
+            )
         event = self.session.auxiliary_events[index]
         event["status"] = "failure" if errors or reported_failure else "success"
         if errors:
@@ -320,7 +341,10 @@ class _BrowserUseRecorder:
             raise RuntimeError("Browser Use browser session is not attached")
         try:
             browser_state = await self._browser_session.get_browser_state_summary()
-            state = _page_state(browser_state)
+            state = _page_state(
+                browser_state,
+                redact_sensitive_data=self.redact_sensitive_data,
+            )
             self._last_state = dict(state)
             return state
         except Exception:
@@ -355,10 +379,21 @@ class _BrowserUseRecorder:
             self._persist()
             return
 
-        judgement = _judgement(history)
-        judge_verification = _judge_verification(self.session.goal, judgement)
+        judgement = _judgement(
+            history,
+            redact_sensitive_data=self.redact_sensitive_data,
+        )
+        judge_verification = _judge_verification(
+            self.session.goal,
+            judgement,
+        )
         if deterministic_verification is not None:
-            evidence = dict(deterministic_verification.evidence)
+            evidence = _json_safe(
+                dict(deterministic_verification.evidence),
+                redact_sensitive_data=self.redact_sensitive_data,
+            )
+            if not isinstance(evidence, dict):
+                evidence = {}
             if judge_verification is not None:
                 evidence["browser_use_judge"] = {
                     "passed": judge_verification.passed,
@@ -439,6 +474,8 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
     ) -> None:
         config_settings = _resolve_config(config)
         goal = _resolve_agent_goal(agent, goal)
+        if config_settings.redact_sensitive_data:
+            goal = _redact_text(goal)
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal cannot be empty")
         if not callable(getattr(agent, "run", None)):
@@ -534,6 +571,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             self._create_trace_directory(),
             self.goal,
             capture_screenshots=self.config.screenshots,
+            redact_sensitive_data=self.config.redact_sensitive_data,
         )
         trace.attach_browser_session(self.agent.browser_session)  # type: ignore[attr-defined]
         self.last_trace = trace
@@ -713,6 +751,8 @@ def _new_trace_directory(output_root: Path) -> Path:
 
 def _action_from_model_output(
     model_output: object,
+    *,
+    redact_sensitive_data: bool = True,
 ) -> tuple[str, dict[str, object]]:
     actions = getattr(model_output, "action", None)
     if not isinstance(actions, list) or not actions:
@@ -720,12 +760,23 @@ def _action_from_model_output(
 
     serialized = [_model_dump(action) for action in actions]
     if len(serialized) != 1 or len(serialized[0]) != 1:
-        return "browser_use_step", {"actions": _json_safe(serialized)}
+        return "browser_use_step", {
+            "actions": _json_safe(
+                serialized,
+                redact_sensitive_data=redact_sensitive_data,
+            )
+        }
 
     action_type, arguments = next(iter(serialized[0].items()))
     if not isinstance(arguments, dict):
         arguments = {"value": arguments}
-    return str(action_type), _json_safe(arguments)
+    safe_arguments = _json_safe(
+        arguments,
+        redact_sensitive_data=redact_sensitive_data,
+    )
+    return str(action_type), (
+        safe_arguments if isinstance(safe_arguments, dict) else {}
+    )
 
 
 def _model_dump(value: object) -> dict[str, object]:
@@ -736,7 +787,11 @@ def _model_dump(value: object) -> dict[str, object]:
     return result if isinstance(result, dict) else {"unknown": {}}
 
 
-def _latest_action_result(agent: object) -> tuple[list[str], bool]:
+def _latest_action_result(
+    agent: object,
+    *,
+    redact_sensitive_data: bool = True,
+) -> tuple[list[str], bool]:
     history = getattr(agent, "history", None)
     items = getattr(history, "history", None)
     if not isinstance(items, list) or not items:
@@ -746,7 +801,7 @@ def _latest_action_result(agent: object) -> tuple[list[str], bool]:
         return [], False
 
     errors = [
-        error[:2_000]
+        _redact_text(error[:2_000]) if redact_sensitive_data else error[:2_000]
         for result in results
         if isinstance((error := getattr(result, "error", None)), str)
         and error.strip()
@@ -792,9 +847,13 @@ def _history_failure_note(history: object | None) -> str | None:
     )
 
 
-def _page_state(state: object) -> dict[str, object]:
+def _page_state(
+    state: object,
+    *,
+    redact_sensitive_data: bool = True,
+) -> dict[str, object]:
     browser_errors = getattr(state, "browser_errors", [])
-    return {
+    raw_state = {
         "url": getattr(state, "url", None),
         "title": getattr(state, "title", None),
         "browser_errors": (
@@ -803,6 +862,11 @@ def _page_state(state: object) -> dict[str, object]:
             else []
         ),
     }
+    safe_state = _json_safe(
+        raw_state,
+        redact_sensitive_data=redact_sensitive_data,
+    )
+    return safe_state if isinstance(safe_state, dict) else {}
 
 
 def _save_screenshot(
@@ -823,7 +887,11 @@ def _save_screenshot(
     return relative_path
 
 
-def _judgement(history: object | None) -> dict[str, object] | None:
+def _judgement(
+    history: object | None,
+    *,
+    redact_sensitive_data: bool = True,
+) -> dict[str, object] | None:
     if history is None:
         return None
     get_judgement = getattr(history, "judgement", None)
@@ -831,11 +899,19 @@ def _judgement(history: object | None) -> dict[str, object] | None:
         return None
     value = get_judgement()
     if isinstance(value, dict):
-        return value
+        safe_value = _json_safe(
+            value,
+            redact_sensitive_data=redact_sensitive_data,
+        )
+        return safe_value if isinstance(safe_value, dict) else None
     dump = getattr(value, "model_dump", None)
     if callable(dump):
         result = dump()
-        return result if isinstance(result, dict) else None
+        safe_result = _json_safe(
+            result,
+            redact_sensitive_data=redact_sensitive_data,
+        )
+        return safe_result if isinstance(safe_result, dict) else None
     return None
 
 
@@ -879,8 +955,52 @@ def _optional_text(value: object) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
 
 
-def _json_safe(value: object) -> object:
-    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
+_SENSITIVE_KEY = re.compile(
+    r"(?:api[_-]?key|access[_-]?token|authorization|password|secret|token|cookie)",
+    re.IGNORECASE,
+)
+_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)(\b(?:api[_-]?key|access[_-]?token|authorization|password|secret|token)\b\s*[:=]\s*)([^\s,;&]+)"
+)
+_SECRET_VALUE = re.compile(
+    r"(?i)\b(?:sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}|AQ\.[A-Za-z0-9_-]{20,})\b"
+)
+_SECRET_QUERY = re.compile(
+    r"(?i)([?&](?:api[_-]?key|access[_-]?token|password|secret|token)=[^&#\s]*)"
+)
+
+
+def _json_safe(
+    value: object,
+    *,
+    redact_sensitive_data: bool = False,
+) -> object:
+    safe_value = json.loads(json.dumps(value, ensure_ascii=False, default=str))
+    return _redact_value(safe_value) if redact_sensitive_data else safe_value
+
+
+def _redact_value(value: object, *, key: str | None = None) -> object:
+    if key is not None and _SENSITIVE_KEY.search(key):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {
+            str(child_key): _redact_value(child_value, key=str(child_key))
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_value(item) for item in value]
+    if isinstance(value, str):
+        return _redact_text(value)
+    return value
+
+
+def _redact_text(value: str) -> str:
+    value = _SECRET_ASSIGNMENT.sub(r"\1[REDACTED]", value)
+    value = _SECRET_QUERY.sub(
+        lambda match: match.group(1).split("=", 1)[0] + "=[REDACTED]",
+        value,
+    )
+    return _SECRET_VALUE.sub("[REDACTED]", value)
 
 
 __all__ = [

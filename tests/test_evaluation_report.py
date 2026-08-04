@@ -72,6 +72,7 @@ def test_report_shows_statuses_links_baseline_and_repeated_pattern(
     assert "Open &lt;the&gt; product." in html
     assert "Passed: 1" in html
     assert "Failed: 2" in html
+    assert "Runs need attention" in html
     assert "33.3%" in html
     assert "Average duration" in html
     assert "Median duration" in html
@@ -98,3 +99,4 @@ def test_report_explains_missing_success_baseline(tmp_path: Path) -> None:
 
     assert "No successful baseline was available" in html
     assert "Unverified: 1" in html
+    assert "Runs need attention" in html

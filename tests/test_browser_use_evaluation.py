@@ -11,6 +11,7 @@ from agent_devtools.browser_use import (
     EvaluationRunStatus,
     evaluate_browser_use_agent,
 )
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.evaluation_serialization import read_evaluation_json
 from agent_devtools.serialization import read_session_json
 
@@ -315,5 +316,32 @@ def test_evaluator_rejects_unsafe_output_root() -> None:
                 task="Open the product.",
                 runs=1,
                 output_root=Path.home(),
+            )
+        )
+
+
+def test_evaluator_uses_configured_evaluation_directory(tmp_path: Path) -> None:
+    configured_root = tmp_path / "configured-evaluations"
+    evaluation = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: _Agent(),
+            task="Open the product.",
+            runs=1,
+            config=AgentDevToolsConfig(evaluation_directory=configured_root),
+        )
+    )
+
+    assert evaluation.output_dir.parent == configured_root
+
+
+def test_evaluator_requires_recording_to_be_enabled(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="recording to be enabled"):
+        asyncio.run(
+            evaluate_browser_use_agent(
+                agent_factory=lambda task: _Agent(),
+                task="Open the product.",
+                runs=1,
+                output_root=tmp_path,
+                config=AgentDevToolsConfig(enabled=False),
             )
         )

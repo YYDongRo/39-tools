@@ -7,13 +7,15 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class AgentDevToolsConfig:
-    """Small, optional configuration for the Browser Use observer."""
+    """Small, optional configuration for Browser Use recording and evaluation."""
 
     enabled: bool = True
     screenshots: bool = True
+    redact_sensitive_data: bool = True
     terminal_summary: bool = True
     open_report: bool = False
     trace_directory: Path = Path("trace") / "browser-use"
+    evaluation_directory: Path = Path("evaluations") / "browser-use"
 
     @classmethod
     def from_file(cls, path: str | Path) -> "AgentDevToolsConfig":
@@ -49,9 +51,11 @@ class AgentDevToolsConfig:
         allowed = {
             "enabled",
             "screenshots",
+            "redact_sensitive_data",
             "terminal_summary",
             "open_report",
             "trace_directory",
+            "evaluation_directory",
         }
         unknown = set(section).difference(allowed)
         if unknown:
@@ -61,6 +65,11 @@ class AgentDevToolsConfig:
         values = {
             "enabled": _bool_option(section, "enabled", True),
             "screenshots": _bool_option(section, "screenshots", True),
+            "redact_sensitive_data": _bool_option(
+                section,
+                "redact_sensitive_data",
+                True,
+            ),
             "terminal_summary": _bool_option(
                 section,
                 "terminal_summary",
@@ -71,6 +80,11 @@ class AgentDevToolsConfig:
                 section,
                 "trace_directory",
                 Path("trace") / "browser-use",
+            ),
+            "evaluation_directory": _path_option(
+                section,
+                "evaluation_directory",
+                Path("evaluations") / "browser-use",
             ),
         }
         return cls(**values)

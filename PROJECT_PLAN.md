@@ -27,7 +27,11 @@ trace with:
 - optional deterministic Browser Use final-state checks for URL/title
   components, with the framework judge retained as supporting evidence.
 - optional explicit TOML configuration for enabling recording, screenshots,
-  summaries, report opening, and trace output.
+  metadata redaction, summaries, report opening, trace output, and
+  repeated-evaluation output.
+- a product-shaped repeated-run Browser Use example that keeps reports local,
+  opens the aggregate report on request, and returns a CI-friendly non-zero
+  status when not every run is explicitly passed.
 
 The original one-action MVP is complete. Current work focuses on making this
 browser-agent debugging workflow useful, understandable, and easy to adopt.

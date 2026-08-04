@@ -207,6 +207,29 @@ class AgentEvaluation:
         return self.passed_count / self.requested_run_count
 
     @property
+    def all_runs_passed(self) -> bool:
+        """Whether every requested run reached an explicit passed result."""
+
+        return (
+            self.attempted_run_count == self.requested_run_count
+            and self.passed_count == self.requested_run_count
+        )
+
+    def assert_all_passed(self) -> None:
+        """Raise an assertion suitable for CI when any run is not passed."""
+
+        if self.all_runs_passed:
+            return
+        raise AssertionError(
+            "Browser Use evaluation did not pass every requested run: "
+            f"{self.passed_count}/{self.requested_run_count} passed, "
+            f"{self.failed_count} failed, "
+            f"{self.unverified_count} unverified, "
+            f"{self.errored_count} errored. "
+            f"Report: {self.report_path.resolve()}"
+        )
+
+    @property
     def average_duration_ms(self) -> float | None:
         values = [run.duration_ms for run in self._completed_runs]
         return fmean(values) if values else None

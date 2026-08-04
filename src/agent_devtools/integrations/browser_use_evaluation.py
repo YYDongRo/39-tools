@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from inspect import isawaitable
 from pathlib import Path
@@ -17,6 +18,7 @@ from agent_devtools.evaluation import (
 from agent_devtools.evaluation_analysis import analyze_evaluation_runs
 from agent_devtools.evaluation_report import write_evaluation_html
 from agent_devtools.evaluation_serialization import write_evaluation_json
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     ObservedBrowserUseAgent,
@@ -40,6 +42,7 @@ class _FixedTraceObservedAgent(ObservedBrowserUseAgent[AgentT]):
         goal: str,
         trace_directory: Path,
         final_check: BrowserUseFinalCheck | None,
+        config: AgentDevToolsConfig,
     ) -> None:
         self._trace_directory = trace_directory
         super().__init__(
@@ -48,6 +51,11 @@ class _FixedTraceObservedAgent(ObservedBrowserUseAgent[AgentT]):
             trace_directory.parent,
             print_summary=False,
             final_check=final_check,
+            config=replace(
+                config,
+                open_report=False,
+                terminal_summary=False,
+            ),
         )
 
     def _create_trace_directory(self) -> Path:
@@ -60,11 +68,21 @@ async def evaluate_browser_use_agent(
     task: str,
     runs: int,
     max_steps: int = 100,
-    output_root: str | Path = Path("evaluations") / "browser-use",
+    output_root: str | Path | None = None,
     final_check: BrowserUseFinalCheck | None = None,
+    config: AgentDevToolsConfig | str | Path | None = None,
 ) -> AgentEvaluation:
     _validate_inputs(agent_factory, task, runs, max_steps, final_check)
-    root = _safe_output_root(output_root)
+    config_settings = _resolve_config(config)
+    if not config_settings.enabled:
+        raise ValueError(
+            "Browser Use evaluation requires Agent DevTools recording to be enabled"
+        )
+    root = _safe_output_root(
+        output_root
+        if output_root is not None
+        else config_settings.evaluation_directory
+    )
     evaluation_id, output_dir = _create_evaluation_directory(root)
     evaluation_started_at = datetime.now(UTC)
     evaluation_runs: list[EvaluationRun] = []
@@ -80,6 +98,7 @@ async def evaluate_browser_use_agent(
             output_dir=output_dir,
             seen_agents=seen_agents,
             final_check=final_check,
+            config=config_settings,
         )
         evaluation_runs.append(run)
         sessions[run_number] = session
@@ -101,6 +120,13 @@ async def evaluate_browser_use_agent(
     )
     write_evaluation_json(evaluation, output_dir / "evaluation.json")
     write_evaluation_html(evaluation, evaluation.report_path)
+    if config_settings.open_report:
+        try:
+            evaluation.open_report()
+        except Exception:
+            # Opening a local browser is a convenience and must not change
+            # the evaluation result, especially in headless CI environments.
+            pass
     return evaluation
 
 
@@ -113,6 +139,7 @@ async def _evaluate_attempt(
     output_dir: Path,
     seen_agents: list[object],
     final_check: BrowserUseFinalCheck | None,
+    config: AgentDevToolsConfig,
 ) -> tuple[EvaluationRun, ActionSession]:
     relative_trace = Path("runs") / f"{run_number:03d}"
     trace_directory = output_dir / relative_trace
@@ -143,6 +170,7 @@ async def _evaluate_attempt(
                 task,
                 trace_directory,
                 final_check,
+                config,
             )
             error_phase = "run"
             await observer.run(max_steps=max_steps)
@@ -234,6 +262,20 @@ def _write_trace(session: ActionSession, trace_directory: Path) -> None:
     trace_directory.mkdir(parents=True, exist_ok=True)
     write_session_json(session, trace_directory / "session.json")
     write_session_html(session, trace_directory / "report.html")
+
+
+def _resolve_config(
+    config: AgentDevToolsConfig | str | Path | None,
+) -> AgentDevToolsConfig:
+    if config is None:
+        return AgentDevToolsConfig()
+    if isinstance(config, AgentDevToolsConfig):
+        return config
+    if isinstance(config, (str, Path)):
+        return AgentDevToolsConfig.from_file(config)
+    raise TypeError(
+        "config must be an AgentDevToolsConfig, a TOML path, or None"
+    )
 
 
 def _validate_inputs(

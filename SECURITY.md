@@ -26,7 +26,10 @@ Include, when possible:
 
 Agent DevTools reports may contain URLs, action arguments, typed text,
 screenshots, page metadata, and error details. Review and redact generated
-traces before sharing them.
+traces before sharing them. Browser Use metadata redaction is enabled by
+default and covers common credential-shaped keys, tokens, and URL query
+values; it does not alter screenshots or guarantee that arbitrary sensitive
+text is identified.
 
 Keep model-provider keys in environment variables. Agent DevTools should not
 write provider keys to traces or reports. Revoke any credential that may have

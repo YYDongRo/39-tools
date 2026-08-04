@@ -96,10 +96,12 @@ agent = observe_browser_use_agent(raw_agent, config="agent_devtools.toml")
 ```
 
 The file controls recording, screenshots, terminal summaries, automatic report
-opening, and the trace directory. It does not contain the task or provider
-keys: the task remains on `Agent(task=...)`, and credentials stay in the
-environment variables expected by Browser Use. Without `config=...`, the
-current recording behavior is unchanged.
+opening, local trace output, and repeated-evaluation output. Credential-shaped
+metadata is redacted by default. Screenshots are not edited, so review them
+before sharing. The file does not contain the task or provider keys: the task
+remains on `Agent(task=...)`, and credentials stay in the environment variables
+expected by Browser Use. Without `config=...`, the current recording behavior
+is unchanged apart from the default metadata redaction.
 
 For a stronger final result without relying only on the Browser Use judge, add
 an optional deterministic check:
@@ -157,6 +159,25 @@ representative successful trajectory, and groups repeated explainable failure
 patterns. The evaluator closes each Agent returned by the factory. See the
 [stability evaluation guide](docs/evaluation.md) for the factory contract,
 statistics, output layout, and limitations.
+
+### Run the provided workflow
+
+To try the real local workflow, copy the human-readable configuration and set
+your Browser Use provider key in the shell (never in the TOML file):
+
+```bash
+cp agent_devtools.example.toml agent_devtools.toml
+uv run --extra browser-use python examples/browser_use_evaluation.py \
+  --runs 3 --open-report
+```
+
+The script creates a fresh agent for every attempt, writes one aggregate report
+under `evaluations/browser-use/`, and returns exit code `1` if any run is not
+explicitly passed. A failed evaluation still keeps all generated traces, so
+CI can save the report as an artifact. Add `--headed` to watch the browser.
+Python callers can use `evaluation.assert_all_passed()` for the same CI check.
+The complete workflow and configuration options are in the
+[stability evaluation guide](docs/evaluation.md).
 
 ## Understand the result
 

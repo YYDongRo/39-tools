@@ -12,6 +12,10 @@ enabled = true
 # Set to false to keep action/state evidence but skip before/after images.
 screenshots = true
 
+# Replace common credential-shaped values in recorded metadata. Screenshots
+# are binary evidence and are not altered; review them before sharing.
+redact_sensitive_data = true
+
 # Set to false when the host application has its own terminal logging.
 terminal_summary = true
 
@@ -20,3 +24,6 @@ open_report = false
 
 # Relative to the current working directory unless an absolute path is used.
 trace_directory = "trace/browser-use"
+
+# Root directory for repeated-run Browser Use evaluations.
+evaluation_directory = "evaluations/browser-use"

@@ -80,11 +80,27 @@ def test_evaluation_statistics_keep_run_statuses_distinct(tmp_path: Path) -> Non
     assert evaluation.errored_count == 1
     assert evaluation.completed_run_count == 3
     assert evaluation.empirical_pass_rate == 0.25
+    assert evaluation.all_runs_passed is False
     assert evaluation.average_duration_ms == 200
     assert evaluation.median_duration_ms == 200
     assert evaluation.average_action_count == 4
     assert evaluation.median_action_count == 4
     assert evaluation.representative_unsuccessful_run_numbers == (2, 3, 4)
+
+
+def test_all_runs_passed_is_ci_friendly(tmp_path: Path) -> None:
+    evaluation = AgentEvaluation(
+        evaluation_id="evaluation-1",
+        task="Open the page",
+        started_at=START,
+        ended_at=START + timedelta(seconds=1),
+        requested_run_count=1,
+        runs=(make_run(1, EvaluationRunStatus.PASSED),),
+        output_dir=tmp_path,
+    )
+
+    assert evaluation.all_runs_passed is True
+    evaluation.assert_all_passed()
 
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5])
