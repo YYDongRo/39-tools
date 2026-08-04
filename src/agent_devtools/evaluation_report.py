@@ -160,7 +160,8 @@ def write_evaluation_html(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     html = render_evaluation_html(evaluation)
     normalized = "\n".join(line.rstrip() for line in html.splitlines()) + "\n"
-    output_path.write_text(normalized, encoding="utf-8")
+    with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
+        output_file.write(normalized)
 
 
 def _metric(label: str, value: str) -> str:

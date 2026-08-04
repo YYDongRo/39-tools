@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from agent_devtools.evaluation import (
     AgentEvaluation,
@@ -307,8 +307,9 @@ def _relative_path(data: dict[str, object], field: str) -> Path:
     if "\\" in value:
         raise ValueError(f"{field} must use POSIX separators")
     path = Path(value)
+    posix_path = PurePosixPath(value)
     if (
-        path.is_absolute()
+        posix_path.is_absolute()
         or ".." in path.parts
         or path == Path(".")
         or re.match(r"^[A-Za-z]:/", value) is not None

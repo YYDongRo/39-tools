@@ -677,8 +677,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
 </html>
 """
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(document, encoding="utf-8")
+    _write_utf8_text(output_path, document)
 
 
 def _session_action_card(index: int, action: ActionRecord) -> str:
@@ -1136,5 +1135,10 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
 </html>
 """
 
+    _write_utf8_text(output_path, document)
+
+
+def _write_utf8_text(output_path: Path, document: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(document, encoding="utf-8")
+    with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
+        output_file.write(document)

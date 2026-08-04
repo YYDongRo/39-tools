@@ -209,19 +209,17 @@ def _write_session_trace(
         before = trace_dir / action.screenshot_before  # type: ignore[operator]
         after = trace_dir / action.screenshot_after  # type: ignore[operator]
         before.parent.mkdir(parents=True, exist_ok=True)
-        before.write_text(
+        before.write_bytes(
             _snapshot(
                 str(action.observations["page_url_before"]),
                 f"Before action {action_number}: {action.action_type}",
-            ),
-            encoding="utf-8",
+            ).encode("utf-8")
         )
-        after.write_text(
+        after.write_bytes(
             _snapshot(
                 str(action.observations["page_url_after"]),
                 f"After action {action_number}: {action.action_type}",
-            ),
-            encoding="utf-8",
+            ).encode("utf-8")
         )
         generated.extend((before, after))
     session_path = trace_dir / "session.json"
@@ -251,7 +249,7 @@ def generate_sample_evaluation(
 def _normalize_text_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     normalized = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
-    path.write_text(normalized, encoding="utf-8")
+    path.write_bytes(normalized.encode("utf-8"))
 
 
 def main() -> None:

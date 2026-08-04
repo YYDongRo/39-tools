@@ -24,6 +24,7 @@ def _write_json(data: dict[str, object], output_path: Path) -> None:
         with NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
+            newline="\n",
             dir=output_path.parent,
             prefix=f".{output_path.name}.",
             suffix=".tmp",

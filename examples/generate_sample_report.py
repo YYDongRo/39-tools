@@ -208,7 +208,7 @@ def generate_sample_report(output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[Path]:
     generated_paths: list[Path] = []
     for filename, document in _snapshot_documents().items():
         path = screenshot_dir / filename
-        path.write_text(document, encoding="utf-8")
+        path.write_bytes(document.encode("utf-8"))
         generated_paths.append(path)
 
     report_path = output_dir / "report.html"

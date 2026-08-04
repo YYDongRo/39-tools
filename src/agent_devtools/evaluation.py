@@ -5,7 +5,7 @@ import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from statistics import fmean, median
 
 
@@ -315,8 +315,10 @@ def _validate_relative_path(path: object, field_name: str) -> None:
     if not isinstance(path, Path):
         raise TypeError(f"{field_name} must be a Path")
     serialized = path.as_posix()
+    posix_path = PurePosixPath(serialized)
     if (
         path.is_absolute()
+        or posix_path.is_absolute()
         or ".." in path.parts
         or path == Path(".")
         or "\\" in serialized

@@ -159,7 +159,7 @@ def test_final_state_check_requires_a_bound(tmp_path: Path) -> None:
         judge = verification.evidence["browser_use_judge"]
         assert isinstance(judge, dict)
         assert judge["passed"] is False
-        report = (observed.last_report_path or Path()).read_text()
+        report = (observed.last_report_path or Path()).read_text(encoding="utf-8")
         assert "Deterministic final checks" in report
 
     asyncio.run(run())

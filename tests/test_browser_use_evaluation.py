@@ -208,7 +208,9 @@ def test_evaluator_preserves_four_distinct_statuses(tmp_path: Path) -> None:
     )
     assert evaluation.completed_run_count == 3
     assert evaluation.empirical_pass_rate == 0.25
-    serialized = (evaluation.output_dir / "evaluation.json").read_text()
+    serialized = (evaluation.output_dir / "evaluation.json").read_text(
+        encoding="utf-8"
+    )
     assert "secret detail" not in serialized
     assert evaluation.runs[3].error_phase == "run"
     assert evaluation.runs[3].error_type == "RuntimeError"
@@ -244,7 +246,9 @@ def test_factory_error_creates_trace_and_does_not_stop_later_runs(
     assert first_session.action_count == 0
     assert "RuntimeError" in (first_session.verification_note or "")
     assert "private factory failure" not in json.dumps(
-        json.loads((first_trace / "session.json").read_text())
+        json.loads(
+            (first_trace / "session.json").read_text(encoding="utf-8")
+        )
     )
 
 
@@ -266,7 +270,7 @@ def test_cleanup_error_marks_run_errored(tmp_path: Path) -> None:
     assert run.error_type == "RuntimeError"
     session_text = (
         evaluation.output_dir / "runs/001/session.json"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     assert "secret cleanup message" not in session_text
 
 
