@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from browser_use import Agent, Browser, ChatGoogle
 
@@ -19,7 +20,11 @@ async def main() -> None:
         browser=browser,
         use_judge=True,
     )
-    agent = observe_browser_use_agent(raw_agent)
+    local_config = Path("agent_devtools.toml")
+    agent = observe_browser_use_agent(
+        raw_agent,
+        config=local_config if local_config.is_file() else None,
+    )
 
     try:
         await agent.run(max_steps=5)
