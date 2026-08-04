@@ -67,6 +67,21 @@ check determines the final result and the judge remains supporting evidence.
 AI verification is probabilistic and should not be treated as ground truth for
 high-risk decisions.
 
+## The agent integration boundary
+
+The framework-independent entry points `observe_agent(...)` and
+`observe_async_agent(...)` accept an agent with this small contract:
+
+```python
+agent.run(task, *, tools=recorded_tools)
+```
+
+The observer reads `agent.task` when the task is not passed again, injects a
+recording proxy once, and sends every callable tool method through the existing
+action/session recorder. Screenshot, state, and final-verification callbacks
+remain optional. Agents that call browser or desktop APIs directly instead of
+using the provided tool object still require a framework-specific adapter.
+
 ## Failure analysis
 
 Core recording classifies timeouts, operation errors, verification mismatches,

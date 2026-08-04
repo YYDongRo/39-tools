@@ -1,6 +1,12 @@
 import agent_devtools
 import agent_devtools.browser_use as public_browser_use
 import agent_devtools.playwright as public_playwright
+from agent_devtools.agent import (
+    ObservedAgent,
+    ObservedAsyncAgent,
+    observe_agent,
+    observe_async_agent,
+)
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.analysis import TrajectoryFinding, analyze_session
 from agent_devtools.async_tool_recorder import (
@@ -102,6 +108,8 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
         "FailureCategory": FailureCategory,
+        "ObservedAgent": ObservedAgent,
+        "ObservedAsyncAgent": ObservedAsyncAgent,
         "RecordedAsyncTools": RecordedAsyncTools,
         "RecordedTools": RecordedTools,
         "SessionRecorder": SessionRecorder,
@@ -110,6 +118,8 @@ def test_core_public_api_exports_supported_types() -> None:
         "analyze_session": analyze_session,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
+        "observe_agent": observe_agent,
+        "observe_async_agent": observe_async_agent,
         "record_async_tools": record_async_tools,
         "record_tools": record_tools,
     }

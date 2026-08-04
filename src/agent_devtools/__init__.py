@@ -1,3 +1,9 @@
+from agent_devtools.agent import (
+    ObservedAgent,
+    ObservedAsyncAgent,
+    observe_agent,
+    observe_async_agent,
+)
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.analysis import TrajectoryFinding, analyze_session
 from agent_devtools.async_tool_recorder import (
@@ -20,6 +26,8 @@ __all__ = [
     "ActionStatus",
     "AgentDevToolsConfig",
     "FailureCategory",
+    "ObservedAgent",
+    "ObservedAsyncAgent",
     "RecordedAsyncTools",
     "RecordedTools",
     "SessionRecorder",
@@ -28,6 +36,8 @@ __all__ = [
     "analyze_session",
     "read_action_json",
     "read_session_json",
+    "observe_agent",
+    "observe_async_agent",
     "record_async_tools",
     "record_tools",
 ]

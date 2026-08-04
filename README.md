@@ -199,6 +199,7 @@ completed.
 | --- | --- | --- |
 | Browser Use observer | Existing Browser Use 0.13.x agents | `observe_browser_use_agent(...)` |
 | Playwright agent observer | Agents with `run(user_request, *, tools=...)` | `observe_playwright_agent(...)` |
+| Generic agent observer | Agents with `run(task, *, tools=...)` | `observe_agent(...)` |
 | Playwright tool wrapper | Existing browser tool objects | `record_playwright_tools(...)` |
 | Generic sync/async wrapper | Framework-independent tool objects | `record_tools(...)`, `record_async_tools(...)` |
 | Core recorder | Building a custom adapter | `SessionRecorder`, `record_action(...)` |
@@ -210,6 +211,28 @@ Detailed documentation:
 - [Playwright and tool integrations](docs/playwright.md)
 - [Results, verification, and trace concepts](docs/concepts.md)
 - [Development and testing](docs/development.md)
+
+### The minimal agent boundary
+
+If an agent exposes `run(task, *, tools=...)`, wrap it once and let
+Agent DevTools inject the recording tools. When the task already lives on
+`agent.task`, you do not enter it again:
+
+```python
+from agent_devtools import observe_agent
+
+raw_agent = MyAgent(task="Open the settings page")
+observed = observe_agent(raw_agent, my_tools, "trace/my-agent")
+result = observed.run()
+observed.open_last_report()
+```
+
+The wrapper records every callable method that the agent calls through the
+provided tool object. Optional `capture_screenshot`, `observe_state`, and
+`task_verification` callbacks add the same evidence used by the existing
+recorders. Async agents use `observe_async_agent(...)`. This is an explicit
+adapter boundary, not a promise to intercept arbitrary direct desktop or
+browser calls.
 
 ## Current scope and alpha status
 

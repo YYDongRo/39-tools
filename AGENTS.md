@@ -67,7 +67,7 @@ Design for three user groups:
 
 The current supported workflows are:
 
-1. Wrap a supported Browser Use or Playwright agent once.
+1. Wrap a supported Browser Use, Playwright, or contract-compatible agent once.
 2. Run its normal task without entering the task a second time when the
    framework exposes it.
 3. Inspect the local JSON trace and static HTML report.
@@ -104,6 +104,10 @@ package.
 - Browser Use repeated evaluation creates a fresh Agent per run, retains a
   normal trace for every attempt, computes conservative divergences and failure
   groups, and writes versioned aggregate JSON and static HTML.
+- Framework-independent `observe_agent(...)` and
+  `observe_async_agent(...)` inject the existing sync/async recording proxies
+  into agents with `run(task, *, tools=...)`, so a caller does not instrument
+  each action manually.
 - Optional OpenAI/Gemini expectation and final-state integrations remain
   bounded, provider-specific, and probabilistic. They must not silently
   replace deterministic verification semantics.
@@ -116,6 +120,7 @@ package.
 - Distribution name: `39-tools`.
 - Python import name: `agent_devtools`.
 - Browser Use observer: `observe_browser_use_agent(...)`.
+- Generic agent observer: `observe_agent(...)` and `observe_async_agent(...)`.
 - Repeated evaluator: `evaluate_browser_use_agent(...)`.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
 - Human-readable config: `agent_devtools.toml`, based on
@@ -256,8 +261,9 @@ Work in this order unless the user explicitly changes direction:
    public imports, redaction, reports, and deterministic sample artifacts.
 2. **Developer adoption**: keep the first-run flow short, make CI artifacts
    obvious, and validate supported Browser Use/Playwright versions.
-3. **Adapter contract**: document and test a small integration contract so new
-   agent runtimes can be added without changing the core recorder.
+3. **Adapter contract**: extend and test the small generic boundary already
+   provided by `observe_agent(...)` so new agent runtimes can be added without
+   changing the core recorder.
 4. **Reliability workflows**: improve divergence evidence, failure grouping,
    and controlled replay only when it answers a concrete debugging need.
 5. **Team foundation**: design export, run identity, retention, and access
