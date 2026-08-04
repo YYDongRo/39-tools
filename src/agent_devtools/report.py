@@ -860,6 +860,9 @@ def write_session_html(session: ActionSession, output_path: Path) -> None:
             "AI task assessment"
             if session.verification.evidence.get("assessment_type")
             == "ai_final_state"
+            else "Deterministic final checks"
+            if session.verification.evidence.get("verification_type")
+            == "browser-use-final-state"
             else "Final checks"
         )
         task_verification_section = _verification_result_section(

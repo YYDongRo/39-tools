@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from agent_devtools.browser_use import (
+    BrowserUseFinalStateCheck,
     EvaluationRunStatus,
     evaluate_browser_use_agent,
 )
@@ -152,6 +153,31 @@ def test_evaluator_creates_numbered_traces_and_closes_fresh_agents(
     assert read_evaluation_json(
         evaluation.output_dir / "evaluation.json"
     ) == evaluation
+
+
+def test_evaluator_uses_deterministic_final_check(tmp_path: Path) -> None:
+    evaluation = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: _Agent(),
+            task="Open the product.",
+            runs=1,
+            output_root=tmp_path,
+            final_check=BrowserUseFinalStateCheck(
+                url_contains="/product",
+                title_contains="Evaluation fixture",
+            ),
+        )
+    )
+
+    assert evaluation.runs[0].status is EvaluationRunStatus.PASSED
+    session = read_session_json(
+        evaluation.output_dir / "runs/001/session.json"
+    )
+    assert session.verification_source == "browser-use:deterministic"
+    assert session.verification is not None
+    judge = session.verification.evidence["browser_use_judge"]
+    assert isinstance(judge, dict)
+    assert judge["passed"] is True
 
 
 def test_evaluator_preserves_four_distinct_statuses(tmp_path: Path) -> None:

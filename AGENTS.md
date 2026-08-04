@@ -166,6 +166,8 @@ The repository currently includes:
   lifecycle ownership, numbered per-run traces, versioned aggregate JSON,
   deterministic trajectory divergence, conservative failure grouping, and a
   static aggregate HTML report;
+- optional deterministic Browser Use final-state checks for URL and title,
+  with the model judge retained as supporting evidence;
 - stable core and Playwright public import paths, plus a repeatable quickstart;
 - wheel and source-distribution build validation with Python 3.11 through 3.14
   compatibility coverage;
@@ -199,6 +201,8 @@ whether the user's task is correct.
 Final-state AI assessment is optional and probabilistic. It is stored and
 displayed separately from deterministic check semantics, may remain unverified,
 and receives bounded visible page text that can still be sensitive.
+Browser Use final-state checks are optional and currently cover URL/title
+contains checks plus custom callbacks over bounded final state.
 Browser event evidence includes failed requests and HTTP 4xx/5xx responses but
 does not include successful request timelines, request or response bodies,
 headers, or cookies.

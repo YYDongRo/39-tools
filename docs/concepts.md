@@ -60,6 +60,10 @@ happened. Verification requires one of:
 - a framework judge;
 - an optional model assessment grounded in bounded observed state.
 
+For Browser Use, an optional deterministic final-state check can validate URL
+and title components independently of the model judge. When configured, that
+check determines the final result and the judge remains supporting evidence.
+
 AI verification is probabilistic and should not be treated as ground truth for
 high-risk decisions.
 

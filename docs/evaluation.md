@@ -8,7 +8,10 @@ report. Runs are sequential and each attempt uses a fresh Agent.
 
 ```python
 from browser_use import Agent, Browser, ChatGoogle
-from agent_devtools.browser_use import evaluate_browser_use_agent
+from agent_devtools.browser_use import (
+    BrowserUseFinalStateCheck,
+    evaluate_browser_use_agent,
+)
 
 
 def create_agent(task: str) -> Agent:
@@ -25,6 +28,10 @@ evaluation = await evaluate_browser_use_agent(
     task="Find the wireless headphones and open the correct product page.",
     runs=10,
     max_steps=15,
+    final_check=BrowserUseFinalStateCheck(
+        url_contains="/products/wireless-headphones",
+        title_contains="Wireless Headphones",
+    ),
 )
 evaluation.open_report()
 ```
@@ -46,6 +53,8 @@ owns.
 
 An action completing successfully is not enough to classify a run as passed.
 Only explicit final task verification produces `passed` or `failed`.
+When `final_check` is provided, its deterministic result is the final task
+verification; the Browser Use judge is retained as supporting evidence.
 
 ## Output
 

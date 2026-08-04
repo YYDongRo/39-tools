@@ -85,6 +85,29 @@ directory containing `session.json`, `report.html`, and per-action screenshots.
 Use `agent.assert_last_task_passed()` when failed or unverified tasks should
 fail a test.
 
+For a stronger final result without relying only on the Browser Use judge, add
+an optional deterministic check:
+
+```python
+from agent_devtools.browser_use import (
+    BrowserUseFinalStateCheck,
+    observe_browser_use_agent,
+)
+
+agent = observe_browser_use_agent(
+    raw_agent,
+    task,
+    final_check=BrowserUseFinalStateCheck(
+        url_contains="/products/wireless-headphones",
+        title_contains="Wireless Headphones",
+    ),
+)
+```
+
+The report uses these checks for the final result and keeps the model judge in
+collapsed evidence for comparison. If no check is provided, the existing judge
+behavior is unchanged.
+
 See the [complete runnable example](examples/browser_use_quickstart.py) and
 [Browser Use guide](docs/browser-use.md) for setup, cleanup, output paths, and
 integration limits.

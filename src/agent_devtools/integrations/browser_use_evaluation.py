@@ -17,7 +17,10 @@ from agent_devtools.evaluation import (
 from agent_devtools.evaluation_analysis import analyze_evaluation_runs
 from agent_devtools.evaluation_report import write_evaluation_html
 from agent_devtools.evaluation_serialization import write_evaluation_json
-from agent_devtools.integrations.browser_use import ObservedBrowserUseAgent
+from agent_devtools.integrations.browser_use import (
+    BrowserUseFinalCheck,
+    ObservedBrowserUseAgent,
+)
 from agent_devtools.report import write_session_html
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
@@ -31,13 +34,20 @@ class _FreshAgentRequiredError(TypeError):
 
 
 class _FixedTraceObservedAgent(ObservedBrowserUseAgent[AgentT]):
-    def __init__(self, agent: AgentT, goal: str, trace_directory: Path) -> None:
+    def __init__(
+        self,
+        agent: AgentT,
+        goal: str,
+        trace_directory: Path,
+        final_check: BrowserUseFinalCheck | None,
+    ) -> None:
         self._trace_directory = trace_directory
         super().__init__(
             agent,
             goal,
             trace_directory.parent,
             print_summary=False,
+            final_check=final_check,
         )
 
     def _create_trace_directory(self) -> Path:
@@ -51,8 +61,9 @@ async def evaluate_browser_use_agent(
     runs: int,
     max_steps: int = 100,
     output_root: str | Path = Path("evaluations") / "browser-use",
+    final_check: BrowserUseFinalCheck | None = None,
 ) -> AgentEvaluation:
-    _validate_inputs(agent_factory, task, runs, max_steps)
+    _validate_inputs(agent_factory, task, runs, max_steps, final_check)
     root = _safe_output_root(output_root)
     evaluation_id, output_dir = _create_evaluation_directory(root)
     evaluation_started_at = datetime.now(UTC)
@@ -68,6 +79,7 @@ async def evaluate_browser_use_agent(
             run_number=run_number,
             output_dir=output_dir,
             seen_agents=seen_agents,
+            final_check=final_check,
         )
         evaluation_runs.append(run)
         sessions[run_number] = session
@@ -100,6 +112,7 @@ async def _evaluate_attempt(
     run_number: int,
     output_dir: Path,
     seen_agents: list[object],
+    final_check: BrowserUseFinalCheck | None,
 ) -> tuple[EvaluationRun, ActionSession]:
     relative_trace = Path("runs") / f"{run_number:03d}"
     trace_directory = output_dir / relative_trace
@@ -125,7 +138,12 @@ async def _evaluate_attempt(
                     "agent_factory must return a fresh Agent for every run"
                 )
             seen_agents.append(agent)
-            observer = _FixedTraceObservedAgent(agent, task, trace_directory)
+            observer = _FixedTraceObservedAgent(
+                agent,
+                task,
+                trace_directory,
+                final_check,
+            )
             error_phase = "run"
             await observer.run(max_steps=max_steps)
             error_phase = None
@@ -223,11 +241,14 @@ def _validate_inputs(
     task: object,
     runs: object,
     max_steps: object,
+    final_check: object,
 ) -> None:
     if not callable(agent_factory):
         raise TypeError("agent_factory must be callable")
     if not isinstance(task, str) or not task.strip():
         raise ValueError("task cannot be empty")
+    if final_check is not None and not callable(final_check):
+        raise TypeError("final_check must be callable or None")
     for name, value in (("runs", runs), ("max_steps", max_steps)):
         if (
             not isinstance(value, int)

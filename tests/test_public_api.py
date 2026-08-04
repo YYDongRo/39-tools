@@ -10,6 +10,8 @@ from agent_devtools.async_tool_recorder import (
 from agent_devtools.failure import FailureCategory
 from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
 from agent_devtools.integrations.browser_use import (
+    BrowserUseFinalCheck,
+    BrowserUseFinalStateCheck,
     ObservedBrowserUseAgent,
     observe_browser_use_agent,
 )
@@ -177,6 +179,8 @@ def test_playwright_public_api_exports_supported_types() -> None:
 def test_browser_use_public_api_exports_supported_types() -> None:
     expected_exports = {
         "AgentEvaluation": AgentEvaluation,
+        "BrowserUseFinalCheck": BrowserUseFinalCheck,
+        "BrowserUseFinalStateCheck": BrowserUseFinalStateCheck,
         "EvaluationRunStatus": EvaluationRunStatus,
         "ObservedBrowserUseAgent": ObservedBrowserUseAgent,
         "evaluate_browser_use_agent": evaluate_browser_use_agent,

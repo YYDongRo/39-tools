@@ -121,6 +121,32 @@ agent.assert_last_task_passed()
 It raises `AssertionError` for failed or unverified runs and includes the report
 path.
 
+### Optional deterministic final checks
+
+The Browser Use judge is useful, but it is still model-based. For a stable
+final result, provide bounded checks over the final URL or page title:
+
+```python
+from agent_devtools.browser_use import BrowserUseFinalStateCheck
+
+agent = observe_browser_use_agent(
+    raw_agent,
+    task,
+    final_check=BrowserUseFinalStateCheck(
+        url_contains="/products/wireless-headphones",
+        title_contains="Wireless Headphones",
+    ),
+)
+```
+
+The deterministic checks become the report's final result. The Browser Use
+judge remains available under collapsed verification evidence, so a disagreement
+is visible without making the main report noisy. The check is optional; without
+it, the existing Browser Use judge behavior is unchanged. Custom synchronous or
+asynchronous checks may also be supplied when URL and title are insufficient;
+they receive the bounded final state dictionary and must return a
+`VerificationResult`.
+
 ## Lifecycle behavior
 
 The observer preserves existing Browser Use step callbacks and caller-provided

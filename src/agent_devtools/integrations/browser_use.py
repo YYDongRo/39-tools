@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from inspect import isawaitable
 from pathlib import Path
 from time import monotonic_ns
-from typing import Generic, TypeVar
+from typing import Awaitable, Generic, TypeAlias, TypeVar
 from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
@@ -21,6 +21,10 @@ from agent_devtools.verification import VerificationResult
 
 
 AgentT = TypeVar("AgentT")
+BrowserUseFinalCheck: TypeAlias = Callable[
+    [dict[str, object]],
+    VerificationResult | Awaitable[VerificationResult],
+]
 
 _READ_ONLY_ACTIONS = {
     "done",
@@ -36,6 +40,86 @@ _READ_ONLY_ACTIONS = {
     "search_page",
     "wait",
 }
+
+
+@dataclass(frozen=True)
+class BrowserUseFinalStateCheck:
+    """Check bounded final browser state without requiring an LLM."""
+
+    url_contains: str | None = None
+    title_contains: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.url_contains is None and self.title_contains is None:
+            raise ValueError(
+                "at least one of url_contains or title_contains is required"
+            )
+        for field_name, value in (
+            ("url_contains", self.url_contains),
+            ("title_contains", self.title_contains),
+        ):
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{field_name} cannot be empty")
+
+    def __call__(self, state: dict[str, object]) -> VerificationResult:
+        url = state.get("url")
+        title = state.get("title")
+        checks: list[dict[str, object]] = []
+
+        if self.url_contains is not None:
+            url_value = url if isinstance(url, str) else "<missing>"
+            passed = self.url_contains in url_value
+            checks.append(
+                {
+                    "name": "url_contains",
+                    "passed": passed,
+                    "expected_state": f"URL contains {self.url_contains!r}",
+                    "observed_state": f"URL is {url_value!r}",
+                }
+            )
+
+        if self.title_contains is not None:
+            title_value = title if isinstance(title, str) else "<missing>"
+            passed = self.title_contains in title_value
+            checks.append(
+                {
+                    "name": "title_contains",
+                    "passed": passed,
+                    "expected_state": (
+                        f"title contains {self.title_contains!r}"
+                    ),
+                    "observed_state": f"title is {title_value!r}",
+                }
+            )
+
+        passed = all(check["passed"] is True for check in checks)
+        failed_checks = [
+            str(check["expected_state"])
+            for check in checks
+            if check["passed"] is not True
+        ]
+        return VerificationResult(
+            expected_state="all configured final browser checks pass",
+            observed_state=(
+                "all configured final browser checks pass"
+                if passed
+                else "; ".join(
+                    str(check["observed_state"]) for check in checks
+                )
+            ),
+            passed=passed,
+            failure_reason=(
+                None
+                if passed
+                else "Final browser state did not satisfy: "
+                + "; ".join(failed_checks)
+            ),
+            evidence={
+                "verification_type": "browser-use-final-state",
+                "state": dict(state),
+                "checks": checks,
+            },
+        )
 
 
 @dataclass
@@ -162,11 +246,19 @@ class _BrowserUseRecorder:
         self.session.verification = None
         self._persist()
 
+    async def final_state(self) -> dict[str, object]:
+        if self._browser_session is None:
+            raise RuntimeError("Browser Use browser session is not attached")
+        browser_state = await self._browser_session.get_browser_state_summary()
+        return _page_state(browser_state)
+
     def finish(
         self,
         history: object | None,
         *,
         run_error: BaseException | None = None,
+        deterministic_verification: VerificationResult | None = None,
+        deterministic_error_type: str | None = None,
     ) -> None:
         if run_error is not None:
             self.session.verification_source = "browser-use"
@@ -177,7 +269,39 @@ class _BrowserUseRecorder:
             self._persist()
             return
 
+        if deterministic_error_type is not None:
+            self.session.verification_source = "browser-use:deterministic"
+            self.session.verification_note = (
+                "Deterministic final checks could not run "
+                f"({deterministic_error_type})."
+            )
+            self.session.verification = None
+            self._persist()
+            return
+
         judgement = _judgement(history)
+        judge_verification = _judge_verification(self.session.goal, judgement)
+        if deterministic_verification is not None:
+            evidence = dict(deterministic_verification.evidence)
+            if judge_verification is not None:
+                evidence["browser_use_judge"] = {
+                    "passed": judge_verification.passed,
+                    "observed_state": judge_verification.observed_state,
+                    "failure_reason": judge_verification.failure_reason,
+                }
+            self.session.verification_source = "browser-use:deterministic"
+            self.session.verification_note = None
+            self.session.verification = VerificationResult(
+                expected_state=deterministic_verification.expected_state,
+                observed_state=deterministic_verification.observed_state,
+                passed=deterministic_verification.passed,
+                evidence=evidence,
+                failure_reason=deterministic_verification.failure_reason,
+                failure_category=deterministic_verification.failure_category,
+            )
+            self._persist()
+            return
+
         if judgement is None:
             self.session.verification_source = "browser-use"
             self.session.verification_note = (
@@ -187,39 +311,16 @@ class _BrowserUseRecorder:
             self._persist()
             return
 
-        verdict = judgement.get("verdict")
-        if not isinstance(verdict, bool):
+        if judge_verification is None:
             self.session.verification_source = "browser-use:judge"
             self.session.verification_note = (
                 "Browser Use returned an invalid final task judgment."
             )
             self._persist()
             return
-
-        reasoning = _optional_text(judgement.get("reasoning"))
-        provider_failure = _optional_text(judgement.get("failure_reason"))
-        observed_state = reasoning or (
-            "Browser Use judged the task successful."
-            if verdict
-            else "Browser Use judged the task unsuccessful."
-        )
-        failure_reason = None
-        if not verdict:
-            failure_reason = provider_failure or observed_state
-
         self.session.verification_source = "browser-use:judge"
         self.session.verification_note = None
-        self.session.verification = VerificationResult(
-            expected_state=self.session.goal or "Complete the requested task",
-            observed_state=observed_state,
-            passed=verdict,
-            evidence={
-                "judge": "browser-use",
-                "impossible_task": judgement.get("impossible_task") is True,
-                "reached_captcha": judgement.get("reached_captcha") is True,
-            },
-            failure_reason=failure_reason,
-        )
+        self.session.verification = judge_verification
         self._persist()
 
     async def _capture_screenshot(self, browser_state: object) -> object:
@@ -257,6 +358,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         output_root: str | Path = Path("trace") / "browser-use",
         *,
         print_summary: bool = True,
+        final_check: BrowserUseFinalCheck | None = None,
     ) -> None:
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal cannot be empty")
@@ -264,6 +366,8 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             raise TypeError("agent must provide a callable async run method")
         if not isinstance(print_summary, bool):
             raise TypeError("print_summary must be a bool")
+        if final_check is not None and not callable(final_check):
+            raise TypeError("final_check must be callable or None")
         if not hasattr(agent, "register_new_step_callback"):
             raise TypeError("agent must be a compatible Browser Use Agent")
         if not hasattr(agent, "directly_open_url"):
@@ -293,6 +397,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         self.goal = goal
         self.output_root = Path(output_root)
         self.print_summary = print_summary
+        self.final_check = final_check
         self.last_trace: _BrowserUseRecorder | None = None
         self._active_trace: _BrowserUseRecorder | None = None
         self._active = False
@@ -341,6 +446,8 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
 
         history: object | None = None
         run_error: BaseException | None = None
+        deterministic_verification: VerificationResult | None = None
+        deterministic_error_type: str | None = None
         try:
             result = self.agent.run(  # type: ignore[attr-defined]
                 *args,
@@ -355,7 +462,25 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             run_error = error
             raise
         finally:
-            trace.finish(history, run_error=run_error)
+            if run_error is None and self.final_check is not None:
+                try:
+                    state = await trace.final_state()
+                    result = self.final_check(state)
+                    if isawaitable(result):
+                        result = await result
+                    if not isinstance(result, VerificationResult):
+                        raise TypeError(
+                            "final_check must return VerificationResult"
+                        )
+                    deterministic_verification = result
+                except Exception as error:
+                    deterministic_error_type = type(error).__name__
+            trace.finish(
+                history,
+                run_error=run_error,
+                deterministic_verification=deterministic_verification,
+                deterministic_error_type=deterministic_error_type,
+            )
             if self.print_summary:
                 print(format_session_summary(trace.session, trace.report_path))
             self._active_trace = None
@@ -422,12 +547,14 @@ def observe_browser_use_agent(
     output_root: str | Path = Path("trace") / "browser-use",
     *,
     print_summary: bool = True,
+    final_check: BrowserUseFinalCheck | None = None,
 ) -> ObservedBrowserUseAgent[AgentT]:
     return ObservedBrowserUseAgent(
         agent,
         goal,
         output_root,
         print_summary=print_summary,
+        final_check=final_check,
     )
 
 
@@ -572,6 +699,36 @@ def _judgement(history: object | None) -> dict[str, object] | None:
     return None
 
 
+def _judge_verification(
+    goal: str | None,
+    judgement: dict[str, object] | None,
+) -> VerificationResult | None:
+    if judgement is None:
+        return None
+    verdict = judgement.get("verdict")
+    if not isinstance(verdict, bool):
+        return None
+    reasoning = _optional_text(judgement.get("reasoning"))
+    provider_failure = _optional_text(judgement.get("failure_reason"))
+    observed_state = reasoning or (
+        "Browser Use judged the task successful."
+        if verdict
+        else "Browser Use judged the task unsuccessful."
+    )
+    failure_reason = None if verdict else provider_failure or observed_state
+    return VerificationResult(
+        expected_state=goal or "Complete the requested task",
+        observed_state=observed_state,
+        passed=verdict,
+        evidence={
+            "judge": "browser-use",
+            "impossible_task": judgement.get("impossible_task") is True,
+            "reached_captcha": judgement.get("reached_captcha") is True,
+        },
+        failure_reason=failure_reason,
+    )
+
+
 def _failure_category(reason: str | None) -> FailureCategory:
     if reason is not None and "timeout" in reason.lower():
         return FailureCategory.TIMEOUT
@@ -587,6 +744,8 @@ def _json_safe(value: object) -> object:
 
 
 __all__ = [
+    "BrowserUseFinalCheck",
+    "BrowserUseFinalStateCheck",
     "ObservedBrowserUseAgent",
     "observe_browser_use_agent",
 ]

@@ -24,6 +24,8 @@ trace with:
 - sequential repeated-run Browser Use evaluation with fresh Agents, preserved
   per-run traces, empirical pass-rate statistics, trajectory divergence, and a
   static aggregate stability report.
+- optional deterministic Browser Use final-state checks for URL/title
+  components, with the framework judge retained as supporting evidence.
 
 The original one-action MVP is complete. Current work focuses on making this
 browser-agent debugging workflow useful, understandable, and easy to adopt.
