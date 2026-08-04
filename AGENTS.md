@@ -1,311 +1,298 @@
-# Project Identity
+# Agent DevTools Development Guide
 
-Agent DevTools is a developer-tooling project for computer-use agents.
+This repository is building **Agent DevTools**, an open-source, local-first
+reliability layer for teams that develop and operate computer-use agents.
 
-Mission:
-Make computer-use agents observable, debuggable, verifiable, and eventually replayable.
+The product helps a developer answer, with evidence:
 
-This project is NOT:
+- What did the agent ask the computer to do?
+- What changed before and after each action?
+- Did the action execute, and if not, why?
+- Did the complete user task succeed?
+- Does the same task fail in a repeatable way?
 
-- a general AI agent;
-- an LLM framework;
-- a coding agent;
-- a replacement for OpenClaw, Google ADK, or browser-use;
-- a model-training project.
+The long-term direction is a product that can serve both an individual engineer
+and a company team. The current repository is the open-source core and local
+workflow, not yet a hosted enterprise service.
 
-It is an action-level reliability and debugging layer that existing computer-use agents can integrate with.
+## Product boundary
 
-# Target Users
+Agent DevTools observes, records, verifies, analyzes, and evaluates an existing
+agent. The agent still decides what to do.
 
-The main users are engineers and researchers building agents that:
+This project is not:
 
-- click;
-- type;
-- scroll;
-- navigate browser or desktop interfaces;
-- interact with visual UI state.
+- a general-purpose computer-use agent;
+- an LLM framework or model-training system;
+- a replacement for Browser Use, Playwright, or another agent runtime;
+- a universal interceptor for arbitrary browser, desktop, or Android calls;
+- a hosted dashboard, trace database, or collaboration service yet.
 
-The tool should help them answer:
+Do not claim a capability only because it is on the roadmap. Claims must be
+supported by source code, tests, and user-facing documentation.
 
-- What action ran?
-- What did the agent see before and after?
-- Did the action actually succeed?
-- If it failed, why?
-- Can the failure be reproduced or replayed?
+## Product positioning
 
-# Long-Term Architecture
+Keep the message narrow and evidence-based:
 
-```text
-Computer-use agent or test runner
-    ↓
-Integration adapter
-    ↓
-Action recorder
-    ↓
-ActionRecord / ActionSession
-    ↓
-Artifacts
-    ├── screenshots
-    ├── JSON traces
-    └── HTML timeline
-    ↓
-Verification
-    ↓
-Failure analysis
-    ↓
-Replay and evaluation
+> Action-level visual debugging and task reliability evaluation for Browser Use
+> and Playwright agents.
+
+The differentiating workflow is failure-oriented debugging, not generic event
+collection:
+
+```
+run the agent normally
+    -> capture action evidence
+    -> show before/after state
+    -> separate execution from task outcome
+    -> compare repeated runs
+    -> explain the earliest useful divergence
 ```
 
-The agent decides what it wants to do.
-Agent DevTools records, verifies, explains, and eventually replays what happened.
+Do not add features merely because another observability product has them. A
+new feature should make an agent failure easier to understand, reproduce, or
+prevent.
 
-# Core Product Areas
+## Users and supported workflows
 
-1. Action observability
-   Record action type, arguments, timing, status, errors, and artifacts.
+Design for three user groups:
 
-2. Session tracing
-   Group ordered actions into a complete execution timeline.
+1. **Individual developers and researchers** who need a local report while
+   building an agent.
+2. **Agent teams** who need repeatable evaluations, failure patterns, and CI
+   gates for task reliability.
+3. **Platform and QA engineers** who may eventually need shared storage,
+   access control, retention, and integrations across many agent projects.
 
-3. Verification
-   Compare expected UI state with observed UI state after an action.
+The current supported workflows are:
 
-4. Failure analysis
-   Classify failures such as:
-   - wrong target;
-   - blocked target;
-   - timeout;
-   - page not ready;
-   - layout change;
-   - operation error;
-   - verification mismatch.
+1. Wrap a supported Browser Use or Playwright agent once.
+2. Run its normal task without entering the task a second time when the
+   framework exposes it.
+3. Inspect the local JSON trace and static HTML report.
+4. Optionally run the same Browser Use task with fresh Agents and compare the
+   resulting trajectories.
+5. Use the explicit evaluation verdict as a local or CI quality gate.
 
-5. Replay
-   Inspect or reproduce recorded actions in a controlled environment.
+The intended future team workflow adds a secure export or hosted service, but
+that is a separate product layer and must not be assumed to exist in the local
+package.
 
-6. Integration
-   Eventually support adapters for systems such as Playwright-based agents,
-   browser-use, OpenClaw, and other computer-use runtimes.
+## Current implementation (verified in this repository)
 
-# Current State
+### Core observability
 
-The repository currently includes:
+- `ActionRecord` and `ActionStatus` store action type, arguments, timing,
+  screenshots, execution status, and failure information.
+- `ActionSession` and `SessionRecorder` preserve ordered trajectories, goals,
+  task verification, final outcomes, and resumable session state.
+- Versioned JSON persistence uses safe relative paths and atomic writes.
+- Static action and session HTML reports show screenshots, compact state,
+  action checks, task checks, and bounded browser/runtime evidence.
+- Failure categories cover explicit timeout, operation, verification, and
+  unknown signals. Prefer evidence over inferred explanations.
 
-- `ActionRecord` and `ActionStatus`;
-- action execution recording;
-- optional post-action verification orchestration in action and session recording;
-- versioned JSON serialization and loading;
-- atomic JSON persistence;
-- `ActionSession`;
-- persisted session goals, task-level verification, and final task outcomes;
-- `SessionRecorder`, session resumption, and automatic task verification on
-  successful context-manager exit;
-- static HTML action and session reports with derived final outcomes;
-- screenshot paths in action records and before-and-after capture through integration callbacks;
-- Playwright verified-success, failure, and multi-action browser demonstrations;
-- automated real-browser integration coverage for a successful click action;
-- a minimal reusable contract for deterministic text-state verification;
-- optional verification results persisted with action records;
-- general action observations persisted separately from verification results;
-- conservative structured failure categories for timeouts, operation errors,
-  verification mismatches, and unknown failures;
-- static session summaries with a prominent final result, action execution,
-  failure, action-check coverage, and failure-category counts;
-- controlled framework-independent replay for validated click actions, with
-  real-browser success and timeout coverage and a controlled failure demo;
-- a Playwright click adapter that records minimal element-state evidence and
-  diagnoses missing, ambiguous, hidden, and disabled targets;
-- Playwright fill failure diagnostics for missing, ambiguous, hidden, disabled,
-  and non-editable targets;
-- structured Playwright exact-text and element-visibility expectations with
-  automatic waiting;
-- automatic post-fill input-value observations and optional exact-value
-  expectations;
-- automatic before-and-after page URL observations for supported Playwright
-  actions, displayed compactly in HTML reports;
-- a Playwright action entry point for traced navigate, click, fill, press, and
-  scroll
-  trajectories;
-- a single recorded Playwright executor that owns session and screenshot
-  lifecycle for supported actions;
-- a generic synchronous tool wrapper for recording public method calls with a
-  single setup point;
-- a generic sequential async tool wrapper that awaits tool execution and accepts
-  synchronous or asynchronous screenshot, observation, and task-verification
-  callbacks;
-- optional automatic before-and-after structured state observations with
-  deterministic changed paths and non-fatal observer errors;
-- deterministic session analysis for repeated successful actions with unchanged
-  structured state, shown as non-outcome-changing warnings in HTML reports;
-- a Playwright tool wrapper that automatically captures screenshots and small
-  page-state metadata without collecting page text, form values, or full DOM;
-- bounded action-scoped Playwright `pageerror`, `console.error`, failed-request,
-  and HTTP 4xx/5xx evidence for synchronous and asynchronous tools, with
-  sanitized event URLs and prioritized likely-cause findings;
-- composable synchronous and asynchronous Playwright task checks for URL
-  components, element visibility, exact or contained text, and scalar DOM
-  properties, with automatic verification and pytest-friendly assertions;
-- synchronous and asynchronous observed-agent entry points that capture the
-  user request as the goal, inject recorded Playwright tools, preserve the
-  agent result, create unique run directories, and retain reports on errors;
-- optional synchronous and asynchronous OpenAI and Gemini expectation generation that
-  converts the captured request into bounded data-only Playwright task checks,
-  preserves provider failures as unverified report metadata, and never blocks
-  the agent run;
-- a bounded Gemini function-calling adapter and local real-browser demo that
-  records model-selected navigate, fill, and click actions without recording
-  read-only observations as computer actions;
-- optional final-state Gemini assessment that automatically compares the
-  captured request with bounded final URL, title, heading, and rendered-text
-  evidence after an observed agent returns;
-- an optional Browser Use 0.13.x observer that wraps an existing agent once,
-  records state-changing steps with screenshots, prevents unobserved initial
-  actions, preserves existing callbacks, reads the task from `agent.task` when
-  no duplicate goal is supplied, maps the framework judge into task
-  verification, and reports bounded provider-startup failures;
-- Browser Use planning and file-management operations are retained as
-  collapsed auxiliary events instead of inflating the browser action timeline;
-- sequential repeated-run Browser Use stability evaluation with fresh Agent
-  lifecycle ownership, numbered per-run traces, versioned aggregate JSON,
-  deterministic trajectory divergence, conservative failure grouping, and a
-  static aggregate HTML report;
-- optional deterministic Browser Use final-state checks for URL and title,
-  with the model judge retained as supporting evidence;
-- stable core and Playwright public import paths, plus a repeatable quickstart;
-- an optional human-readable TOML configuration for Browser Use recording,
-  screenshots, summaries, report opening, and trace output;
-- wheel and source-distribution build validation with Python 3.11 through 3.14
-  compatibility coverage;
-- a bounded observe-decide-act Playwright loop with typed action decisions and
-  automatic structured expectation verification;
-- a deterministic local video-search agent trajectory demonstration;
-- an optional live YouTube trajectory demonstration for manual testing;
-- unit tests for the foundational modules.
-- MIT-licensed packaging and automated GitHub Actions test coverage.
+### Integrations
 
-Action and task verification results are stored in JSON, displayed in HTML
-reports, and included in derived action and session outcomes.
-Replay does not support complete sessions or action types other than click.
-Browser Use 0.13.x is the first official third-party agent integration. Other
-agent frameworks still require dedicated adapters.
-The observed-agent MVP requires an agent entry point shaped like
-`run(user_request, *, tools=...)`; other framework call shapes need adapters.
-Async tool recording intentionally rejects overlapping actions and uses
-synchronous local writes for JSON and HTML persistence.
-Action and session recorders can run caller-provided verification callbacks
-before persistence. The model-agnostic core does not infer intent. The optional
-OpenAI and Gemini Playwright integrations can propose conservative final-state
-checks from the captured request; generated checks are hypotheses and may remain
-unverified when context is insufficient.
-Action-level Playwright expectations support exact text and input values, plus
-single-element visibility. Task checks additionally support component URL
-matching, contained text, and scalar DOM property equality.
-Automatic trajectory analysis is intentionally limited to conservative
-stuck-loop and explicit browser/runtime error warnings and does not infer
-whether the user's task is correct.
-Final-state AI assessment is optional and probabilistic. It is stored and
-displayed separately from deterministic check semantics, may remain unverified,
-and receives bounded visible page text that can still be sensitive.
-Browser Use final-state checks are optional and currently cover URL/title
-contains checks plus custom callbacks over bounded final state.
-Browser event evidence includes failed requests and HTTP 4xx/5xx responses but
-does not include successful request timelines, request or response bodies,
-headers, or cookies.
+- Playwright supports traced `navigate`, `click`, `fill`, `press`, and
+  `scroll` flows plus element diagnostics, state observations, task checks,
+  and bounded page/console/network findings.
+- Browser Use 0.13.x has an observer that wraps an existing Agent once,
+  records state-changing steps, keeps auxiliary planning events collapsed,
+  preserves normal callbacks, and maps the framework judge into task evidence.
+- Browser Use repeated evaluation creates a fresh Agent per run, retains a
+  normal trace for every attempt, computes conservative divergences and failure
+  groups, and writes versioned aggregate JSON and static HTML.
+- Optional OpenAI/Gemini expectation and final-state integrations remain
+  bounded, provider-specific, and probabilistic. They must not silently
+  replace deterministic verification semantics.
+- Replay is intentionally limited to validated click actions; it is not full
+  session replay or recovery.
 
-# Near-Term Roadmap
+### User-facing entry points
 
-Follow this order unless the user explicitly changes direction:
+- Display name: **Agent DevTools**.
+- Distribution name: `39-tools`.
+- Python import name: `agent_devtools`.
+- Browser Use observer: `observe_browser_use_agent(...)`.
+- Repeated evaluator: `evaluate_browser_use_agent(...)`.
+- Product-shaped example: `examples/browser_use_evaluation.py`.
+- Human-readable config: `agent_devtools.toml`, based on
+  `agent_devtools.example.toml`.
 
-Milestone 1:
-Automated real-browser integration coverage. Complete for a successful click action.
+Keep these names stable unless a deliberate compatibility plan is written.
 
-Milestone 2:
-A minimal verification contract. Complete for deterministic text-state comparisons:
+## Architecture
 
-- expected state;
-- observed state;
-- pass/fail result;
-- evidence;
-- failure reason.
+```
+Browser Use / Playwright / future agent runtime
+                    |
+          integration adapter or observer
+                    |
+          ActionRecord + ActionSession
+                    |
+       screenshots | JSON trace | HTML report
+                    |
+       action checks + final task verification
+                    |
+       failure analysis + repeated-run evaluation
+                    |
+        local developer/CI result (current)
+                    |
+       secure exporter / team service (future)
+```
 
-Milestone 3:
-Structured failure categories and failure summaries. Complete for categories
-supported by explicit exception and verification signals.
+Keep framework-specific behavior in `src/agent_devtools/integrations/` and keep
+the core models, serialization, analysis, and reports framework-agnostic.
 
-Milestone 4:
-A developer-friendly trace inspector or improved timeline. Complete for static
-session overviews and failure-category counts.
+## Result semantics
 
-Milestone 5:
-Controlled replay of supported browser actions. Complete for synchronous click
-actions with explicit selector and timeout validation.
+Never collapse these levels into one boolean:
 
-Milestone 6:
-One external agent integration adapter. Complete for Browser Use 0.13.x with
-one-time wrapping, action screenshots, final-judge mapping, and real-browser
-integration coverage.
+- **Execution status**: did a particular operation run or raise an error?
+- **Action verification**: did that operation produce its expected local effect?
+- **Final task outcome**: did the complete trajectory satisfy the request?
+- **Evaluation run status**: was one repeated attempt passed, failed,
+  unverified, or errored?
 
-Do not jump directly to dashboards, LLM integration, OpenClaw integration,
-desktop automation, or complex replay before the foundations are tested.
+Explicit deterministic checks are authoritative for the fields they cover.
+LLM judges can provide supporting evidence or hypotheses, but missing context
+must remain `unverified`, not be presented as success.
 
-# Engineering Principles
+## Privacy and security rules
 
-- Keep the core package model- and framework-agnostic.
-- Prefer evidence over guesses.
-- Treat screenshots, action metadata, and observed state as debugging evidence.
-- Keep milestones small and independently demonstrable.
+Treat task text, typed values, arguments, URLs, exception details, and
+screenshots as potentially sensitive.
+
+- Never put API keys in source, TOML, tests, reports, or committed examples.
+- Keep provider credentials in environment variables or the provider's normal
+  secret store.
+- Preserve metadata redaction defaults and test common credential-shaped keys,
+  tokens, and URL query values when changing Browser Use recording.
+- Screenshots are not automatically redacted; documentation must say so.
+- Sanitize persisted exception details and avoid storing hidden model reasoning.
+- Reject absolute or parent-traversing stored paths where the schema requires
+  safe relative paths.
+- Do not add uploads, hosted storage, authentication, or team sharing without
+  an explicit data-retention and access-control design.
+
+## Open-source core and future company product
+
+Keep the open-source package useful on its own:
+
+- local traces and reports;
+- stable schemas and public Python APIs;
+- deterministic tests and sample artifacts;
+- Browser Use and Playwright adapters;
+- CI-friendly machine-readable verdicts.
+
+Treat these as future, separately designed layers rather than hidden coupling
+in the core recorder:
+
+- shared project/run storage;
+- organization and project boundaries;
+- authentication, roles, SSO, and audit logs;
+- retention, deletion, encryption, and regional data controls;
+- searchable run history and team annotations;
+- hosted APIs, dashboards, and enterprise support.
+
+Before implementing a hosted layer, define its ingestion contract, threat
+model, retention behavior, and migration path from local JSON. Do not make the
+local package require a server or provider account.
+
+## Engineering principles
+
+- Prefer observed evidence over guesses.
+- Keep the core model- and framework-agnostic.
+- Keep adapters thin and explicit; do not monkey-patch arbitrary runtimes.
+- Preserve backward compatibility for saved trace and evaluation schemas where
+  practical. Version any incompatible change.
+- Keep repeated evaluations sequential and fresh unless concurrency is a
+  deliberate, tested feature; do not add hidden retries.
+- Use deterministic local pages and fake agents for unit tests.
+- Keep optional providers and browser dependencies out of the core install.
 - Reuse existing public APIs before adding abstractions.
-- Avoid premature abstraction and unrelated refactoring.
-- Do not silently expand scope.
-- Preserve backward compatibility for saved trace schemas where practical.
-- Treat screenshots, typed text, action arguments, and exception messages as potentially sensitive.
-- Keep dependencies minimal.
-- Use deterministic local HTML pages for browser integration tests where possible.
+- Keep reports concise, readable, and useful during failure triage.
+- Update README/docs whenever exposed behavior or setup changes.
+- Keep generated artifacts deterministic and out of normal temporary output.
+- Avoid broad refactors, speculative abstractions, and unrelated UI work.
 
-# Task Workflow
+## Development workflow
 
 For every implementation request:
 
-1. Inspect the repository, relevant documentation, Git status, and existing tests.
-2. State the smallest implementation plan before editing.
-3. Implement only the requested milestone.
-4. Add or update focused tests.
-5. Run the relevant focused tests.
-6. Run the full unit test suite.
-7. Report:
-   - files changed;
-   - behavior added;
-   - tests run and results;
-   - limitations;
-   - one recommended next milestone.
-8. Do not commit or push unless explicitly requested.
+1. Inspect the repository, relevant docs, current Git status, and existing
+   tests.
+2. State the smallest plan before editing; communicate with the user in the
+   requested language (currently Chinese).
+3. Implement one bounded milestone and preserve unrelated local changes.
+4. Add focused tests for new behavior, including failure and privacy cases.
+5. Run focused tests, then the full suite and build checks appropriate to the
+   changed area.
+6. Review `git diff --check`, generated paths, and documentation.
+7. Report files changed, behavior, commands/results, limitations, and one
+   next milestone.
 
-# Definition of Done
+Useful checks from the project root:
 
-A task is complete only when:
+```bash
+uv run pytest
+uv lock --check
+uv build
+git diff --check
+```
 
-- behavior is implemented;
-- relevant tests pass;
-- existing tests still pass;
-- generated artifacts use temporary or ignored directories;
-- documentation is updated only when behavior exposed to users changes;
-- no unrelated files are modified.
+Use the project's normal WSL environment when Windows virtual-environment
+permissions prevent `uv` from recreating `.venv`. Browser Use and Playwright
+integration tests are optional checks when their extras and browsers are
+available; core tests must not require API keys or network access.
 
-# Commit Convention
+## Near-term roadmap
+
+Work in this order unless the user explicitly changes direction:
+
+1. **Core contract hardening**: stabilize action/session/evaluation schemas,
+   public imports, redaction, reports, and deterministic sample artifacts.
+2. **Developer adoption**: keep the first-run flow short, make CI artifacts
+   obvious, and validate supported Browser Use/Playwright versions.
+3. **Adapter contract**: document and test a small integration contract so new
+   agent runtimes can be added without changing the core recorder.
+4. **Reliability workflows**: improve divergence evidence, failure grouping,
+   and controlled replay only when it answers a concrete debugging need.
+5. **Team foundation**: design export, run identity, retention, and access
+   boundaries while keeping local mode fully functional.
+6. **Optional hosted product**: implement secure shared storage and team UX only
+   after the local data contract and privacy model are stable.
+
+Do not jump directly to a hosted dashboard, universal desktop interception,
+Android support, full replay, automatic recovery, or model training.
+
+## Definition of done
+
+A change is complete only when:
+
+- the behavior is implemented and reachable through a documented API or
+  example;
+- focused and existing tests pass;
+- generated reports use safe, deterministic paths;
+- security/privacy implications are documented;
+- no unrelated files or public APIs are changed accidentally;
+- the user can understand how to run and inspect the result.
+
+## Commit convention
 
 Use Semantic Commit Messages:
 
-```text
+```
 <type>(<scope>): <subject>
 ```
 
-Common types:
+Use concise lowercase subjects. When the user's standing instruction authorizes
+automatic local commits, include:
 
-- feat
-- fix
-- test
-- docs
-- refactor
-- chore
+```
+Signed-off-by: Roy <157320193+YYDongRo@users.noreply.github.com>
+```
 
-Keep commit subjects lowercase and concise.
+Never push automatically; pushing requires a separate explicit request.
