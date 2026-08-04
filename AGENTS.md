@@ -123,6 +123,8 @@ package.
 - Generic agent observer: `observe_agent(...)` and `observe_async_agent(...)`.
 - Repeated evaluator: `evaluate_browser_use_agent(...)`.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
+- Deterministic real-browser boundary demo:
+  `examples/generic_agent_browser.py`.
 - Human-readable config: `agent_devtools.toml`, based on
   `agent_devtools.example.toml`.
 

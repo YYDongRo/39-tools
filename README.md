@@ -234,6 +234,16 @@ recorders. Async agents use `observe_async_agent(...)`. This is an explicit
 adapter boundary, not a promise to intercept arbitrary direct desktop or
 browser calls.
 
+To try this boundary with a real local browser and no model API key:
+
+```bash
+uv run --extra browser python examples/generic_agent_browser.py --headed
+```
+
+The deterministic demo opens `examples/browser_click.html`, records a
+navigation and click, verifies the final status text, and prints the report
+path. Remove `--headed` for a headless run.
+
 ## Current scope and alpha status
 
 Agent DevTools is an early alpha focused on Browser Use and Playwright agents.
