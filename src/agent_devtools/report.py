@@ -36,6 +36,19 @@ _FIELD_LABELS = {
     "target_enabled": "Enabled",
     "target_visible": "Visible",
 }
+_ARGUMENT_LABELS = {
+    "url": "Target URL",
+    "selector": "Target",
+    "text": "Text",
+    "key": "Key",
+    "button": "Button",
+    "new_tab": "New tab",
+    "index": "Element index",
+    "timeout_ms": "Timeout",
+    "delta_x": "Horizontal scroll",
+    "delta_y": "Vertical scroll",
+}
+_INTERNAL_ARGUMENT_KEYS = {"browser_use_step"}
 _FAILURE_SUMMARIES = {
     FailureCategory.TIMEOUT: "The action timed out.",
     FailureCategory.OPERATION_ERROR: "The action returned an operation error.",
@@ -182,9 +195,10 @@ def _verification_result_section(
     summarize_checks: bool = False,
 ) -> str:
     status = "passed" if verification.passed else "failed"
-    is_ai_assessment = (
-        verification.evidence.get("assessment_type") == "ai_final_state"
-    )
+    is_ai_assessment = verification.evidence.get("assessment_type") in {
+        "ai_final_state",
+        "ai_trajectory",
+    }
     evidence_section = _verification_evidence_section(
         verification,
         summarize_check=summarize_checks,
@@ -208,8 +222,10 @@ def _verification_result_section(
         assessment_summary = ""
         if is_ai_assessment:
             assessment_summary = (
-                '<p class="assessment-summary">'
-                f"{escape(verification.observed_state)}</p>"
+                '<details class="assessment-summary">'
+                "<summary>Judge explanation</summary>"
+                f"<p>{escape(verification.observed_state)}</p>"
+                "</details>"
             )
         overview = f"""
         <div class="verification-heading">
@@ -459,6 +475,41 @@ def _key_value_grid(values: dict[str, object]) -> str:
     return f'<dl class="key-value-grid">{items}</dl>'
 
 
+def _arguments_content(arguments: object) -> str:
+    encoded_arguments = escape(
+        json.dumps(arguments, ensure_ascii=False, indent=2)
+    )
+    visible_arguments: dict[str, object] = {}
+    if isinstance(arguments, dict):
+        for key, value in arguments.items():
+            if not isinstance(key, str) or key in _INTERNAL_ARGUMENT_KEYS:
+                continue
+            label = _ARGUMENT_LABELS.get(key, key.replace("_", " ").title())
+            if label in visible_arguments:
+                label = f"{label} ({key})"
+            visible_arguments[label] = value
+
+    if visible_arguments:
+        items = "".join(
+            "<div><dt>"
+            f"{escape(key)}"
+            "</dt><dd>"
+            f"{_display_value(value)}"
+            "</dd></div>"
+            for key, value in visible_arguments.items()
+        )
+        summary = f'<dl class="key-value-grid">{items}</dl>'
+    else:
+        summary = '<p class="missing">No user-facing arguments.</p>'
+
+    return f"""
+        {summary}
+        <details class="technical-details">
+          <summary>Technical details</summary>
+          <pre>{encoded_arguments}</pre>
+        </details>""".strip()
+
+
 def _display_value(value: object) -> str:
     if value is None:
         return "—"
@@ -599,9 +650,6 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
     outcome = escape(action.outcome.value)
     display_status, display_label = _action_status(action)
     verification_status = _verification_label(action)
-    arguments = escape(
-        json.dumps(data["arguments"], ensure_ascii=False, indent=2)
-    )
     failure_section = ""
     failure_content = _failure_content(action)
     if failure_content:
@@ -651,6 +699,9 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       .raw-error {{ margin-top: 16px; }}
       .raw-error summary {{ cursor: pointer; font-weight: 700; }}
       .raw-error pre {{ margin-bottom: 0; }}
+      .technical-details {{ margin-top: 14px; }}
+      .technical-details summary {{ cursor: pointer; font-weight: 700; }}
+      .technical-details pre {{ margin: 10px 0 0; }}
       .verification {{ border: 1px solid #cbd5e1; }}
       .verification-failure {{ background: #fff1f2; border-radius: 8px;
                                margin-top: 20px; padding: 16px; }}
@@ -690,7 +741,7 @@ def write_action_html(action: ActionRecord, output_path: Path) -> None:
       </section>
       <section>
         <h2>Arguments</h2>
-        <pre>{arguments}</pre>
+        {_arguments_content(data["arguments"])}
       </section>{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
       <section class="screenshots">
 {_screenshot_panel("Before", data["screenshot_before"])}
@@ -709,9 +760,6 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
     execution_status = escape(str(data["status"]))
     display_status, display_label = _action_status(action)
     verification_status = _verification_label(action)
-    arguments = escape(
-        json.dumps(data["arguments"], ensure_ascii=False, indent=2)
-    )
     failure_section = ""
     failure_content = _failure_content(action)
     if failure_content:
@@ -765,7 +813,7 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               {page_url_details}
             </dl>
             <h3>Arguments</h3>
-            <pre>{arguments}</pre>{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
+            {_arguments_content(data["arguments"])}{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
             <div class="action-screenshots">{screenshot_section}
             </div>
           </div>
@@ -1152,18 +1200,19 @@ def write_session_html(
 
     if session.outcome is ActionOutcome.SUCCESS:
         result_title = "Successful"
-        result_detail = (
-            session.verification.observed_state
-            if session.verification is not None
-            else "The task completed successfully."
-        )
+        result_detail = "Final task check passed."
     elif session.outcome is ActionOutcome.FAILURE:
         result_title = "Failed"
-        result_detail = (
+        failure_reason = (
             session.verification.failure_reason
             if session.verification is not None
-            and session.verification.failure_reason is not None
-            else "The final task checks did not pass."
+            else None
+        )
+        result_detail = (
+            "Final task check failed: "
+            + _compact_console_text(failure_reason, limit=180)
+            if failure_reason
+            else "Final task check failed."
         )
     elif session.verification_source == "agent-run":
         result_title = "Agent run failed"
@@ -1443,6 +1492,9 @@ def write_session_html(
       .raw-error {{ margin-top: 16px; }}
       .raw-error summary {{ cursor: pointer; font-weight: 700; }}
       .raw-error pre {{ margin-bottom: 0; }}
+      .technical-details {{ margin-top: 14px; }}
+      .technical-details summary {{ cursor: pointer; font-weight: 700; }}
+      .technical-details pre {{ margin: 10px 0 0; }}
       .verification {{ background: white; border: 1px solid #cbd5e1;
                        border-radius: 12px; margin: 0 0 28px; padding: 22px; }}
       .action-card .verification {{ margin: 20px 0 0; }}
@@ -1457,8 +1509,10 @@ def write_session_html(
                                margin-top: 16px; padding: 16px; }}
       .verification-failure p {{ margin-bottom: 0; white-space: pre-wrap; }}
       .verification-check-list {{ margin-top: 20px; }}
-      .assessment-summary {{ color: #334155; font-size: 16px; line-height: 1.55;
-                             margin: 14px 0 0; }}
+      .assessment-summary {{ color: #334155; margin: 14px 0 0; }}
+      .assessment-summary summary {{ cursor: pointer; font-weight: 700; }}
+      .assessment-summary p {{ font-size: 16px; line-height: 1.55;
+                               margin: 10px 0 0; }}
       .assessment-evidence {{ margin-top: 18px; }}
       .assessment-evidence ul {{ color: #334155; line-height: 1.55;
                                  margin-bottom: 0; padding-left: 22px; }}

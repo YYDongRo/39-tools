@@ -119,6 +119,36 @@ def test_write_successful_action_report(tmp_path: Path) -> None:
     assert 'src="after.png"' in content
 
 
+def test_report_shows_friendly_arguments_and_collapses_raw_values(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="navigate",
+        arguments={
+            "url": "https://example.com",
+            "new_tab": False,
+            "browser_use_step": 1,
+        },
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    action_output = tmp_path / "action.html"
+    session_output = tmp_path / "session.html"
+
+    write_action_html(action, action_output)
+    write_session_html(ActionSession(actions=[action]), session_output)
+
+    for output_path in (action_output, session_output):
+        content = output_path.read_text(encoding="utf-8")
+        assert "Target URL" in content
+        assert "https://example.com" in content
+        assert "New tab" in content
+        assert '<summary>Technical details</summary>' in content
+        assert 'class="technical-details"' in content
+        assert "browser_use_step" in content
+
+
 def test_report_displays_changed_page_urls_compactly(tmp_path: Path) -> None:
     action = ActionRecord(
         action_type="navigate",
@@ -509,6 +539,34 @@ def test_session_report_displays_successful_task_verification(
     assert "Final checks" in content
     assert 'class="check-total check-total-passed">passed</span>' in content
     assert "&lt;player-status&gt;" in content
+
+
+def test_session_report_collapses_verbose_ai_success_explanation(
+    tmp_path: Path,
+) -> None:
+    explanation = (
+        "The agent completed every requested action and confirmed the final "
+        "page state with additional evidence."
+    )
+    session = ActionSession(
+        goal="Open the page",
+        actions=[],
+        verification=VerificationResult(
+            expected_state="Page open",
+            observed_state=explanation,
+            passed=True,
+            evidence={"assessment_type": "ai_final_state"},
+        ),
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "Final task check passed." in content
+    assert '<details class="assessment-summary">' in content
+    assert "<summary>Judge explanation</summary>" in content
+    assert explanation in content
 
 
 def test_session_report_displays_automatic_verification_metadata(

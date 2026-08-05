@@ -156,6 +156,9 @@
       .raw-error { margin-top: 16px; }
       .raw-error summary { cursor: pointer; font-weight: 700; }
       .raw-error pre { margin-bottom: 0; }
+      .technical-details { margin-top: 14px; }
+      .technical-details summary { cursor: pointer; font-weight: 700; }
+      .technical-details pre { margin: 10px 0 0; }
       .verification { background: white; border: 1px solid #cbd5e1;
                        border-radius: 12px; margin: 0 0 28px; padding: 22px; }
       .action-card .verification { margin: 20px 0 0; }
@@ -170,8 +173,10 @@
                                margin-top: 16px; padding: 16px; }
       .verification-failure p { margin-bottom: 0; white-space: pre-wrap; }
       .verification-check-list { margin-top: 20px; }
-      .assessment-summary { color: #334155; font-size: 16px; line-height: 1.55;
-                             margin: 14px 0 0; }
+      .assessment-summary { color: #334155; margin: 14px 0 0; }
+      .assessment-summary summary { cursor: pointer; font-weight: 700; }
+      .assessment-summary p { font-size: 16px; line-height: 1.55;
+                               margin: 10px 0 0; }
       .assessment-evidence { margin-top: 18px; }
       .assessment-evidence ul { color: #334155; line-height: 1.55;
                                  margin-bottom: 0; padding-left: 22px; }
@@ -225,7 +230,7 @@
           <div>
             <span class="result-kicker">Final result</span>
             <strong class="result-title">Failed</strong>
-            <p class="result-detail">The agent selected the wrong product result.</p>
+            <p class="result-detail">Final task check failed: The agent selected the wrong product result.</p>
           </div>
           <span class="result-mark" aria-hidden="true">×</span>
         </section>
@@ -301,9 +306,13 @@
               <div><dt>Page URL before</dt><dd>about:blank</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/</dd></div>
             </dl>
             <h3>Arguments</h3>
-            <pre>{
+            <dl class="key-value-grid"><div><dt>Target URL</dt><dd>https://shop.example.test/</dd></div></dl>
+        <details class="technical-details">
+          <summary>Technical details</summary>
+          <pre>{
   &quot;url&quot;: &quot;https://shop.example.test/&quot;
 }</pre>
+        </details>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
@@ -360,10 +369,14 @@
               <div><dt>Page URL before</dt><dd>https://shop.example.test/</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div>
             </dl>
             <h3>Arguments</h3>
-            <pre>{
+            <dl class="key-value-grid"><div><dt>Target</dt><dd>#product-search</dd></div><div><dt>Text</dt><dd>Wireless Headphones</dd></div></dl>
+        <details class="technical-details">
+          <summary>Technical details</summary>
+          <pre>{
   &quot;selector&quot;: &quot;#product-search&quot;,
   &quot;text&quot;: &quot;Wireless Headphones&quot;
 }</pre>
+        </details>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
@@ -420,9 +433,13 @@
               <div><dt>Page URL before</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/products/usb-c-cable</dd></div>
             </dl>
             <h3>Arguments</h3>
-            <pre>{
+            <dl class="key-value-grid"><div><dt>Target</dt><dd>#usb-c-cable</dd></div></dl>
+        <details class="technical-details">
+          <summary>Technical details</summary>
+          <pre>{
   &quot;selector&quot;: &quot;#usb-c-cable&quot;
 }</pre>
+        </details>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
