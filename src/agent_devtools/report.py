@@ -63,6 +63,15 @@ class ReplayReportSummary:
     context_failure_action_number: int | None = None
 
 
+@dataclass(frozen=True)
+class ReplayStabilityRunSummary:
+    """One run in an aggregate replay stability report."""
+
+    run_number: int
+    replay_summary: ReplayReportSummary
+    report_path: Path
+
+
 def format_session_summary(
     session: ActionSession,
     report_path: str | Path,
@@ -774,6 +783,21 @@ def _replay_action_label(action: ActionRecord | None) -> str:
     return f"failure · {category.value}"
 
 
+def _replay_context_detail(summary: ReplayReportSummary) -> str:
+    if summary.context_failure_action_number is not None:
+        return (
+            "Stopped before target action "
+            f"{summary.target_action_number} at context action "
+            f"{summary.context_failure_action_number}."
+        )
+
+    context_count = max(summary.target_action_number - 1, 0)
+    return (
+        f"{context_count} preceding action"
+        f"{'s' if context_count != 1 else ''} rebuilt."
+    )
+
+
 def _replay_summary_section(summary: ReplayReportSummary) -> str:
     verdict = "Reproduced" if summary.reproduced else "Not reproduced"
     verdict_class = "reproduced" if summary.reproduced else "not-reproduced"
@@ -782,18 +806,7 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
         if summary.reproduced
         else "The replay did not match the original target outcome."
     )
-    if summary.context_failure_action_number is not None:
-        context_detail = (
-            "Stopped before target action "
-            f"{summary.target_action_number} at context action "
-            f"{summary.context_failure_action_number}."
-        )
-    else:
-        context_count = max(summary.target_action_number - 1, 0)
-        context_detail = (
-            f"{context_count} preceding action"
-            f"{'s' if context_count != 1 else ''} rebuilt."
-        )
+    context_detail = _replay_context_detail(summary)
 
     return f"""
         <section class="replay-summary replay-summary-{verdict_class}">
@@ -826,6 +839,179 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
             </div>
           </dl>
         </section>"""
+
+
+def _safe_replay_report_path(path: Path) -> str:
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError("replay report links must be relative paths")
+    return escape(path.as_posix(), quote=True)
+
+
+def _replay_stability_title(
+    source_action: ActionRecord,
+    reproduced_count: int,
+    run_count: int,
+) -> tuple[str, str, str]:
+    if reproduced_count == run_count:
+        if source_action.status is ActionStatus.FAILURE:
+            return (
+                "Failure reproduced every time",
+                "stable",
+                "The recorded failure matched in every replay.",
+            )
+        return (
+            "Outcome matched every time",
+            "stable",
+            "The recorded target outcome matched in every replay.",
+        )
+    if reproduced_count == 0:
+        if source_action.status is ActionStatus.FAILURE:
+            return (
+                "Failure not reproduced",
+                "not-reproduced",
+                "None of the replays matched the recorded failure.",
+            )
+        return (
+            "Outcome changed every time",
+            "not-reproduced",
+            "None of the replays matched the recorded target outcome.",
+        )
+    return (
+        "Intermittent replay result",
+        "intermittent",
+        "Only some replays matched the recorded target outcome.",
+    )
+
+
+def write_replay_stability_html(
+    output_path: Path,
+    *,
+    target_action_number: int,
+    source_action: ActionRecord,
+    runs: tuple[ReplayStabilityRunSummary, ...],
+) -> None:
+    if not runs:
+        raise ValueError("replay stability reports require at least one run")
+
+    reproduced_count = sum(
+        run.replay_summary.reproduced for run in runs
+    )
+    run_count = len(runs)
+    title, status, detail = _replay_stability_title(
+        source_action,
+        reproduced_count,
+        run_count,
+    )
+    rows = []
+    for run in runs:
+        summary = run.replay_summary
+        verdict = "reproduced" if summary.reproduced else "not reproduced"
+        verdict_class = "passed" if summary.reproduced else "failed"
+        report_link = _safe_replay_report_path(run.report_path)
+        rows.append(
+            f"""
+          <tr>
+            <td><strong>{run.run_number}</strong></td>
+            <td><span class="pill {verdict_class}">{verdict}</span></td>
+            <td>{escape(_replay_action_label(summary.source_action))}</td>
+            <td>{escape(_replay_action_label(summary.replayed_action))}</td>
+            <td>{escape(_replay_context_detail(summary))}</td>
+            <td><a href="{report_link}">Open report</a></td>
+          </tr>"""
+        )
+
+    document = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Replay stability</title>
+    <style>
+      :root {{ color-scheme: light; font-family: system-ui, sans-serif; }}
+      * {{ box-sizing: border-box; }}
+      body {{ background: #f8fafc; color: #0f172a; margin: 0; }}
+      main {{ margin: 0 auto; max-width: 1120px; padding: 48px 24px; }}
+      section {{ background: white; border: 1px solid #e2e8f0;
+                 border-radius: 16px; margin-bottom: 20px; padding: 28px; }}
+      .eyebrow {{ color: #64748b; font-size: 13px; font-weight: 800;
+                  letter-spacing: .06em; text-transform: uppercase; }}
+      h1, h2, p {{ margin-top: 0; }}
+      h1 {{ font-size: 30px; margin-bottom: 8px; }}
+      h2 {{ font-size: 19px; }}
+      .hero {{ border-left: 6px solid #64748b; }}
+      .hero-stable {{ background: #f0fdf4; border-color: #86efac;
+                      border-left-color: #16a34a; }}
+      .hero-intermittent {{ background: #fffbeb; border-color: #fcd34d;
+                            border-left-color: #d97706; }}
+      .hero-not-reproduced {{ background: #f1f5f9; border-color: #cbd5e1;
+                              border-left-color: #64748b; }}
+      .detail {{ color: #475569; line-height: 1.5; }}
+      .metrics {{ display: grid; gap: 12px;
+                  grid-template-columns: repeat(3, minmax(0, 1fr));
+                  margin-top: 22px; }}
+      .metric {{ background: rgba(255, 255, 255, .72); border: 1px solid #e2e8f0;
+                 border-radius: 10px; padding: 14px 16px; }}
+      .metric span {{ color: #64748b; display: block; font-size: 12px;
+                      font-weight: 700; margin-bottom: 5px; }}
+      .metric strong {{ font-size: 18px; }}
+      .pill {{ border-radius: 999px; font-size: 12px; font-weight: 800;
+               padding: 5px 9px; text-transform: uppercase; }}
+      .passed {{ background: #dcfce7; color: #166534; }}
+      .failed {{ background: #fee2e2; color: #991b1b; }}
+      .table-wrap {{ overflow-x: auto; }}
+      table {{ border-collapse: collapse; width: 100%; }}
+      th, td {{ border-bottom: 1px solid #e2e8f0; padding: 13px 10px;
+                text-align: left; vertical-align: top; }}
+      th {{ color: #64748b; font-size: 12px; letter-spacing: .04em;
+            text-transform: uppercase; }}
+      td {{ font-size: 14px; }}
+      a {{ color: #1d4ed8; font-weight: 700; }}
+      .target {{ display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); }}
+      dt {{ color: #64748b; font-size: 12px; font-weight: 700; }}
+      dd {{ margin: 5px 0 0; overflow-wrap: anywhere; }}
+      @media (max-width: 760px) {{
+        .metrics, .target {{ grid-template-columns: 1fr; }}
+      }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero hero-{status}">
+        <p class="eyebrow">Agent DevTools · Replay stability</p>
+        <h1>{escape(title)}</h1>
+        <p class="detail">{escape(detail)}</p>
+        <div class="metrics" aria-label="Replay stability summary">
+          <div class="metric"><span>Total replays</span>
+            <strong>{run_count}</strong></div>
+          <div class="metric"><span>Reproduced</span>
+            <strong>{reproduced_count}</strong></div>
+          <div class="metric"><span>Not reproduced</span>
+            <strong>{run_count - reproduced_count}</strong></div>
+        </div>
+      </section>
+      <section>
+        <h2>Target action</h2>
+        <dl class="target">
+          <div><dt>Action number</dt><dd>{target_action_number}</dd></div>
+          <div><dt>Original outcome</dt>
+            <dd>{escape(_replay_action_label(source_action))}</dd></div>
+        </dl>
+      </section>
+      <section>
+        <h2>Replay runs</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run</th><th>Verdict</th><th>Original</th>
+              <th>Replay</th><th>Context</th><th>Trace</th></tr></thead>
+            <tbody>{''.join(rows)}</tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+"""
+    _write_utf8_text(output_path, document)
 
 
 def write_session_html(

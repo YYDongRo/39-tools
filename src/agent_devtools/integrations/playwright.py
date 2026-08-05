@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from math import isfinite
 from pathlib import Path
 from types import TracebackType
@@ -27,7 +28,9 @@ from agent_devtools.replay import ReplayResult, _outcome_matches
 from agent_devtools.recorder import record_action
 from agent_devtools.report import (
     ReplayReportSummary,
+    ReplayStabilityRunSummary,
     write_action_html,
+    write_replay_stability_html,
     write_session_html,
 )
 from agent_devtools.serialization import write_action_json
@@ -962,15 +965,61 @@ class PlaywrightSessionReplayResult:
         )
 
 
-def replay_playwright_session_action(
-    page: Page,
-    source_session: ActionSession,
-    *,
-    target_action_number: int,
-    output_dir: Path,
-) -> PlaywrightSessionReplayResult:
-    """Replay a target Playwright action after rebuilding its prior context."""
+class ReplayStabilityStatus(StrEnum):
+    STABLE = "stable"
+    INTERMITTENT = "intermittent"
+    NOT_REPRODUCED = "not_reproduced"
 
+
+@dataclass(frozen=True)
+class PlaywrightReplayStabilityResult:
+    source_session: ActionSession
+    target_action_number: int
+    replay_results: tuple[PlaywrightSessionReplayResult, ...]
+    report_path: Path
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.target_action_number, int)
+            or isinstance(self.target_action_number, bool)
+            or self.target_action_number <= 0
+        ):
+            raise ValueError("target_action_number must be a positive integer")
+        if not self.replay_results:
+            raise ValueError("replay stability results require at least one run")
+        if not all(
+            isinstance(result, PlaywrightSessionReplayResult)
+            for result in self.replay_results
+        ):
+            raise TypeError(
+                "replay_results must contain PlaywrightSessionReplayResult values"
+            )
+
+    @property
+    def requested_runs(self) -> int:
+        return len(self.replay_results)
+
+    @property
+    def reproduced_count(self) -> int:
+        return sum(result.reproduced for result in self.replay_results)
+
+    @property
+    def not_reproduced_count(self) -> int:
+        return self.requested_runs - self.reproduced_count
+
+    @property
+    def status(self) -> ReplayStabilityStatus:
+        if self.reproduced_count == self.requested_runs:
+            return ReplayStabilityStatus.STABLE
+        if self.reproduced_count == 0:
+            return ReplayStabilityStatus.NOT_REPRODUCED
+        return ReplayStabilityStatus.INTERMITTENT
+
+
+def _validated_replay_actions(
+    source_session: ActionSession,
+    target_action_number: int,
+) -> tuple[ActionRecord, ...]:
     if not isinstance(source_session, ActionSession):
         raise TypeError("source_session must be an ActionSession")
     if (
@@ -991,6 +1040,22 @@ def replay_playwright_session_action(
                 "unsupported Playwright replay action: "
                 f"{action.action_type}"
             )
+    return tuple(source_actions)
+
+
+def replay_playwright_session_action(
+    page: Page,
+    source_session: ActionSession,
+    *,
+    target_action_number: int,
+    output_dir: Path,
+) -> PlaywrightSessionReplayResult:
+    """Replay a target Playwright action after rebuilding its prior context."""
+
+    source_actions = _validated_replay_actions(
+        source_session,
+        target_action_number,
+    )
 
     target_source_action = source_actions[-1]
     target_result: ReplayResult | None = None
@@ -1066,6 +1131,93 @@ def replay_playwright_session_action(
         target_result=target_result,
         context_failure_action_number=context_failure_action_number,
         report_path=output_dir / "report.html",
+    )
+
+
+def evaluate_playwright_session_replay(
+    source_session: ActionSession,
+    *,
+    page_factory: Callable[[], Page],
+    target_action_number: int,
+    runs: int = 3,
+    output_dir: Path,
+) -> PlaywrightReplayStabilityResult:
+    """Replay one recorded target repeatedly on fresh Playwright pages."""
+
+    if not callable(page_factory):
+        raise TypeError("page_factory must be callable")
+    if not isinstance(runs, int) or isinstance(runs, bool) or runs <= 0:
+        raise ValueError("runs must be a positive integer")
+
+    source_actions = _validated_replay_actions(
+        source_session,
+        target_action_number,
+    )
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise FileExistsError(
+            f"replay stability output directory is not empty: {output_dir}"
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    replay_results: list[PlaywrightSessionReplayResult] = []
+    run_summaries: list[ReplayStabilityRunSummary] = []
+    seen_pages: list[Page] = []
+    target_source_action = source_actions[-1]
+
+    for run_number in range(1, runs + 1):
+        page = page_factory()
+        if page is None:
+            raise TypeError("page_factory must return a Playwright Page")
+        if any(page is previous_page for previous_page in seen_pages):
+            raise ValueError("page_factory must return a fresh Page per run")
+        seen_pages.append(page)
+
+        run_directory = output_dir / "runs" / f"{run_number:03d}"
+        try:
+            result = replay_playwright_session_action(
+                page,
+                source_session,
+                target_action_number=target_action_number,
+                output_dir=run_directory,
+            )
+        finally:
+            page.close()
+
+        replay_results.append(result)
+        run_summaries.append(
+            ReplayStabilityRunSummary(
+                run_number=run_number,
+                replay_summary=ReplayReportSummary(
+                    target_action_number=target_action_number,
+                    source_action=target_source_action,
+                    replayed_action=(
+                        result.target_result.replayed_action
+                        if result.target_result is not None
+                        else None
+                    ),
+                    reproduced=result.reproduced,
+                    context_failure_action_number=(
+                        result.context_failure_action_number
+                    ),
+                ),
+                report_path=Path("runs")
+                / f"{run_number:03d}"
+                / "report.html",
+            )
+        )
+
+    report_path = output_dir / "report.html"
+    write_replay_stability_html(
+        report_path,
+        target_action_number=target_action_number,
+        source_action=target_source_action,
+        runs=tuple(run_summaries),
+    )
+    return PlaywrightReplayStabilityResult(
+        source_session=source_session,
+        target_action_number=target_action_number,
+        replay_results=tuple(replay_results),
+        report_path=report_path,
     )
 
 

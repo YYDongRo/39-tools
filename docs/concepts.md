@@ -109,10 +109,11 @@ actions arrive. A non-empty trace directory is never overwritten implicitly.
 Interrupted runs retain their completed evidence, and an existing session can
 be resumed explicitly.
 
-Current replay support is intentionally narrow: one saved synchronous `click` or
-`fill` action can be replayed through a caller-provided executor after strict
-argument validation. Replay is post-run and developer-triggered; it does not
-rerun an Agent or retry an action automatically.
+The framework-independent replay helpers intentionally stay narrow: one saved
+synchronous `click` or `fill` action can be replayed through a caller-provided
+executor after strict argument validation. Replay is post-run and
+developer-triggered; it does not rerun an Agent or retry an action
+automatically.
 
 For example, a loaded `fill` record can be replayed without rebuilding the
 original agent:
@@ -145,6 +146,17 @@ If a context action fails, the target is not run and the report explains where
 reconstruction stopped. General trajectory replay and recovery are not
 implemented. The replay report also shows a clear `Reproduced` or `Not
 reproduced` verdict, with the original and replay target outcomes side by side.
+
+To check whether a result is stable, use
+`evaluate_playwright_session_replay(...)`. It calls the bounded session replay
+on a fresh page for each requested run, keeps each run under `runs/001/`,
+`runs/002/`, and so on, and writes an aggregate `report.html`. The aggregate
+report distinguishes a stable result, an intermittent result, and a result
+that was not reproduced. The local demo can be run with:
+
+```bash
+uv run --extra browser python examples/browser_replay_stability.py
+```
 
 Browser Use reports keep planning and file-management operations in a separate
 collapsed auxiliary-event section. The main timeline and action statistics only

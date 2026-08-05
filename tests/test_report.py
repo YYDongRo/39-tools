@@ -5,8 +5,10 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.report import (
     ReplayReportSummary,
+    ReplayStabilityRunSummary,
     format_session_summary,
     write_action_html,
+    write_replay_stability_html,
     write_session_html,
 )
 from agent_devtools.session import ActionSession
@@ -604,6 +606,69 @@ def test_session_report_displays_unreproduced_replay_verdict(
     assert "The replay did not match the original target outcome." in content
     assert "failure · target_not_found" in content
     assert "1 preceding action rebuilt." in content
+
+
+def test_replay_stability_report_summarizes_mixed_results(
+    tmp_path: Path,
+) -> None:
+    source_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    matching_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    successful_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    output_path = tmp_path / "stability.html"
+
+    write_replay_stability_html(
+        output_path,
+        target_action_number=2,
+        source_action=source_action,
+        runs=(
+            ReplayStabilityRunSummary(
+                1,
+                ReplayReportSummary(2, source_action, matching_action, True),
+                Path("runs/001/report.html"),
+            ),
+            ReplayStabilityRunSummary(
+                2,
+                ReplayReportSummary(2, source_action, successful_action, False),
+                Path("runs/002/report.html"),
+            ),
+            ReplayStabilityRunSummary(
+                3,
+                ReplayReportSummary(2, source_action, matching_action, True),
+                Path("runs/003/report.html"),
+            ),
+        ),
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "Intermittent replay result" in content
+    assert "Total replays" in content and "<strong>3</strong>" in content
+    assert "Reproduced" in content and "<strong>2</strong>" in content
+    assert "Not reproduced" in content and "<strong>1</strong>" in content
+    assert 'href="runs/001/report.html"' in content
+    assert 'href="runs/003/report.html"' in content
+    assert "failure · target_not_found" in content
 
 
 def test_session_report_displays_agent_run_failure(

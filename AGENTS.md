@@ -113,7 +113,8 @@ package.
   replace deterministic verification semantics.
 - Replay is intentionally limited to validated click and fill actions plus a
   bounded Playwright session-context replay; it is not full session replay or
-  recovery.
+  recovery. Repeated Playwright replay evaluates the recorded trajectory and
+  does not rerun the agent or perform automatic repair.
 
 ### User-facing entry points
 
@@ -123,6 +124,7 @@ package.
 - Browser Use observer: `observe_browser_use_agent(...)`.
 - Generic agent observer: `observe_agent(...)` and `observe_async_agent(...)`.
 - Repeated evaluator: `evaluate_browser_use_agent(...)`.
+- Replay stability evaluator: `evaluate_playwright_session_replay(...)`.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
 - Deterministic real-browser boundary demo:
   `examples/generic_agent_browser.py`.

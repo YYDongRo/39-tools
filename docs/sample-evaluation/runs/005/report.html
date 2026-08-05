@@ -41,6 +41,20 @@
                       justify-content: center; width: 48px; }
       .result-hero-failure .result-mark { color: #991b1b; }
       .result-hero-unverified .result-mark { color: #92400e; }
+      .replay-summary { border: 2px solid #cbd5e1; border-radius: 12px;
+                         margin-top: 18px; padding: 20px; }
+      .replay-summary-reproduced { background: #f0fdf4; border-color: #86efac; }
+      .replay-summary-not-reproduced { background: #fffbeb; border-color: #fcd34d; }
+      .replay-summary-heading { align-items: center; display: flex;
+                                 gap: 16px; justify-content: space-between; }
+      .replay-verdict { display: block; font-size: 24px; line-height: 1.2; }
+      .replay-verdict-mark { align-items: center; background: white;
+                              border-radius: 50%; color: #166534; display: flex;
+                              flex: 0 0 auto; font-size: 22px; font-weight: 900;
+                              height: 44px; justify-content: center; width: 44px; }
+      .replay-summary-not-reproduced .replay-verdict-mark { color: #92400e; }
+      .replay-comparison { gap: 14px; margin: 18px 0 0; }
+      .replay-comparison dd { font-weight: 600; }
       .run-stats { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
                     margin-top: 16px; }
       .run-stat { background: #f8fafc; border: 1px solid #e2e8f0;
@@ -180,7 +194,9 @@
       .missing { color: #64748b; }
       .empty-state { padding: 32px; text-align: center; }
       @media (max-width: 800px) {
-        dl, .action-screenshots, .run-stats { grid-template-columns: 1fr; }
+        dl, .action-screenshots, .replay-comparison, .run-stats {
+          grid-template-columns: 1fr;
+        }
         .title-row, .action-heading, .findings-heading { align-items: flex-start;
                                                           flex-direction: column; }
         .result-mark { display: none; }
@@ -203,6 +219,7 @@
           </div>
           <span class="result-mark" aria-hidden="true">×</span>
         </section>
+
         <section class="run-stats" aria-label="Run summary">
           <div class="run-stat"><span>Actions</span><strong>3</strong></div>
           <div class="run-stat"><span>Executed</span><strong>3 succeeded</strong></div>

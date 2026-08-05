@@ -7,7 +7,9 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright import (
     RecordedPlaywrightExecutor,
+    ReplayStabilityStatus,
     diagnose_playwright_click_failure,
+    evaluate_playwright_session_replay,
     replay_playwright_session_action,
 )
 from agent_devtools.replay import replay_click, replay_fill
@@ -196,6 +198,59 @@ def test_replays_browser_fill_with_navigation_context(tmp_path: Path) -> None:
     assert (replay_dir / "report.html").is_file()
     assert (replay_dir / "actions/001/before.png").is_file()
     assert (replay_dir / "actions/002/after.png").is_file()
+
+
+def test_evaluates_browser_replay_stability(tmp_path: Path) -> None:
+    source_dir = tmp_path / "original"
+    evaluation_dir = tmp_path / "stability"
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve()
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        source_page = browser.new_page(
+            viewport={"width": 1000, "height": 650}
+        )
+        with RecordedPlaywrightExecutor(
+            source_page,
+            source_dir,
+            goal="Open the diagnostics page and fill the missing input.",
+        ) as executor:
+            executor.navigate(page_path.as_uri())
+            executor.fill(
+                "#missing-input",
+                "Agent debugging",
+                timeout_ms=100,
+            )
+        source_page.close()
+
+        source_session = read_session_json(source_dir / "session.json")
+        evaluation = evaluate_playwright_session_replay(
+            source_session,
+            page_factory=lambda: browser.new_page(
+                viewport={"width": 1000, "height": 650}
+            ),
+            target_action_number=2,
+            runs=3,
+            output_dir=evaluation_dir,
+        )
+        browser.close()
+
+    assert evaluation.status is ReplayStabilityStatus.STABLE
+    assert evaluation.requested_runs == 3
+    assert evaluation.reproduced_count == 3
+    assert evaluation.not_reproduced_count == 0
+    assert evaluation.report_path == evaluation_dir / "report.html"
+    report_content = evaluation.report_path.read_text(encoding="utf-8")
+    assert "Failure reproduced every time" in report_content
+    assert "Reproduced</span>" in report_content
+    for run_number in range(1, 4):
+        run_dir = evaluation_dir / "runs" / f"{run_number:03d}"
+        assert (run_dir / "session.json").is_file()
+        assert (run_dir / "report.html").is_file()
+        assert (run_dir / "actions/001/before.png").is_file()
+        assert (run_dir / "actions/002/after.png").is_file()
 
 
 def test_replays_browser_timeout_failure() -> None:
