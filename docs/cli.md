@@ -33,11 +33,12 @@ uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
 ```
 
-Set the model provider key in the environment expected by Browser Use. For the
-Gemini example in this repository:
+Set exactly one model provider key in the environment. The included CLI
+supports Gemini and OpenAI:
 
 ```bash
-export GOOGLE_API_KEY="..."
+export GOOGLE_API_KEY="..."       # Gemini
+# export OPENAI_API_KEY="..."     # OpenAI instead
 ```
 
 Do not put the key in `agent_devtools.toml` or in Python source code.
@@ -71,6 +72,10 @@ The included example prompts for a task when `--task` is omitted:
 uv run --extra browser-use python examples/browser_use_cli.py \
   --headed --open-report
 ```
+
+With exactly one supported key set, the CLI selects that provider. If both are
+set, choose one explicitly with `--provider gemini` or `--provider openai`.
+Use `--model MODEL` to override the provider default.
 
 The user enters a normal request, for example:
 

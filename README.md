@@ -82,16 +82,23 @@ The displayed project name is **Agent DevTools**. The Python distribution is
 
 ### Recommended: one command-line workflow
 
-The included CLI uses Browser Use with Gemini, asks for the task in the
-terminal, and creates the report without requiring you to write recording code.
-Set the provider key in your shell, never in the TOML file:
+The included CLI supports Gemini and OpenAI, asks for the task in the terminal,
+and creates the report without requiring you to write recording code. Set one
+provider key in your shell, never in the TOML file:
+
+| Provider | Environment variable | Example model |
+| --- | --- | --- |
+| Gemini | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `gemini-2.5-flash` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
 
 ```bash
-# WSL, macOS, or Linux
+# WSL, macOS, or Linux: choose one
 export GOOGLE_API_KEY="your-key-from-Google"
+# export OPENAI_API_KEY="your-key-from-OpenAI"
 
 # PowerShell equivalent:
 # $env:GOOGLE_API_KEY = "your-key-from-Google"
+# $env:OPENAI_API_KEY = "your-key-from-OpenAI"
 ```
 
 Copy the recording settings once, then run tasks:
@@ -102,6 +109,11 @@ uv run --extra browser-use python examples/browser_use_cli.py \
   --headed --open-report
 ```
 
+With exactly one supported key set, the CLI selects that provider
+automatically. If both are present, choose one explicitly with
+`--provider gemini` or `--provider openai`; use `--model MODEL` only when the
+default model is not suitable.
+
 The CLI prints the exact report path and returns a non-zero exit code when the
 agent errors or the final task is failed or unverified. The configuration file
 controls screenshots, redaction, summaries, report opening, and output
@@ -109,8 +121,15 @@ directories; it never stores provider credentials.
 
 ### Advanced: wrap an existing Agent in Python
 
-For an application that already creates its own Browser Use Agent, keep your
-normal agent code and wrap it once at the integration boundary:
+For an application that already creates its own Browser Use Agent, install the
+package in that application first:
+
+```bash
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
+uv run playwright install chromium
+```
+
+Then keep your normal agent code and wrap it once at the integration boundary:
 
 ```python
 from browser_use import Agent, Browser, ChatGoogle

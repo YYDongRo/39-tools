@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from pathlib import Path
+from typing import Literal
 
-from browser_use import Agent, Browser, ChatGoogle
+from browser_use import Agent, Browser, ChatGoogle, ChatOpenAI
 
 from agent_devtools.browser_use import observe_browser_use_agent
 from agent_devtools.config import AgentDevToolsConfig
+
+
+Provider = Literal["auto", "gemini", "openai"]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -25,6 +30,19 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         default=10,
         help="maximum Browser Use steps (default: 10)",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("auto", "gemini", "openai"),
+        default="auto",
+        help=(
+            "LLM provider; auto detects the only configured key "
+            "(default: auto)"
+        ),
+    )
+    parser.add_argument(
+        "--model",
+        help="optional provider model; otherwise use the example default",
     )
     parser.add_argument(
         "--headed",
@@ -44,6 +62,50 @@ def _load_config() -> AgentDevToolsConfig | None:
     return AgentDevToolsConfig.from_file(path) if path.is_file() else None
 
 
+def _resolve_provider(requested: Provider) -> Literal["gemini", "openai"]:
+    provider = requested
+    if provider == "auto":
+        provider = os.getenv("AGENT_DEVTOOLS_LLM_PROVIDER", "auto").strip().lower()
+
+    if provider in {"gemini", "openai"}:
+        return provider
+    if provider != "auto":
+        raise ValueError(
+            "AGENT_DEVTOOLS_LLM_PROVIDER must be 'gemini' or 'openai'"
+        )
+
+    configured = []
+    if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
+        configured.append("gemini")
+    if os.getenv("OPENAI_API_KEY"):
+        configured.append("openai")
+
+    if len(configured) == 1:
+        return configured[0]  # type: ignore[return-value]
+    if not configured:
+        raise ValueError(
+            "set GOOGLE_API_KEY or GEMINI_API_KEY for Gemini, "
+            "or OPENAI_API_KEY for OpenAI"
+        )
+    raise ValueError(
+        "multiple provider keys are set; pass --provider gemini or "
+        "--provider openai"
+    )
+
+
+def _create_llm(provider: Literal["gemini", "openai"], model: str | None) -> object:
+    if provider == "gemini":
+        key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not key:
+            raise ValueError("set GOOGLE_API_KEY or GEMINI_API_KEY for Gemini")
+        return ChatGoogle(model=model or "gemini-2.5-flash", api_key=key)
+
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise ValueError("set OPENAI_API_KEY for OpenAI")
+    return ChatOpenAI(model=model or "gpt-4o", api_key=key)
+
+
 async def main() -> int:
     args = _parser().parse_args()
     task = (args.task or input("Task: ")).strip()
@@ -51,11 +113,18 @@ async def main() -> int:
         print("Task cannot be empty.")
         return 2
 
+    try:
+        provider = _resolve_provider(args.provider)
+        llm = _create_llm(provider, args.model)
+    except ValueError as error:
+        print(f"Configuration error: {error}")
+        return 2
+
     config = _load_config()
     browser = Browser(headless=not args.headed)
     raw_agent = Agent(
         task=task,
-        llm=ChatGoogle(model="gemini-2.5-flash"),
+        llm=llm,
         browser=browser,
         use_judge=True,
     )
