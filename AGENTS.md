@@ -131,10 +131,12 @@ package.
 - Playwright replay can select the first failed action automatically; if only
   the final task check failed, it clearly labels the last-action fallback.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
+- CLI task example: `examples/browser_use_cli.py`.
 - Deterministic real-browser boundary demo:
   `examples/generic_agent_browser.py`.
 - Human-readable config: `agent_devtools.toml`, based on
   `agent_devtools.example.toml`.
+- CLI and custom-agent setup guide: `docs/cli.md`.
 
 Keep these names stable unless a deliberate compatibility plan is written.
 

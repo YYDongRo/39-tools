@@ -90,6 +90,30 @@ Use `agent.assert_last_task_passed()` when failed or unverified tasks should
 fail a test. An explicit goal is still supported for agents that do not expose
 their task as `agent.task`.
 
+### One-time setup, then run tasks from the CLI
+
+After installation and the one-time wrapper setup, a user can run the included
+CLI example, enter a task, and receive a report without adding recording code
+for that task:
+
+```bash
+cp agent_devtools.example.toml agent_devtools.toml
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --headed --open-report
+```
+
+The command asks for the task, runs the existing Browser Use Agent, and prints
+the generated `report.html` path. It exits with a failure status when the
+Agent raises or the final task result is failed or unverified. The configuration
+file controls screenshots, redaction, summaries, report opening, and output
+directories; provider keys stay in environment variables.
+
+For a custom desktop or browser Agent, keep your existing CLI and connect its
+`run(task, *, tools=...)` boundary to `observe_agent(...)` once. Agent DevTools
+records calls made through `tools`; it does not intercept arbitrary direct
+`pyautogui` or browser calls. See the [CLI and custom-agent guide](docs/cli.md)
+for the exact contract and a desktop integration example.
+
 ### Optional configuration
 
 To keep setup in one human-readable file, copy
@@ -214,6 +238,7 @@ Detailed documentation:
 - [Browser Use integration](docs/browser-use.md)
 - [Repeated-run stability evaluation](docs/evaluation.md)
 - [Playwright and tool integrations](docs/playwright.md)
+- [CLI workflow and custom-agent integration](docs/cli.md)
 - [Results, verification, and trace concepts](docs/concepts.md)
 - [Development and testing](docs/development.md)
 
