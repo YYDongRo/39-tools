@@ -5,6 +5,25 @@ global background process that can discover every program on the computer.
 After the one-time integration, however, the user's workflow can be as simple
 as entering a task in a terminal and opening the generated report.
 
+## First run: real Chromium without an API key
+
+Start here if you want to see the recording and report before connecting your
+own agent. From a clone of the repository, run:
+
+```bash
+uv sync --extra browser
+uv run --extra browser playwright install chromium
+uv run --extra browser python examples/generic_agent_browser.py \
+  --headed --open-report
+```
+
+This deterministic demo uses the local `examples/browser_click.html` page. It
+records a navigation and click, captures the before/after evidence, verifies
+the final page, and opens the report. It does not need a model, API key, or
+network access. Reports are written below `trace/generic-agent-browser/`.
+
+After this run succeeds, choose the Browser Use or custom-agent setup below.
+
 ## Browser Use: one-time setup
 
 Install the optional Browser Use integration and Chromium:

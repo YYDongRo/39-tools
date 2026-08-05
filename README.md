@@ -33,6 +33,25 @@ For a multi-run view, inspect the
 six deterministic attempts: three passes, two matching wrong-target failures,
 and one unverified early ending.
 
+## Try a real browser run (no API key)
+
+This is the fastest way to see Agent DevTools working locally. It uses the
+included deterministic page and Chromium, so there is no model account or
+provider key involved:
+
+```bash
+uv sync --extra browser
+uv run --extra browser playwright install chromium
+uv run --extra browser python examples/generic_agent_browser.py \
+  --headed --open-report
+```
+
+The demo navigates and clicks through a real browser, verifies the final page,
+and opens the generated report. Without `--headed`, it runs headlessly. The
+report is also saved under `trace/generic-agent-browser/` if you want to open
+it again later. Once this works, continue with the Browser Use integration
+below to connect your own agent and provider key.
+
 ## What it records
 
 - Ordered `navigate`, `click`, `fill`, `press`, and scroll actions from
@@ -324,15 +343,9 @@ evidence and are not uploaded by this judge. LLM results are probabilistic:
 provider errors, invalid responses, or insufficient evidence remain
 `unverified`.
 
-To try this boundary with a real local browser and no model API key:
-
-```bash
-uv run --extra browser python examples/generic_agent_browser.py --headed
-```
-
-The deterministic demo opens `examples/browser_click.html`, records a
-navigation and click, verifies the final status text, and prints the report
-path. Remove `--headed` for a headless run.
+The no-key real-browser demo is shown near the top of this page. It opens
+`examples/browser_click.html`, records a navigation and click, verifies the
+final status text, and prints the report path.
 
 To see the same contract without installing a browser or using a real desktop,
 run the in-memory desktop-style demo:
