@@ -12,6 +12,7 @@ from agent_devtools.async_tool_recorder import (
 )
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
+from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.replay import ReplayResult, replay_click, replay_fill
 from agent_devtools.session import ActionSession
@@ -27,6 +28,7 @@ __all__ = [
     "ActionStatus",
     "AgentDevToolsConfig",
     "FailureCategory",
+    "FinalStateObservation",
     "ObservedAgent",
     "ObservedAsyncAgent",
     "RecordedAsyncTools",

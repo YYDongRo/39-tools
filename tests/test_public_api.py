@@ -15,6 +15,7 @@ from agent_devtools.async_tool_recorder import (
 )
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
+from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
@@ -114,6 +115,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
         "FailureCategory": FailureCategory,
+        "FinalStateObservation": FinalStateObservation,
         "ObservedAgent": ObservedAgent,
         "ObservedAsyncAgent": ObservedAsyncAgent,
         "RecordedAsyncTools": RecordedAsyncTools,

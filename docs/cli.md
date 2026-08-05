@@ -107,6 +107,29 @@ Agent DevTools wraps public callable methods on `tools` and records their
 names, arguments, timing, status, and exceptions. A screenshot callback and a
 small state observer are optional but provide stronger visual evidence.
 
+For automatic final verification, replace `task_verification` with a
+`final_state_verifier` callback. It receives a `FinalStateObservation` with the
+task, final state, actions, and last after-screenshot path:
+
+```python
+from agent_devtools import FinalStateObservation, VerificationResult
+
+
+def judge(observation: FinalStateObservation) -> VerificationResult:
+    passed = observation.state.get("status") == "complete"
+    return VerificationResult(
+        expected_state="status is complete",
+        observed_state=str(observation.state),
+        passed=passed,
+        failure_reason=None if passed else "the final status is not complete",
+    )
+```
+
+The callback can later be backed by an LLM, but it is not tied to a provider.
+If it fails, Agent DevTools records an `unverified` result with a sanitized
+verification note. Configure either `task_verification` or
+`final_state_verifier`, not both.
+
 This is an explicit integration boundary. Direct calls such as
 `pyautogui.click(...)` made outside `tools` are not automatically visible.
 The application can still keep its existing CLI: it only needs to pass the

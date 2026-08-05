@@ -107,7 +107,8 @@ package.
 - Framework-independent `observe_agent(...)` and
   `observe_async_agent(...)` inject the existing sync/async recording proxies
   into agents with `run(task, *, tools=...)`, so a caller does not instrument
-  each action manually.
+  each action manually. They also accept an optional provider-neutral
+  `final_state_verifier` for task-level judge results.
 - Optional OpenAI/Gemini expectation and final-state integrations remain
   bounded, provider-specific, and probabilistic. They must not silently
   replace deterministic verification semantics.

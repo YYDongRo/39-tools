@@ -264,6 +264,29 @@ recorders. Async agents use `observe_async_agent(...)`. This is an explicit
 adapter boundary, not a promise to intercept arbitrary direct desktop or
 browser calls.
 
+For an automatic final check without hard-coding one expectation per action,
+pass a provider-neutral `final_state_verifier` instead of
+`task_verification`:
+
+```python
+from agent_devtools import FinalStateObservation, VerificationResult
+
+
+def judge(observation: FinalStateObservation) -> VerificationResult:
+    passed = observation.state.get("status") == "complete"
+    return VerificationResult(
+        expected_state="status is complete",
+        observed_state=str(observation.state),
+        passed=passed,
+        failure_reason=None if passed else "the final status is not complete",
+    )
+```
+
+The observation contains the task, final structured state, recorded actions,
+and the last after-screenshot when one was captured. A judge can later call an
+LLM, but the core stays provider-neutral. If the judge raises or returns
+invalid data, the report stays `unverified`; it never invents a success.
+
 To try this boundary with a real local browser and no model API key:
 
 ```bash

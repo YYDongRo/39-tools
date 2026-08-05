@@ -82,9 +82,15 @@ agent.run(task, *, tools=recorded_tools)
 
 The observer reads `agent.task` when the task is not passed again, injects a
 recording proxy once, and sends every callable tool method through the existing
-action/session recorder. Screenshot, state, and final-verification callbacks
-remain optional. Agents that call browser or desktop APIs directly instead of
-using the provided tool object still require a framework-specific adapter.
+action/session recorder. Screenshot and state callbacks remain optional. A
+`final_state_verifier` can consume a `FinalStateObservation` containing the
+task, final state, actions, and last after-screenshot. Agents that call browser
+or desktop APIs directly instead of using the provided tool object still
+require a framework-specific adapter.
+
+The final-state verifier is an alternative to the deterministic
+`task_verification` callback. Its errors are recorded as `unverified`, and it
+must never be treated as ground truth merely because it uses an LLM.
 
 ## Failure analysis
 

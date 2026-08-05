@@ -14,7 +14,11 @@ import webbrowser
 import zlib
 from pathlib import Path
 
-from agent_devtools import VerificationResult, observe_agent
+from agent_devtools import (
+    FinalStateObservation,
+    VerificationResult,
+    observe_agent,
+)
 from agent_devtools.serialization import read_session_json
 
 
@@ -82,8 +86,8 @@ class DemoAgent:
         return "done"
 
 
-def _verify(surface: DesktopSurface) -> VerificationResult:
-    state = surface.state()
+def _verify(observation: FinalStateObservation) -> VerificationResult:
+    state = observation.state
     passed = (
         state["screen"] == "settings"
         and state["dark_mode_enabled"] is True
@@ -191,7 +195,7 @@ def run_demo(output_root: str | Path, *, correct: bool = False) -> Path:
             _render_surface(surface)
         ),
         observe_state=surface.state,
-        task_verification=lambda: _verify(surface),
+        final_state_verifier=_verify,
     )
     observed.run()
     if observed.last_report_path is None:

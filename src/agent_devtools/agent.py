@@ -14,6 +14,7 @@ from agent_devtools.async_tool_recorder import (
 )
 from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import record_agent_run_failure
+from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.tool_recorder import RecordedTools, record_tools
 from agent_devtools.verification import VerificationResult
 
@@ -31,6 +32,10 @@ AsyncStateObserver = Callable[
 AsyncTaskVerification = Callable[
     [], VerificationResult | Awaitable[VerificationResult]
 ]
+SyncFinalStateVerifier = Callable[[FinalStateObservation], VerificationResult]
+AsyncFinalStateVerifier = Callable[
+    [FinalStateObservation], VerificationResult | Awaitable[VerificationResult]
+]
 
 
 class ObservedAgent(Generic[AgentT, ToolT]):
@@ -46,11 +51,16 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         capture_screenshot: SyncScreenshot | None = None,
         observe_state: SyncStateObserver | None = None,
         task_verification: SyncTaskVerification | None = None,
+        final_state_verifier: SyncFinalStateVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
     ) -> None:
         _validate_agent(agent)
         _validate_optional_task(task)
+        _validate_final_state_verifier(
+            task_verification,
+            final_state_verifier,
+        )
         self.agent = agent
         self.tools = tools
         self.output_root = Path(output_root)
@@ -58,6 +68,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         self.capture_screenshot = capture_screenshot
         self.observe_state = observe_state
         self.task_verification = task_verification
+        self.final_state_verifier = final_state_verifier
         self.methods = methods
         self.event_collector = event_collector
         self.last_trace: RecordedTools[ToolT] | None = None
@@ -110,6 +121,13 @@ class ObservedAgent(Generic[AgentT, ToolT]):
                             "async agent run methods require "
                             "observe_async_agent()"
                         )
+                    if self.final_state_verifier is not None:
+                        _apply_final_state_verifier(
+                            trace,
+                            task,
+                            self.observe_state,
+                            self.final_state_verifier,
+                        )
                     return result
                 except BaseException as error:
                     record_agent_run_failure(trace.session, error)
@@ -144,11 +162,16 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         capture_screenshot: AsyncScreenshot | None = None,
         observe_state: AsyncStateObserver | None = None,
         task_verification: AsyncTaskVerification | None = None,
+        final_state_verifier: AsyncFinalStateVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
     ) -> None:
         _validate_agent(agent)
         _validate_optional_task(task)
+        _validate_final_state_verifier(
+            task_verification,
+            final_state_verifier,
+        )
         self.agent = agent
         self.tools = tools
         self.output_root = Path(output_root)
@@ -156,6 +179,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         self.capture_screenshot = capture_screenshot
         self.observe_state = observe_state
         self.task_verification = task_verification
+        self.final_state_verifier = final_state_verifier
         self.methods = methods
         self.event_collector = event_collector
         self.last_trace: RecordedAsyncTools[ToolT] | None = None
@@ -205,7 +229,15 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
                             "observe_async_agent() requires an async agent "
                             "run method"
                         )
-                    return await result
+                    resolved_result = await result
+                    if self.final_state_verifier is not None:
+                        await _apply_async_final_state_verifier(
+                            trace,
+                            task,
+                            self.observe_state,
+                            self.final_state_verifier,
+                        )
+                    return resolved_result
                 except BaseException as error:
                     record_agent_run_failure(trace.session, error)
                     raise
@@ -235,6 +267,7 @@ def observe_agent(
     capture_screenshot: SyncScreenshot | None = None,
     observe_state: SyncStateObserver | None = None,
     task_verification: SyncTaskVerification | None = None,
+    final_state_verifier: SyncFinalStateVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
 ) -> ObservedAgent[AgentT, ToolT]:
@@ -246,6 +279,7 @@ def observe_agent(
         capture_screenshot=capture_screenshot,
         observe_state=observe_state,
         task_verification=task_verification,
+        final_state_verifier=final_state_verifier,
         methods=methods,
         event_collector=event_collector,
     )
@@ -260,6 +294,7 @@ def observe_async_agent(
     capture_screenshot: AsyncScreenshot | None = None,
     observe_state: AsyncStateObserver | None = None,
     task_verification: AsyncTaskVerification | None = None,
+    final_state_verifier: AsyncFinalStateVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
 ) -> ObservedAsyncAgent[AgentT, ToolT]:
@@ -271,6 +306,7 @@ def observe_async_agent(
         capture_screenshot=capture_screenshot,
         observe_state=observe_state,
         task_verification=task_verification,
+        final_state_verifier=final_state_verifier,
         methods=methods,
         event_collector=event_collector,
     )
@@ -286,6 +322,142 @@ def _validate_optional_task(task: object) -> None:
         not isinstance(task, str) or not task.strip()
     ):
         raise ValueError("task must be a non-empty string or None")
+
+
+def _validate_final_state_verifier(
+    task_verification: object,
+    final_state_verifier: object,
+) -> None:
+    if task_verification is not None and final_state_verifier is not None:
+        raise ValueError(
+            "use either task_verification or final_state_verifier, not both"
+        )
+    if final_state_verifier is not None and not callable(final_state_verifier):
+        raise TypeError("final_state_verifier must be callable or None")
+
+
+def _build_final_state_observation(
+    trace: RecordedTools[object] | RecordedAsyncTools[object],
+    task: str,
+    observe_state: Callable[[], object] | None,
+) -> FinalStateObservation:
+    state = observe_state() if observe_state is not None else {}
+    if isawaitable(state):
+        close = getattr(state, "close", None)
+        if callable(close):
+            close()
+        raise TypeError(
+            "async state observers require observe_async_agent()"
+        )
+    if not isinstance(state, dict):
+        raise TypeError("observe_state must return a dictionary")
+
+    screenshot_path: Path | None = None
+    if trace.session.actions:
+        relative_path = trace.session.actions[-1].screenshot_after
+        if relative_path is not None:
+            screenshot_path = (
+                trace.report_path.parent / relative_path
+            ).resolve()
+    return FinalStateObservation(
+        task=task,
+        state=state,
+        actions=tuple(trace.session.actions),
+        screenshot_path=screenshot_path,
+        trace_directory=trace.report_path.resolve().parent,
+    )
+
+
+def _store_final_state_verification(
+    trace: RecordedTools[object] | RecordedAsyncTools[object],
+    result: VerificationResult,
+) -> None:
+    trace.session.verification = result
+    trace.session.verification_source = "generic:final-state"
+    trace.session.verification_note = None
+
+
+def _store_final_state_verification_error(
+    trace: RecordedTools[object] | RecordedAsyncTools[object],
+    error: Exception,
+) -> None:
+    trace.session.verification = None
+    trace.session.verification_source = "generic:final-state"
+    trace.session.verification_note = (
+        "Final-state verification unavailable "
+        f"({type(error).__name__})."
+    )
+
+
+def _apply_final_state_verifier(
+    trace: RecordedTools[object],
+    task: str,
+    observe_state: SyncStateObserver | None,
+    verifier: SyncFinalStateVerifier,
+) -> None:
+    try:
+        observation = _build_final_state_observation(
+            trace,
+            task,
+            observe_state,
+        )
+        result = verifier(observation)
+        if isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError(
+                "async final-state verifiers require "
+                "observe_async_agent()"
+            )
+        if not isinstance(result, VerificationResult):
+            raise TypeError(
+                "final_state_verifier must return VerificationResult"
+            )
+    except Exception as error:
+        _store_final_state_verification_error(trace, error)
+        return
+    _store_final_state_verification(trace, result)
+
+
+async def _apply_async_final_state_verifier(
+    trace: RecordedAsyncTools[object],
+    task: str,
+    observe_state: AsyncStateObserver | None,
+    verifier: AsyncFinalStateVerifier,
+) -> None:
+    try:
+        state = observe_state() if observe_state is not None else {}
+        if isawaitable(state):
+            state = await state
+        if not isinstance(state, dict):
+            raise TypeError("observe_state must return a dictionary")
+
+        screenshot_path: Path | None = None
+        if trace.session.actions:
+            relative_path = trace.session.actions[-1].screenshot_after
+            if relative_path is not None:
+                screenshot_path = (
+                    trace.report_path.parent / relative_path
+                ).resolve()
+        observation = FinalStateObservation(
+            task=task,
+            state=state,
+            actions=tuple(trace.session.actions),
+            screenshot_path=screenshot_path,
+            trace_directory=trace.report_path.resolve().parent,
+        )
+        result = verifier(observation)
+        if isawaitable(result):
+            result = await result
+        if not isinstance(result, VerificationResult):
+            raise TypeError(
+                "final_state_verifier must return VerificationResult"
+            )
+    except Exception as error:
+        _store_final_state_verification_error(trace, error)
+        return
+    _store_final_state_verification(trace, result)
 
 
 def _resolve_task(
@@ -312,6 +484,7 @@ def _new_trace_directory(output_root: Path) -> Path:
 
 
 __all__ = [
+    "FinalStateObservation",
     "ObservedAgent",
     "ObservedAsyncAgent",
     "observe_agent",
