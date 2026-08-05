@@ -8,7 +8,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypeVar
 
-from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
@@ -957,6 +957,7 @@ class PlaywrightSessionReplayResult:
     target_result: ReplayResult | None
     context_failure_action_number: int | None
     report_path: Path
+    target_action_selection_note: str | None = None
 
     @property
     def reproduced(self) -> bool:
@@ -986,6 +987,7 @@ class PlaywrightReplayStabilityResult:
     target_action_number: int
     replay_results: tuple[PlaywrightSessionReplayResult, ...]
     report_path: Path
+    target_action_selection_note: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -1052,6 +1054,45 @@ def _validated_replay_actions(
     return tuple(source_actions)
 
 
+def _resolve_replay_target_action(
+    source_session: ActionSession,
+    target_action_number: int | None,
+) -> tuple[int, str | None]:
+    """Resolve an explicit target or choose the most useful failed action."""
+
+    if not isinstance(source_session, ActionSession):
+        raise TypeError("source_session must be an ActionSession")
+    if target_action_number is not None:
+        _validated_replay_actions(source_session, target_action_number)
+        return target_action_number, None
+    if source_session.action_count == 0:
+        raise ValueError(
+            "target_action_number is required when the session has no actions"
+        )
+
+    for action_number, action in enumerate(source_session.actions, start=1):
+        if action.outcome is ActionOutcome.FAILURE:
+            return (
+                action_number,
+                "Automatically selected the first failed action.",
+            )
+
+    if (
+        source_session.verification is not None
+        and not source_session.verification.passed
+    ):
+        return (
+            source_session.action_count,
+            "Automatically selected the last action because final task "
+            "verification failed.",
+        )
+
+    raise ValueError(
+        "target_action_number is required when no action or final task "
+        "failure is recorded"
+    )
+
+
 def _replay_trajectory_divergence(
     source_session: ActionSession,
     replayed_session: ActionSession,
@@ -1070,11 +1111,19 @@ def replay_playwright_session_action(
     page: Page,
     source_session: ActionSession,
     *,
-    target_action_number: int,
+    target_action_number: int | None = None,
     output_dir: Path,
 ) -> PlaywrightSessionReplayResult:
-    """Replay a target Playwright action after rebuilding its prior context."""
+    """Replay a target action after rebuilding its prior context.
 
+    When no target number is supplied, the first failed action is selected,
+    with a last-action fallback for a failed final task check.
+    """
+
+    target_action_number, selection_note = _resolve_replay_target_action(
+        source_session,
+        target_action_number,
+    )
     source_actions = _validated_replay_actions(
         source_session,
         target_action_number,
@@ -1149,6 +1198,7 @@ def replay_playwright_session_action(
             ),
             context_failure_action_number=context_failure_action_number,
             first_divergence=first_divergence,
+            target_action_selection_note=selection_note,
         ),
     )
 
@@ -1159,6 +1209,7 @@ def replay_playwright_session_action(
         target_result=target_result,
         context_failure_action_number=context_failure_action_number,
         report_path=output_dir / "report.html",
+        target_action_selection_note=selection_note,
     )
 
 
@@ -1166,20 +1217,28 @@ def evaluate_playwright_session_replay(
     source_session: ActionSession,
     *,
     page_factory: Callable[[], Page],
-    target_action_number: int,
+    target_action_number: int | None = None,
     runs: int = 3,
     output_dir: Path,
 ) -> PlaywrightReplayStabilityResult:
-    """Replay one recorded target repeatedly on fresh Playwright pages."""
+    """Replay one recorded target repeatedly on fresh Playwright pages.
+
+    Omitting the target number applies the same automatic failure selection as
+    :func:`replay_playwright_session_action`.
+    """
 
     if not callable(page_factory):
         raise TypeError("page_factory must be callable")
     if not isinstance(runs, int) or isinstance(runs, bool) or runs <= 0:
         raise ValueError("runs must be a positive integer")
 
-    source_actions = _validated_replay_actions(
+    resolved_target_action_number, selection_note = _resolve_replay_target_action(
         source_session,
         target_action_number,
+    )
+    source_actions = _validated_replay_actions(
+        source_session,
+        resolved_target_action_number,
     )
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(
@@ -1216,7 +1275,7 @@ def evaluate_playwright_session_replay(
             ReplayStabilityRunSummary(
                 run_number=run_number,
                 replay_summary=ReplayReportSummary(
-                    target_action_number=target_action_number,
+                    target_action_number=resolved_target_action_number,
                     source_action=target_source_action,
                     replayed_action=(
                         result.target_result.replayed_action
@@ -1228,6 +1287,7 @@ def evaluate_playwright_session_replay(
                         result.context_failure_action_number
                     ),
                     first_divergence=result.first_divergence,
+                    target_action_selection_note=selection_note,
                 ),
                 report_path=Path("runs")
                 / f"{run_number:03d}"
@@ -1238,15 +1298,17 @@ def evaluate_playwright_session_replay(
     report_path = output_dir / "report.html"
     write_replay_stability_html(
         report_path,
-        target_action_number=target_action_number,
+        target_action_number=resolved_target_action_number,
         source_action=target_source_action,
         runs=tuple(run_summaries),
+        target_action_selection_note=selection_note,
     )
     return PlaywrightReplayStabilityResult(
         source_session=source_session,
-        target_action_number=target_action_number,
+        target_action_number=resolved_target_action_number,
         replay_results=tuple(replay_results),
         report_path=report_path,
+        target_action_selection_note=selection_note,
     )
 
 

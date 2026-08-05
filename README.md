@@ -42,7 +42,8 @@ and one unverified early ending.
 - Action-level checks and final task verification as different result levels
 - Controlled post-run replay for validated `click` and `fill` actions
 - Repeated Playwright session replay with stable, intermittent, or unreproduced
-  results and a concise first-difference summary
+  results, a concise first-difference summary, and automatic failed-action
+  selection when no target number is supplied
 - Agent-run exceptions shown as `unverified` with a sanitized exception type
 - Browser page errors, console errors, failed requests, and HTTP error responses
 - Versioned JSON sessions and a static HTML report after each observed run

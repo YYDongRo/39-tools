@@ -11,11 +11,13 @@ from agent_devtools.integrations.playwright import (
     TextExpectation,
     VisibilityExpectation,
     diagnose_playwright_click_failure,
+    evaluate_playwright_session_replay,
     record_playwright_action,
     record_playwright_click,
     record_playwright_click_trace,
     run_playwright_agent,
 )
+from agent_devtools.session import ActionSession
 
 
 class FakeLocator:
@@ -37,6 +39,28 @@ class FakePage:
 class FailingLocator:
     def count(self) -> int:
         raise RuntimeError("page was closed")
+
+
+def test_replay_requires_target_when_session_has_no_failure(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 20, 12, 0, tzinfo=UTC),
+        duration_ms=20,
+        status=ActionStatus.SUCCESS,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="target_action_number is required when no action or final task",
+    ):
+        evaluate_playwright_session_replay(
+            ActionSession(actions=[action]),
+            page_factory=lambda: object(),  # not reached
+            output_dir=tmp_path / "replay",
+        )
 
 
 def make_failed_click() -> ActionRecord:

@@ -139,9 +139,12 @@ writes an original session, a replay session, screenshots, and `report.html`
 under `trace/browser-fill-replay/`.
 
 For a bounded Playwright session replay, use
-`replay_playwright_session_action(...)` with a fresh page and a target action
-number. It replays the preceding `navigate`, `click`, `fill`, `press`, or
-`scroll` actions first, then runs the target and writes a new session report.
+`replay_playwright_session_action(...)` with a fresh page. The target action
+number is optional: when omitted, Agent DevTools selects the first recorded
+failed action. If every action executed but the final task check failed, it
+uses the last action as a clearly labelled fallback. It replays the preceding
+`navigate`, `click`, `fill`, `press`, or `scroll` actions first, then runs the
+target and writes a new session report.
 If a context action fails, the target is not run and the report explains where
 reconstruction stopped. General trajectory replay and recovery are not
 implemented. The replay report also shows a clear `Reproduced` or `Not
@@ -149,7 +152,9 @@ reproduced` verdict, with the original and replay target outcomes side by side.
 
 To check whether a result is stable, use
 `evaluate_playwright_session_replay(...)`. It calls the bounded session replay
-on a fresh page for each requested run, keeps each run under `runs/001/`,
+on a fresh page for each requested run. The target action number is optional
+here as well, so the common failure-debugging path needs no action counting.
+It keeps each run under `runs/001/`,
 `runs/002/`, and so on, and writes an aggregate `report.html`. The aggregate
 report distinguishes a stable result, an intermittent result, and a result
 that was not reproduced. Its run table shows only the first trajectory

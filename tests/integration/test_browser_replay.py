@@ -19,6 +19,7 @@ from agent_devtools.serialization import (
     read_session_json,
     write_action_json,
 )
+from agent_devtools.verification import VerificationResult
 
 
 playwright = pytest.importorskip(
@@ -231,7 +232,6 @@ def test_evaluates_browser_replay_stability(tmp_path: Path) -> None:
             page_factory=lambda: browser.new_page(
                 viewport={"width": 1000, "height": 650}
             ),
-            target_action_number=2,
             runs=3,
             output_dir=evaluation_dir,
         )
@@ -241,16 +241,73 @@ def test_evaluates_browser_replay_stability(tmp_path: Path) -> None:
     assert evaluation.requested_runs == 3
     assert evaluation.reproduced_count == 3
     assert evaluation.not_reproduced_count == 0
+    assert evaluation.target_action_number == 2
+    assert evaluation.target_action_selection_note == (
+        "Automatically selected the first failed action."
+    )
     assert evaluation.report_path == evaluation_dir / "report.html"
     report_content = evaluation.report_path.read_text(encoding="utf-8")
     assert "Failure reproduced every time" in report_content
     assert "Reproduced</span>" in report_content
+    assert "Automatically selected the first failed action." in report_content
     for run_number in range(1, 4):
         run_dir = evaluation_dir / "runs" / f"{run_number:03d}"
         assert (run_dir / "session.json").is_file()
         assert (run_dir / "report.html").is_file()
         assert (run_dir / "actions/001/before.png").is_file()
         assert (run_dir / "actions/002/after.png").is_file()
+
+
+def test_auto_selects_last_action_after_final_task_failure(
+    tmp_path: Path,
+) -> None:
+    source_dir = tmp_path / "original"
+    replay_dir = tmp_path / "replay"
+    page_path = (
+        Path(__file__).parents[2] / "examples" / "browser_diagnostics.html"
+    ).resolve()
+
+    with playwright.sync_playwright() as browser_api:
+        browser = browser_api.chromium.launch(headless=True)
+        source_page = browser.new_page(
+            viewport={"width": 1000, "height": 650}
+        )
+        with RecordedPlaywrightExecutor(
+            source_page,
+            source_dir,
+            goal="Open the diagnostics page.",
+        ) as executor:
+            executor.navigate(page_path.as_uri())
+            executor.session.verification = VerificationResult(
+                expected_state="The wrong page is open",
+                observed_state="The diagnostics page is open",
+                passed=False,
+                failure_reason="The final page did not match the task.",
+            )
+        source_page.close()
+
+        source_session = read_session_json(source_dir / "session.json")
+        replay_page = browser.new_page(
+            viewport={"width": 1000, "height": 650}
+        )
+        result = replay_playwright_session_action(
+            replay_page,
+            source_session,
+            output_dir=replay_dir,
+        )
+        replay_page.close()
+        browser.close()
+
+    assert result.target_action_number == 1
+    assert result.target_action_selection_note == (
+        "Automatically selected the last action because final task "
+        "verification failed."
+    )
+    assert result.reproduced
+    report_content = (replay_dir / "report.html").read_text(encoding="utf-8")
+    assert "Automatically selected the last action because final task" in (
+        report_content
+    )
 
 
 def test_replays_browser_timeout_failure() -> None:

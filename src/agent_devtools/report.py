@@ -63,6 +63,7 @@ class ReplayReportSummary:
     reproduced: bool
     context_failure_action_number: int | None = None
     first_divergence: TrajectoryDivergence | None = None
+    target_action_selection_note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -800,6 +801,16 @@ def _replay_context_detail(summary: ReplayReportSummary) -> str:
     )
 
 
+def _replay_target_selection_detail(summary: ReplayReportSummary) -> str:
+    if summary.target_action_selection_note is None:
+        return ""
+    return (
+        "<div><dt>Selection</dt><dd>"
+        f"{escape(summary.target_action_selection_note)}"
+        "</dd></div>"
+    )
+
+
 _REPLAY_DIVERGENCE_LABELS = {
     DivergenceKind.ACTION_TYPE: "action type differed",
     DivergenceKind.ARGUMENTS: "arguments differed",
@@ -875,6 +886,7 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
         else "The replay did not match the original target outcome."
     )
     context_detail = _replay_context_detail(summary)
+    selection_detail = _replay_target_selection_detail(summary)
     divergence_section = _replay_divergence_section(summary)
 
     return f"""
@@ -906,6 +918,7 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
               <dt>Context</dt>
               <dd>{escape(context_detail)}</dd>
             </div>
+            {selection_detail}
           </dl>
           {divergence_section}
         </section>"""
@@ -959,6 +972,7 @@ def write_replay_stability_html(
     target_action_number: int,
     source_action: ActionRecord,
     runs: tuple[ReplayStabilityRunSummary, ...],
+    target_action_selection_note: str | None = None,
 ) -> None:
     if not runs:
         raise ValueError("replay stability reports require at least one run")
@@ -992,6 +1006,14 @@ def write_replay_stability_html(
             <td><span class="difference-label">{escape(first_difference)}</span></td>
             <td><a href="{report_link}">Open report</a></td>
           </tr>"""
+        )
+
+    selection_detail = ""
+    if target_action_selection_note is not None:
+        selection_detail = (
+            "<div><dt>Selection</dt><dd>"
+            f"{escape(target_action_selection_note)}"
+            "</dd></div>"
         )
 
     document = f"""<!doctype html>
@@ -1070,6 +1092,7 @@ def write_replay_stability_html(
           <div><dt>Action number</dt><dd>{target_action_number}</dd></div>
           <div><dt>Original outcome</dt>
             <dd>{escape(_replay_action_label(source_action))}</dd></div>
+          {selection_detail}
         </dl>
       </section>
       <section>

@@ -560,6 +560,9 @@ def test_session_report_displays_reproduced_replay_verdict(
             source_action=source_action,
             replayed_action=replayed_action,
             reproduced=True,
+            target_action_selection_note=(
+                "Automatically selected the first failed action."
+            ),
         ),
     )
 
@@ -569,6 +572,7 @@ def test_session_report_displays_reproduced_replay_verdict(
     assert "Original target" in content
     assert "Replay target" in content
     assert "1 preceding action rebuilt." in content
+    assert "Automatically selected the first failed action." in content
 
 
 def test_session_report_displays_unreproduced_replay_verdict(
@@ -765,6 +769,41 @@ def test_replay_stability_report_summarizes_mixed_results(
     assert "failure · target_not_found" in content
     assert "Action 2 · execution status differed." in content
     assert "First difference" in content
+
+
+def test_replay_stability_report_displays_target_selection_note(
+    tmp_path: Path,
+) -> None:
+    source_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#missing", "text": "Agent debugging"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    output_path = tmp_path / "stability.html"
+
+    write_replay_stability_html(
+        output_path,
+        target_action_number=1,
+        source_action=source_action,
+        runs=(
+            ReplayStabilityRunSummary(
+                1,
+                ReplayReportSummary(1, source_action, source_action, True),
+                Path("runs/001/report.html"),
+            ),
+        ),
+        target_action_selection_note=(
+            "Automatically selected the first failed action."
+        ),
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "Selection" in content
+    assert "Automatically selected the first failed action." in content
 
 
 def test_session_report_displays_agent_run_failure(

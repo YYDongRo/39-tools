@@ -128,6 +128,8 @@ package.
 - Replay stability reports show a concise first trajectory difference in the
   aggregate table; detailed original/replay values stay collapsed in each run
   report.
+- Playwright replay can select the first failed action automatically; if only
+  the final task check failed, it clearly labels the last-action fallback.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
 - Deterministic real-browser boundary demo:
   `examples/generic_agent_browser.py`.

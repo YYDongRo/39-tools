@@ -51,7 +51,6 @@ def main() -> None:
                 page_factory=lambda: browser.new_page(
                     viewport={"width": 1000, "height": 650}
                 ),
-                target_action_number=2,
                 runs=3,
                 output_dir=evaluation_dir,
             )
