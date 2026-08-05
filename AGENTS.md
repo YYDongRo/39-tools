@@ -134,6 +134,8 @@ package.
 - CLI task example: `examples/browser_use_cli.py`.
 - Deterministic real-browser boundary demo:
   `examples/generic_agent_browser.py`.
+- Deterministic no-dependency generic boundary demo:
+  `examples/generic_agent.py`.
 - Human-readable config: `agent_devtools.toml`, based on
   `agent_devtools.example.toml`.
 - CLI and custom-agent setup guide: `docs/cli.md`.

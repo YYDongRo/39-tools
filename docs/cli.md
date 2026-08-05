@@ -112,6 +112,18 @@ This is an explicit integration boundary. Direct calls such as
 The application can still keep its existing CLI: it only needs to pass the
 user's input to `observed_agent.run(user_request)` after the one-time setup.
 
+To understand this contract without installing a browser or connecting a real
+desktop, run the deterministic in-memory example:
+
+```bash
+uv run python examples/generic_agent.py
+```
+
+The example opens an in-memory Settings screen and clicks the wrong toggle by
+default. The report therefore shows two successful actions beside a failed
+final task check. Run it with `--correct` to see the passing result. It is a
+safe contract example, not an automatic desktop controller.
+
 ## What the user sees
 
 ```text

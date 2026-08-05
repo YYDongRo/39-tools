@@ -274,6 +274,18 @@ The deterministic demo opens `examples/browser_click.html`, records a
 navigation and click, verifies the final status text, and prints the report
 path. Remove `--headed` for a headless run.
 
+To see the same contract without installing a browser or using a real desktop,
+run the in-memory desktop-style demo:
+
+```bash
+uv run python examples/generic_agent.py
+```
+
+It intentionally clicks the wrong Settings toggle, so the actions succeed but
+the task check fails. Add `--correct` to see a passing task. This demo is a
+deterministic integration fixture, not desktop automation; your own agent must
+still route its operations through the supplied `tools` object.
+
 ## Current scope and alpha status
 
 Agent DevTools is an early alpha focused on Browser Use and Playwright agents.
