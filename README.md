@@ -69,19 +69,48 @@ below to connect your own agent and provider key.
 
 ## Install and run with Browser Use
 
-Agent DevTools is not yet published on PyPI. Install the early alpha directly
-from GitHub and install Chromium:
+Agent DevTools is not yet published on PyPI. The easiest way to try the
+included Browser Use workflow is from a clone of this repository:
 
 ```bash
-uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
-uv run playwright install chromium
+uv sync --extra browser-use
+uv run --extra browser-use playwright install chromium
 ```
 
 The displayed project name is **Agent DevTools**. The Python distribution is
 `39-tools`, while imports use `agent_devtools`.
 
-Keep your model provider key in the environment variable expected by Browser
-Use. Inside the application's async entry point, wrap an existing agent once:
+### Recommended: one command-line workflow
+
+The included CLI uses Browser Use with Gemini, asks for the task in the
+terminal, and creates the report without requiring you to write recording code.
+Set the provider key in your shell, never in the TOML file:
+
+```bash
+# WSL, macOS, or Linux
+export GOOGLE_API_KEY="your-key-from-Google"
+
+# PowerShell equivalent:
+# $env:GOOGLE_API_KEY = "your-key-from-Google"
+```
+
+Copy the recording settings once, then run tasks:
+
+```bash
+cp agent_devtools.example.toml agent_devtools.toml
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --headed --open-report
+```
+
+The CLI prints the exact report path and returns a non-zero exit code when the
+agent errors or the final task is failed or unverified. The configuration file
+controls screenshots, redaction, summaries, report opening, and output
+directories; it never stores provider credentials.
+
+### Advanced: wrap an existing Agent in Python
+
+For an application that already creates its own Browser Use Agent, keep your
+normal agent code and wrap it once at the integration boundary:
 
 ```python
 from browser_use import Agent, Browser, ChatGoogle
@@ -109,31 +138,13 @@ Use `agent.assert_last_task_passed()` when failed or unverified tasks should
 fail a test. An explicit goal is still supported for agents that do not expose
 their task as `agent.task`.
 
-### One-time setup, then run tasks from the CLI
-
-After installation and the one-time wrapper setup, a user can run the included
-CLI example, enter a task, and receive a report without adding recording code
-for that task:
-
-```bash
-cp agent_devtools.example.toml agent_devtools.toml
-uv run --extra browser-use python examples/browser_use_cli.py \
-  --headed --open-report
-```
-
-The command asks for the task, runs the existing Browser Use Agent, and prints
-the generated `report.html` path. It exits with a failure status when the
-Agent raises or the final task result is failed or unverified. The configuration
-file controls screenshots, redaction, summaries, report opening, and output
-directories; provider keys stay in environment variables.
-
 For a custom desktop or browser Agent, keep your existing CLI and connect its
 `run(task, *, tools=...)` boundary to `observe_agent(...)` once. Agent DevTools
 records calls made through `tools`; it does not intercept arbitrary direct
 `pyautogui` or browser calls. See the [CLI and custom-agent guide](docs/cli.md)
 for the exact contract and a desktop integration example.
 
-### Optional configuration
+### Optional configuration for Python integrations
 
 To keep setup in one human-readable file, copy
 [`agent_devtools.example.toml`](agent_devtools.example.toml) to

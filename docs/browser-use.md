@@ -27,6 +27,28 @@ Keep model provider credentials in the environment variables supported by
 Browser Use. Do not pass credentials to Agent DevTools or put them in source
 code.
 
+## Recommended first run
+
+If you cloned this repository, use the included terminal workflow before
+writing integration code:
+
+```bash
+export GOOGLE_API_KEY="your-key-from-Google"
+cp agent_devtools.example.toml agent_devtools.toml
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --headed --open-report
+```
+
+The CLI asks for the task, wraps the Browser Use Agent once, prints the exact
+report path, and exits non-zero for an agent error, failed task, or unverified
+task. The example currently uses Gemini through `ChatGoogle`; keep the key in
+the environment. PowerShell users can set the same variable with
+`$env:GOOGLE_API_KEY = "your-key-from-Google"`.
+
+If you installed `39-tools` into a separate application rather than cloning
+the repository, use the Python integration below instead; the repository's
+`examples/` directory is not installed as a package.
+
 ## Wrap an agent
 
 ```python

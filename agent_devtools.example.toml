@@ -1,6 +1,7 @@
 # Agent DevTools configuration for the Browser Use observer.
 #
-# Copy this file to agent_devtools.toml and pass that path to
+# Copy this file to agent_devtools.toml. The included browser_use_cli.py loads
+# it automatically; Python integrations pass the path to
 # observe_browser_use_agent(..., config="agent_devtools.toml").
 # The task still comes from the Browser Use Agent's task=... value.
 
