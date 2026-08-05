@@ -62,6 +62,25 @@ def _load_config() -> AgentDevToolsConfig | None:
     return AgentDevToolsConfig.from_file(path) if path.is_file() else None
 
 
+def _browser_kwargs(
+    config: AgentDevToolsConfig | None,
+    *,
+    headed: bool,
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {"headless": not headed}
+    if config is None or config.browser_executable_path is None:
+        return kwargs
+
+    executable_path = config.browser_executable_path
+    if not executable_path.is_file():
+        raise ValueError(
+            "configured browser executable was not found: "
+            f"{executable_path}"
+        )
+    kwargs["executable_path"] = str(executable_path)
+    return kwargs
+
+
 def _resolve_provider(requested: Provider) -> Literal["gemini", "openai"]:
     provider = requested
     if provider == "auto":
@@ -121,7 +140,11 @@ async def main() -> int:
         return 2
 
     config = _load_config()
-    browser = Browser(headless=not args.headed)
+    try:
+        browser = Browser(**_browser_kwargs(config, headed=args.headed))
+    except (OSError, ValueError) as error:
+        print(f"Configuration error: {error}")
+        return 2
     raw_agent = Agent(
         task=task,
         llm=llm,

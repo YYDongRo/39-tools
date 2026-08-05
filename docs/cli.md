@@ -49,7 +49,7 @@ Copy the optional recording configuration once:
 cp agent_devtools.example.toml agent_devtools.toml
 ```
 
-The file controls recording and output behavior only:
+The file controls recording, output, and optional browser selection:
 
 | Setting | Purpose |
 | --- | --- |
@@ -60,9 +60,28 @@ The file controls recording and output behavior only:
 | `open_report` | open the report automatically after a local run |
 | `trace_directory` | root for individual task traces |
 | `evaluation_directory` | root for repeated-run evaluations |
+| `browser.executable_path` | optional installed Brave/Chrome/Edge executable |
 
 The task and model remain in the Agent creation code. Credentials remain in
 environment variables.
+
+### Choose the browser
+
+The default is Playwright's managed Chromium. It is the easiest option for a
+repeatable first run and does not use your personal browser profile. To run
+the included Browser Use examples with an installed Brave, Chrome, or Edge,
+add this optional section to `agent_devtools.toml`:
+
+```toml
+[agent_devtools.browser]
+executable_path = "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+```
+
+Use a path that exists in the environment where the command runs. For Linux,
+an example is `/usr/bin/brave-browser`; for WSL, use a browser executable
+available to the WSL runtime rather than copying a Windows path blindly. The
+path selects the browser binary only; it does not select or reuse a personal
+browser profile. Remove the section to return to managed Chromium.
 
 ## Run a task from the terminal
 

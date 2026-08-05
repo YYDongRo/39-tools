@@ -28,3 +28,12 @@ trace_directory = "trace/browser-use"
 
 # Root directory for repeated-run Browser Use evaluations.
 evaluation_directory = "evaluations/browser-use"
+
+# Browser choice for the included Browser Use examples.
+# Leave this section out to use Playwright's managed Chromium (the default).
+# To use an installed browser, set a path that exists in the environment
+# running the command. Do not point this at your personal browser profile.
+# Uncomment the section and use the path for your environment.
+# [agent_devtools.browser]
+# executable_path = "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+# Linux example: "/usr/bin/brave-browser"

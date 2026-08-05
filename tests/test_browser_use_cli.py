@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from agent_devtools.config import AgentDevToolsConfig
+
 
 pytest.importorskip("browser_use")
 
@@ -13,6 +15,28 @@ SPEC = importlib.util.spec_from_file_location("browser_use_cli_example", MODULE_
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+def test_browser_kwargs_use_managed_browser_by_default() -> None:
+    assert MODULE._browser_kwargs(None, headed=True) == {"headless": False}
+
+
+def test_browser_kwargs_use_configured_executable(tmp_path: Path) -> None:
+    executable = tmp_path / "brave"
+    executable.write_text("browser", encoding="utf-8")
+    config = AgentDevToolsConfig(browser_executable_path=executable)
+
+    assert MODULE._browser_kwargs(config, headed=False) == {
+        "headless": True,
+        "executable_path": str(executable),
+    }
+
+
+def test_browser_kwargs_reject_missing_executable() -> None:
+    config = AgentDevToolsConfig(browser_executable_path=Path("missing-browser"))
+
+    with pytest.raises(ValueError, match="browser executable was not found"):
+        MODULE._browser_kwargs(config, headed=False)
 
 
 def test_auto_provider_uses_only_configured_gemini_key(

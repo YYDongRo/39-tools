@@ -114,6 +114,21 @@ still read from `Agent(task=...)`; API keys remain environment variables. If no
 config is passed, the defaults remain in effect. A disabled configuration
 passes the call through to the original Agent and creates no report.
 
+The included CLI and Browser Use evaluation example use Playwright's managed
+Chromium by default. To use an installed Brave, Chrome, or Edge binary, add
+the optional browser section to the same TOML file:
+
+```toml
+[agent_devtools.browser]
+executable_path = "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+```
+
+The path must exist in the environment running the command. A Linux example is
+`/usr/bin/brave-browser`. This selects the browser executable but does not
+reuse a personal browser profile or login session. Remove the section to use
+managed Chromium again. Browser Use accepts this custom executable path, but a
+custom browser version can be less reproducible than the managed default.
+
 Pass an output directory when the default `trace/browser-use/` is not suitable:
 
 ```python

@@ -16,6 +16,7 @@ class AgentDevToolsConfig:
     open_report: bool = False
     trace_directory: Path = Path("trace") / "browser-use"
     evaluation_directory: Path = Path("evaluations") / "browser-use"
+    browser_executable_path: Path | None = None
 
     @classmethod
     def from_file(cls, path: str | Path) -> "AgentDevToolsConfig":
@@ -56,6 +57,7 @@ class AgentDevToolsConfig:
             "open_report",
             "trace_directory",
             "evaluation_directory",
+            "browser",
         }
         unknown = set(section).difference(allowed)
         if unknown:
@@ -86,6 +88,7 @@ class AgentDevToolsConfig:
                 "evaluation_directory",
                 Path("evaluations") / "browser-use",
             ),
+            "browser_executable_path": _browser_executable_path(section),
         }
         return cls(**values)
 
@@ -106,6 +109,33 @@ def _path_option(
     if not isinstance(value, str) or not value.strip():
         raise TypeError(f"Agent DevTools config option {name!r} must be a path")
     return Path(value)
+
+
+def _browser_executable_path(
+    section: dict[object, object],
+) -> Path | None:
+    value = section.get("browser", {})
+    if not isinstance(value, dict):
+        raise TypeError(
+            "Agent DevTools config section 'browser' must be a TOML table"
+        )
+
+    unknown = set(value).difference({"executable_path"})
+    if unknown:
+        names = ", ".join(sorted(str(name) for name in unknown))
+        raise ValueError(
+            "unknown Agent DevTools browser option(s): " + names
+        )
+
+    executable_path = value.get("executable_path")
+    if executable_path is None:
+        return None
+    if not isinstance(executable_path, str) or not executable_path.strip():
+        raise TypeError(
+            "Agent DevTools config option 'browser.executable_path' "
+            "must be a path"
+        )
+    return Path(executable_path)
 
 
 __all__ = ["AgentDevToolsConfig"]

@@ -74,6 +74,28 @@ def _load_local_config() -> AgentDevToolsConfig | None:
     return AgentDevToolsConfig.from_file(path) if path.is_file() else None
 
 
+def _browser_kwargs(
+    config: AgentDevToolsConfig | None,
+    *,
+    headed: bool,
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "headless": not headed,
+        "allowed_domains": ["example.com"],
+    }
+    if config is None or config.browser_executable_path is None:
+        return kwargs
+
+    executable_path = config.browser_executable_path
+    if not executable_path.is_file():
+        raise ValueError(
+            "configured browser executable was not found: "
+            f"{executable_path}"
+        )
+    kwargs["executable_path"] = str(executable_path)
+    return kwargs
+
+
 def _print_summary(evaluation: AgentEvaluation) -> None:
     result = "PASS" if evaluation.all_runs_passed else "FAIL"
     print("Agent DevTools stability evaluation")
@@ -94,14 +116,17 @@ async def main() -> int:
     args = _parser().parse_args()
     config = _load_local_config()
 
+    try:
+        browser_kwargs = _browser_kwargs(config, headed=args.headed)
+    except ValueError as error:
+        print(f"Configuration error: {error}")
+        return 2
+
     def create_agent(task: str) -> Agent:
         return Agent(
             task=task,
             llm=ChatGoogle(model="gemini-2.5-flash"),
-            browser=Browser(
-                headless=not args.headed,
-                allowed_domains=["example.com"],
-            ),
+            browser=Browser(**browser_kwargs),
             use_judge=True,
         )
 

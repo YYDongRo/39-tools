@@ -116,8 +116,26 @@ default model is not suitable.
 
 The CLI prints the exact report path and returns a non-zero exit code when the
 agent errors or the final task is failed or unverified. The configuration file
-controls screenshots, redaction, summaries, report opening, and output
-directories; it never stores provider credentials.
+controls screenshots, redaction, summaries, report opening, output directories,
+and the optional browser executable; it never stores provider credentials.
+
+#### Use Brave, Chrome, or Edge instead
+
+The default uses Playwright's managed Chromium, which is the most repeatable
+choice and does not use your personal browser profile. To use an installed
+browser for the included CLI or repeated-evaluation example, add this section
+to `agent_devtools.toml`:
+
+```toml
+[agent_devtools.browser]
+executable_path = "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+```
+
+Use a path that exists in the environment running the command. For Linux, a
+typical Brave path is `/usr/bin/brave-browser`. Remove the section to return to
+managed Chromium. This selects the browser executable only; it does not reuse
+your personal profile or login session. See the [CLI guide](docs/cli.md) for
+the Windows, Linux, and WSL path notes.
 
 ### Advanced: wrap an existing Agent in Python
 
@@ -136,7 +154,11 @@ from browser_use import Agent, Browser, ChatGoogle
 from agent_devtools.browser_use import observe_browser_use_agent
 
 task = "Open example.com and confirm the Example Domain page is open."
-browser = Browser(headless=False)
+browser = Browser(
+    headless=False,
+    # Optional: use an installed browser instead of managed Chromium.
+    # executable_path="C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe",
+)
 raw_agent = Agent(
     task=task,
     llm=ChatGoogle(model="gemini-2.5-flash"),

@@ -15,6 +15,7 @@ def test_config_defaults_preserve_observer_behavior() -> None:
     assert config.open_report is False
     assert config.trace_directory == Path("trace") / "browser-use"
     assert config.evaluation_directory == Path("evaluations") / "browser-use"
+    assert config.browser_executable_path is None
 
 
 def test_config_reads_human_editable_toml(tmp_path: Path) -> None:
@@ -29,6 +30,9 @@ terminal_summary = false
 open_report = true
 trace_directory = "custom-trace"
 evaluation_directory = "custom-evaluations"
+
+[agent_devtools.browser]
+executable_path = "/usr/bin/brave-browser"
 """,
         encoding="utf-8",
     )
@@ -43,6 +47,7 @@ evaluation_directory = "custom-evaluations"
         open_report=True,
         trace_directory=Path("custom-trace"),
         evaluation_directory=Path("custom-evaluations"),
+        browser_executable_path=Path("/usr/bin/brave-browser"),
     )
 
 
@@ -50,6 +55,11 @@ def test_config_rejects_unknown_options() -> None:
     with pytest.raises(ValueError, match="unknown Agent DevTools config"):
         AgentDevToolsConfig.from_mapping(
             {"agent_devtools": {"not_a_real_option": True}}
+        )
+
+    with pytest.raises(ValueError, match="unknown Agent DevTools browser"):
+        AgentDevToolsConfig.from_mapping(
+            {"agent_devtools": {"browser": {"engine": "brave"}}}
         )
 
 
@@ -67,6 +77,16 @@ def test_config_rejects_wrong_option_types() -> None:
     with pytest.raises(TypeError, match="must be a path"):
         AgentDevToolsConfig.from_mapping(
             {"agent_devtools": {"trace_directory": "   "}}
+        )
+
+    with pytest.raises(TypeError, match="browser.executable_path.*must be a path"):
+        AgentDevToolsConfig.from_mapping(
+            {"agent_devtools": {"browser": {"executable_path": "   "}}}
+        )
+
+    with pytest.raises(TypeError, match="browser.*TOML table"):
+        AgentDevToolsConfig.from_mapping(
+            {"agent_devtools": {"browser": "brave"}}
         )
 
 
