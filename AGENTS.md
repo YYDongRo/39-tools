@@ -125,6 +125,9 @@ package.
 - Generic agent observer: `observe_agent(...)` and `observe_async_agent(...)`.
 - Repeated evaluator: `evaluate_browser_use_agent(...)`.
 - Replay stability evaluator: `evaluate_playwright_session_replay(...)`.
+- Replay stability reports show a concise first trajectory difference in the
+  aggregate table; detailed original/replay values stay collapsed in each run
+  report.
 - Product-shaped example: `examples/browser_use_evaluation.py`.
 - Deterministic real-browser boundary demo:
   `examples/generic_agent_browser.py`.

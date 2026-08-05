@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.analysis import TrajectoryFinding, analyze_session
+from agent_devtools.evaluation import DivergenceKind, TrajectoryDivergence
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
 from agent_devtools.session import ActionSession
@@ -61,6 +62,7 @@ class ReplayReportSummary:
     replayed_action: ActionRecord | None
     reproduced: bool
     context_failure_action_number: int | None = None
+    first_divergence: TrajectoryDivergence | None = None
 
 
 @dataclass(frozen=True)
@@ -798,6 +800,72 @@ def _replay_context_detail(summary: ReplayReportSummary) -> str:
     )
 
 
+_REPLAY_DIVERGENCE_LABELS = {
+    DivergenceKind.ACTION_TYPE: "action type differed",
+    DivergenceKind.ARGUMENTS: "arguments differed",
+    DivergenceKind.EXECUTION_STATUS: "execution status differed",
+    DivergenceKind.ACTION_VERIFICATION: "action check differed",
+    DivergenceKind.PAGE_URL: "page URL differed",
+    DivergenceKind.BROWSER_ERROR: "browser error differed",
+    DivergenceKind.STATE: "page state differed",
+    DivergenceKind.TRAJECTORY_FINDING: "trajectory finding differed",
+    DivergenceKind.MISSING_ACTION: "replay ended early",
+    DivergenceKind.EXTRA_ACTION: "replay added an action",
+    DivergenceKind.FINAL_VERIFICATION: "final check differed",
+}
+
+
+def _replay_divergence_label(
+    divergence: TrajectoryDivergence | None,
+    *,
+    reproduced: bool,
+) -> str:
+    if divergence is None:
+        return "No trajectory difference." if reproduced else "Target outcome differed."
+    location = (
+        f"Action {divergence.action_number}"
+        if divergence.action_number is not None
+        else "Final result"
+    )
+    label = _REPLAY_DIVERGENCE_LABELS[divergence.kind]
+    return f"{location} · {label}."
+
+
+def _replay_divergence_section(summary: ReplayReportSummary) -> str:
+    divergence = summary.first_divergence
+    if divergence is None:
+        return ""
+    label = _replay_divergence_label(
+        divergence,
+        reproduced=summary.reproduced,
+    )
+    baseline = escape(
+        json.dumps(
+            divergence.baseline,
+            ensure_ascii=False,
+            indent=2,
+            default=str,
+        )
+    )
+    observed = escape(
+        json.dumps(
+            divergence.observed,
+            ensure_ascii=False,
+            indent=2,
+            default=str,
+        )
+    )
+    return f"""
+          <details class="replay-divergence">
+            <summary>First difference · {escape(label)}</summary>
+            <p>{escape(divergence.summary)}</p>
+            <div class="replay-divergence-values">
+              <div><strong>Original</strong><pre>{baseline}</pre></div>
+              <div><strong>Replay</strong><pre>{observed}</pre></div>
+            </div>
+          </details>"""
+
+
 def _replay_summary_section(summary: ReplayReportSummary) -> str:
     verdict = "Reproduced" if summary.reproduced else "Not reproduced"
     verdict_class = "reproduced" if summary.reproduced else "not-reproduced"
@@ -807,6 +875,7 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
         else "The replay did not match the original target outcome."
     )
     context_detail = _replay_context_detail(summary)
+    divergence_section = _replay_divergence_section(summary)
 
     return f"""
         <section class="replay-summary replay-summary-{verdict_class}">
@@ -838,6 +907,7 @@ def _replay_summary_section(summary: ReplayReportSummary) -> str:
               <dd>{escape(context_detail)}</dd>
             </div>
           </dl>
+          {divergence_section}
         </section>"""
 
 
@@ -907,6 +977,10 @@ def write_replay_stability_html(
         summary = run.replay_summary
         verdict = "reproduced" if summary.reproduced else "not reproduced"
         verdict_class = "passed" if summary.reproduced else "failed"
+        first_difference = _replay_divergence_label(
+            summary.first_divergence,
+            reproduced=summary.reproduced,
+        )
         report_link = _safe_replay_report_path(run.report_path)
         rows.append(
             f"""
@@ -915,7 +989,7 @@ def write_replay_stability_html(
             <td><span class="pill {verdict_class}">{verdict}</span></td>
             <td>{escape(_replay_action_label(summary.source_action))}</td>
             <td>{escape(_replay_action_label(summary.replayed_action))}</td>
-            <td>{escape(_replay_context_detail(summary))}</td>
+            <td><span class="difference-label">{escape(first_difference)}</span></td>
             <td><a href="{report_link}">Open report</a></td>
           </tr>"""
         )
@@ -958,6 +1032,7 @@ def write_replay_stability_html(
                padding: 5px 9px; text-transform: uppercase; }}
       .passed {{ background: #dcfce7; color: #166534; }}
       .failed {{ background: #fee2e2; color: #991b1b; }}
+      .difference-label {{ color: #334155; font-weight: 600; }}
       .table-wrap {{ overflow-x: auto; }}
       table {{ border-collapse: collapse; width: 100%; }}
       th, td {{ border-bottom: 1px solid #e2e8f0; padding: 13px 10px;
@@ -1002,7 +1077,7 @@ def write_replay_stability_html(
         <div class="table-wrap">
           <table>
             <thead><tr><th>Run</th><th>Verdict</th><th>Original</th>
-              <th>Replay</th><th>Context</th><th>Trace</th></tr></thead>
+              <th>Replay</th><th>First difference</th><th>Trace</th></tr></thead>
             <tbody>{''.join(rows)}</tbody>
           </table>
         </div>
@@ -1241,6 +1316,15 @@ def write_session_html(
       .replay-summary-not-reproduced .replay-verdict-mark {{ color: #92400e; }}
       .replay-comparison {{ gap: 14px; margin: 18px 0 0; }}
       .replay-comparison dd {{ font-weight: 600; }}
+      .replay-divergence {{ border-top: 1px solid #e2e8f0; color: #475569;
+                            margin-top: 18px; padding-top: 14px; }}
+      .replay-divergence summary {{ cursor: pointer; font-weight: 700; }}
+      .replay-divergence p {{ margin: 10px 0 14px; }}
+      .replay-divergence-values {{ display: grid; gap: 14px;
+                                   grid-template-columns: repeat(2, 1fr); }}
+      .replay-divergence-values strong {{ color: #64748b; font-size: 12px;
+                                          text-transform: uppercase; }}
+      .replay-divergence-values pre {{ margin: 6px 0 0; }}
       .run-stats {{ display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
                     margin-top: 16px; }}
       .run-stat {{ background: #f8fafc; border: 1px solid #e2e8f0;
@@ -1380,7 +1464,8 @@ def write_session_html(
       .missing {{ color: #64748b; }}
       .empty-state {{ padding: 32px; text-align: center; }}
       @media (max-width: 800px) {{
-        dl, .action-screenshots, .replay-comparison, .run-stats {{
+        dl, .action-screenshots, .replay-comparison, .replay-divergence-values,
+        .run-stats {{
           grid-template-columns: 1fr;
         }}
         .title-row, .action-heading, .findings-heading {{ align-items: flex-start;

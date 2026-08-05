@@ -55,6 +55,15 @@
       .replay-summary-not-reproduced .replay-verdict-mark { color: #92400e; }
       .replay-comparison { gap: 14px; margin: 18px 0 0; }
       .replay-comparison dd { font-weight: 600; }
+      .replay-divergence { border-top: 1px solid #e2e8f0; color: #475569;
+                            margin-top: 18px; padding-top: 14px; }
+      .replay-divergence summary { cursor: pointer; font-weight: 700; }
+      .replay-divergence p { margin: 10px 0 14px; }
+      .replay-divergence-values { display: grid; gap: 14px;
+                                   grid-template-columns: repeat(2, 1fr); }
+      .replay-divergence-values strong { color: #64748b; font-size: 12px;
+                                          text-transform: uppercase; }
+      .replay-divergence-values pre { margin: 6px 0 0; }
       .run-stats { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr);
                     margin-top: 16px; }
       .run-stat { background: #f8fafc; border: 1px solid #e2e8f0;
@@ -194,7 +203,8 @@
       .missing { color: #64748b; }
       .empty-state { padding: 32px; text-align: center; }
       @media (max-width: 800px) {
-        dl, .action-screenshots, .replay-comparison, .run-stats {
+        dl, .action-screenshots, .replay-comparison, .replay-divergence-values,
+        .run-stats {
           grid-template-columns: 1fr;
         }
         .title-row, .action-heading, .findings-heading { align-items: flex-start;

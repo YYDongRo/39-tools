@@ -13,6 +13,8 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.evaluation import DivergenceKind, TrajectoryDivergence
+from agent_devtools.evaluation_analysis import compare_trajectories
 from agent_devtools.failure import FailureCategory
 from agent_devtools.integrations.playwright_events import (
     AsyncPlaywrightEventCollector,
@@ -964,6 +966,13 @@ class PlaywrightSessionReplayResult:
             and self.target_result.outcome_matches
         )
 
+    @property
+    def first_divergence(self) -> TrajectoryDivergence | None:
+        return _replay_trajectory_divergence(
+            self.source_session,
+            self.replayed_session,
+        )
+
 
 class ReplayStabilityStatus(StrEnum):
     STABLE = "stable"
@@ -1043,6 +1052,20 @@ def _validated_replay_actions(
     return tuple(source_actions)
 
 
+def _replay_trajectory_divergence(
+    source_session: ActionSession,
+    replayed_session: ActionSession,
+) -> TrajectoryDivergence | None:
+    divergence = compare_trajectories(source_session, replayed_session)
+    if (
+        divergence is not None
+        and divergence.kind is DivergenceKind.FINAL_VERIFICATION
+    ):
+        # A bounded action replay does not rerun the session's final task check.
+        return None
+    return divergence
+
+
 def replay_playwright_session_action(
     page: Page,
     source_session: ActionSession,
@@ -1104,6 +1127,10 @@ def replay_playwright_session_action(
 
         replayed_session = executor.session
 
+    first_divergence = _replay_trajectory_divergence(
+        source_session,
+        replayed_session,
+    )
     write_session_html(
         replayed_session,
         output_dir / "report.html",
@@ -1121,6 +1148,7 @@ def replay_playwright_session_action(
                 and context_failure_action_number is None
             ),
             context_failure_action_number=context_failure_action_number,
+            first_divergence=first_divergence,
         ),
     )
 
@@ -1199,6 +1227,7 @@ def evaluate_playwright_session_replay(
                     context_failure_action_number=(
                         result.context_failure_action_number
                     ),
+                    first_divergence=result.first_divergence,
                 ),
                 report_path=Path("runs")
                 / f"{run_number:03d}"

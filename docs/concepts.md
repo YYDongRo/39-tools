@@ -152,7 +152,9 @@ To check whether a result is stable, use
 on a fresh page for each requested run, keeps each run under `runs/001/`,
 `runs/002/`, and so on, and writes an aggregate `report.html`. The aggregate
 report distinguishes a stable result, an intermittent result, and a result
-that was not reproduced. The local demo can be run with:
+that was not reproduced. Its run table shows only the first trajectory
+difference by default; the linked individual report keeps the original and
+replay evidence in a collapsed detail section. The local demo can be run with:
 
 ```bash
 uv run --extra browser python examples/browser_replay_stability.py

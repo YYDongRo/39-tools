@@ -2,7 +2,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.evaluation import DivergenceKind, TrajectoryDivergence
 from agent_devtools.failure import FailureCategory
+from agent_devtools.integrations.playwright import PlaywrightSessionReplayResult
 from agent_devtools.report import (
     ReplayReportSummary,
     ReplayStabilityRunSummary,
@@ -608,6 +610,85 @@ def test_session_report_displays_unreproduced_replay_verdict(
     assert "1 preceding action rebuilt." in content
 
 
+def test_session_report_collapses_replay_first_difference(
+    tmp_path: Path,
+) -> None:
+    source_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "headphones"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    replayed_action = ActionRecord(
+        action_type="fill",
+        arguments={"selector": "#search", "text": "headphones"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    divergence = TrajectoryDivergence(
+        kind=DivergenceKind.EXECUTION_STATUS,
+        action_number=2,
+        summary="First observed divergence at action 2: execution status differed.",
+        baseline={"status": "failure"},
+        observed={"status": "success"},
+    )
+    output_path = tmp_path / "replay.html"
+
+    write_session_html(
+        ActionSession(actions=[replayed_action]),
+        output_path,
+        replay_summary=ReplayReportSummary(
+            target_action_number=2,
+            source_action=source_action,
+            replayed_action=replayed_action,
+            reproduced=False,
+            first_divergence=divergence,
+        ),
+    )
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "First difference · Action 2 · execution status differed." in content
+    assert "First observed divergence at action 2" in content
+    assert 'class="replay-divergence"' in content
+    assert "&quot;status&quot;: &quot;failure&quot;" in content
+    assert "&quot;status&quot;: &quot;success&quot;" in content
+
+
+def test_playwright_replay_result_exposes_first_difference() -> None:
+    source_action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.FAILURE,
+        failure_reason="The target was not found.",
+        failure_category=FailureCategory.TARGET_NOT_FOUND,
+    )
+    replayed_action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#target"},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+    )
+    result = PlaywrightSessionReplayResult(
+        source_session=ActionSession(actions=[source_action]),
+        replayed_session=ActionSession(actions=[replayed_action]),
+        target_action_number=1,
+        target_result=None,
+        context_failure_action_number=None,
+        report_path=Path("report.html"),
+    )
+
+    assert result.first_divergence is not None
+    assert result.first_divergence.kind is DivergenceKind.EXECUTION_STATUS
+    assert result.first_divergence.action_number == 1
+
+
 def test_replay_stability_report_summarizes_mixed_results(
     tmp_path: Path,
 ) -> None:
@@ -636,6 +717,13 @@ def test_replay_stability_report_summarizes_mixed_results(
         duration_ms=32,
         status=ActionStatus.SUCCESS,
     )
+    divergence = TrajectoryDivergence(
+        kind=DivergenceKind.EXECUTION_STATUS,
+        action_number=2,
+        summary="First observed divergence at action 2: execution status differed.",
+        baseline={"status": "failure"},
+        observed={"status": "success"},
+    )
     output_path = tmp_path / "stability.html"
 
     write_replay_stability_html(
@@ -650,7 +738,13 @@ def test_replay_stability_report_summarizes_mixed_results(
             ),
             ReplayStabilityRunSummary(
                 2,
-                ReplayReportSummary(2, source_action, successful_action, False),
+                ReplayReportSummary(
+                    2,
+                    source_action,
+                    successful_action,
+                    False,
+                    first_divergence=divergence,
+                ),
                 Path("runs/002/report.html"),
             ),
             ReplayStabilityRunSummary(
@@ -669,6 +763,8 @@ def test_replay_stability_report_summarizes_mixed_results(
     assert 'href="runs/001/report.html"' in content
     assert 'href="runs/003/report.html"' in content
     assert "failure · target_not_found" in content
+    assert "Action 2 · execution status differed." in content
+    assert "First difference" in content
 
 
 def test_session_report_displays_agent_run_failure(
