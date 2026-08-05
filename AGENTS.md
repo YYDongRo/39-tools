@@ -109,6 +109,10 @@ package.
   into agents with `run(task, *, tools=...)`, so a caller does not instrument
   each action manually. They also accept an optional provider-neutral
   `final_state_verifier` for task-level judge results.
+- The generic observers also accept an optional BYOK `trajectory_verifier`
+  (use `trajectory_judge_from_env()` for OpenAI or Gemini) that reviews the
+  task, structured action evidence, and final state in one request, attaching
+  action-level and task-level results. Provider errors remain `unverified`.
 - Optional OpenAI/Gemini expectation and final-state integrations remain
   bounded, provider-specific, and probabilistic. They must not silently
   replace deterministic verification semantics.

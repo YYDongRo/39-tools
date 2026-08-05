@@ -26,6 +26,9 @@ trace with:
   `run(task, *, tools=...)`, with sync and async recording proxies.
 - an optional provider-neutral final-state verifier for that generic boundary;
   verifier errors remain `unverified`.
+- an optional BYOK trajectory judge that can infer action and final checks from
+  the task and bounded structured evidence in one provider request; uncertain
+  or unavailable model results remain `unverified`.
 - sequential repeated-run Browser Use evaluation with fresh Agents, preserved
   per-run traces, empirical pass-rate statistics, trajectory divergence, and a
   static aggregate stability report.

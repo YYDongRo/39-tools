@@ -92,6 +92,13 @@ The final-state verifier is an alternative to the deterministic
 `task_verification` callback. Its errors are recorded as `unverified`, and it
 must never be treated as ground truth merely because it uses an LLM.
 
+For a one-time BYOK setup, `trajectory_judge_from_env()` can be passed as a
+`trajectory_verifier`. It sends one bounded request containing the task, all
+structured action evidence, and the final state, then attaches one result to
+each action and one result to the session. It does not upload screenshots and
+does not store provider keys. The provider response is still probabilistic;
+missing or uncertain evidence stays `unverified`.
+
 ## Failure analysis
 
 Core recording classifies timeouts, operation errors, verification mismatches,

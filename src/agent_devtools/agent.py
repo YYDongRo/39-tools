@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Generic, TypeVar
 from uuid import uuid4
 
+from agent_devtools.action import ActionStatus
 from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
@@ -16,6 +17,7 @@ from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import record_agent_run_failure
 from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.tool_recorder import RecordedTools, record_tools
+from agent_devtools.trajectory import TrajectoryVerificationResult
 from agent_devtools.verification import VerificationResult
 
 
@@ -36,6 +38,13 @@ SyncFinalStateVerifier = Callable[[FinalStateObservation], VerificationResult]
 AsyncFinalStateVerifier = Callable[
     [FinalStateObservation], VerificationResult | Awaitable[VerificationResult]
 ]
+SyncTrajectoryVerifier = Callable[
+    [FinalStateObservation], TrajectoryVerificationResult
+]
+AsyncTrajectoryVerifier = Callable[
+    [FinalStateObservation],
+    TrajectoryVerificationResult | Awaitable[TrajectoryVerificationResult],
+]
 
 
 class ObservedAgent(Generic[AgentT, ToolT]):
@@ -52,6 +61,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         observe_state: SyncStateObserver | None = None,
         task_verification: SyncTaskVerification | None = None,
         final_state_verifier: SyncFinalStateVerifier | None = None,
+        trajectory_verifier: SyncTrajectoryVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
     ) -> None:
@@ -60,6 +70,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         _validate_final_state_verifier(
             task_verification,
             final_state_verifier,
+            trajectory_verifier,
         )
         self.agent = agent
         self.tools = tools
@@ -69,6 +80,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         self.observe_state = observe_state
         self.task_verification = task_verification
         self.final_state_verifier = final_state_verifier
+        self.trajectory_verifier = trajectory_verifier
         self.methods = methods
         self.event_collector = event_collector
         self.last_trace: RecordedTools[ToolT] | None = None
@@ -128,6 +140,13 @@ class ObservedAgent(Generic[AgentT, ToolT]):
                             self.observe_state,
                             self.final_state_verifier,
                         )
+                    if self.trajectory_verifier is not None:
+                        _apply_trajectory_verifier(
+                            trace,
+                            task,
+                            self.observe_state,
+                            self.trajectory_verifier,
+                        )
                     return result
                 except BaseException as error:
                     record_agent_run_failure(trace.session, error)
@@ -163,6 +182,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         observe_state: AsyncStateObserver | None = None,
         task_verification: AsyncTaskVerification | None = None,
         final_state_verifier: AsyncFinalStateVerifier | None = None,
+        trajectory_verifier: AsyncTrajectoryVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
     ) -> None:
@@ -171,6 +191,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         _validate_final_state_verifier(
             task_verification,
             final_state_verifier,
+            trajectory_verifier,
         )
         self.agent = agent
         self.tools = tools
@@ -180,6 +201,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         self.observe_state = observe_state
         self.task_verification = task_verification
         self.final_state_verifier = final_state_verifier
+        self.trajectory_verifier = trajectory_verifier
         self.methods = methods
         self.event_collector = event_collector
         self.last_trace: RecordedAsyncTools[ToolT] | None = None
@@ -237,6 +259,13 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
                             self.observe_state,
                             self.final_state_verifier,
                         )
+                    if self.trajectory_verifier is not None:
+                        await _apply_async_trajectory_verifier(
+                            trace,
+                            task,
+                            self.observe_state,
+                            self.trajectory_verifier,
+                        )
                     return resolved_result
                 except BaseException as error:
                     record_agent_run_failure(trace.session, error)
@@ -268,6 +297,7 @@ def observe_agent(
     observe_state: SyncStateObserver | None = None,
     task_verification: SyncTaskVerification | None = None,
     final_state_verifier: SyncFinalStateVerifier | None = None,
+    trajectory_verifier: SyncTrajectoryVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
 ) -> ObservedAgent[AgentT, ToolT]:
@@ -280,6 +310,7 @@ def observe_agent(
         observe_state=observe_state,
         task_verification=task_verification,
         final_state_verifier=final_state_verifier,
+        trajectory_verifier=trajectory_verifier,
         methods=methods,
         event_collector=event_collector,
     )
@@ -295,6 +326,7 @@ def observe_async_agent(
     observe_state: AsyncStateObserver | None = None,
     task_verification: AsyncTaskVerification | None = None,
     final_state_verifier: AsyncFinalStateVerifier | None = None,
+    trajectory_verifier: AsyncTrajectoryVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
 ) -> ObservedAsyncAgent[AgentT, ToolT]:
@@ -307,6 +339,7 @@ def observe_async_agent(
         observe_state=observe_state,
         task_verification=task_verification,
         final_state_verifier=final_state_verifier,
+        trajectory_verifier=trajectory_verifier,
         methods=methods,
         event_collector=event_collector,
     )
@@ -327,13 +360,25 @@ def _validate_optional_task(task: object) -> None:
 def _validate_final_state_verifier(
     task_verification: object,
     final_state_verifier: object,
+    trajectory_verifier: object,
 ) -> None:
-    if task_verification is not None and final_state_verifier is not None:
+    configured = sum(
+        value is not None
+        for value in (
+            task_verification,
+            final_state_verifier,
+            trajectory_verifier,
+        )
+    )
+    if configured > 1:
         raise ValueError(
-            "use either task_verification or final_state_verifier, not both"
+            "use either task_verification, final_state_verifier, or "
+            "trajectory_verifier, not more than one"
         )
     if final_state_verifier is not None and not callable(final_state_verifier):
         raise TypeError("final_state_verifier must be callable or None")
+    if trajectory_verifier is not None and not callable(trajectory_verifier):
+        raise TypeError("trajectory_verifier must be callable or None")
 
 
 def _build_final_state_observation(
@@ -460,6 +505,120 @@ async def _apply_async_final_state_verifier(
     _store_final_state_verification(trace, result)
 
 
+def _apply_trajectory_verifier(
+    trace: RecordedTools[object],
+    task: str,
+    observe_state: SyncStateObserver | None,
+    verifier: SyncTrajectoryVerifier,
+) -> None:
+    try:
+        observation = _build_final_state_observation(
+            trace,
+            task,
+            observe_state,
+        )
+        result = verifier(observation)
+        if isawaitable(result):
+            close = getattr(result, "close", None)
+            if callable(close):
+                close()
+            raise TypeError(
+                "async trajectory verifiers require "
+                "observe_async_agent()"
+            )
+        if not isinstance(result, TrajectoryVerificationResult):
+            raise TypeError(
+                "trajectory_verifier must return "
+                "TrajectoryVerificationResult"
+            )
+        _store_trajectory_verification(trace, result)
+    except Exception as error:
+        _store_trajectory_verification_error(trace, error)
+
+
+async def _apply_async_trajectory_verifier(
+    trace: RecordedAsyncTools[object],
+    task: str,
+    observe_state: AsyncStateObserver | None,
+    verifier: AsyncTrajectoryVerifier,
+) -> None:
+    try:
+        state = observe_state() if observe_state is not None else {}
+        if isawaitable(state):
+            state = await state
+        if not isinstance(state, dict):
+            raise TypeError("observe_state must return a dictionary")
+
+        screenshot_path: Path | None = None
+        if trace.session.actions:
+            relative_path = trace.session.actions[-1].screenshot_after
+            if relative_path is not None:
+                screenshot_path = (
+                    trace.report_path.parent / relative_path
+                ).resolve()
+        observation = FinalStateObservation(
+            task=task,
+            state=state,
+            actions=tuple(trace.session.actions),
+            screenshot_path=screenshot_path,
+            trace_directory=trace.report_path.resolve().parent,
+        )
+        result = verifier(observation)
+        if isawaitable(result):
+            result = await result
+        if not isinstance(result, TrajectoryVerificationResult):
+            raise TypeError(
+                "trajectory_verifier must return "
+                "TrajectoryVerificationResult"
+            )
+        _store_trajectory_verification(trace, result)
+    except Exception as error:
+        _store_trajectory_verification_error(trace, error)
+
+
+def _store_trajectory_verification(
+    trace: RecordedTools[object] | RecordedAsyncTools[object],
+    result: TrajectoryVerificationResult,
+) -> None:
+    actions = trace.session.actions
+    if len(result.actions) != len(actions):
+        raise ValueError(
+            "trajectory_verifier must return one action result per recorded "
+            "action"
+        )
+
+    notes = result.action_notes or (None,) * len(actions)
+    for action, verification, note in zip(
+        actions,
+        result.actions,
+        notes,
+        strict=True,
+    ):
+        if action.status is ActionStatus.FAILURE:
+            # Execution failure is authoritative; a model cannot turn it into
+            # a successful action verification.
+            continue
+        action.verification = verification
+        if note is not None:
+            action.observations["verification_note"] = note
+
+    trace.session.verification = result.final
+    trace.session.verification_source = result.source
+    trace.session.verification_note = result.note
+
+
+def _store_trajectory_verification_error(
+    trace: RecordedTools[object] | RecordedAsyncTools[object],
+    error: Exception,
+) -> None:
+    trace.session.verification = None
+    trace.session.verification_source = "generic:trajectory"
+    trace.session.verification_note = (
+        "Trajectory verification unavailable "
+        f"({type(error).__name__})."
+    )
+
+
 def _resolve_task(
     agent: object,
     configured_task: str | None,
@@ -487,6 +646,7 @@ __all__ = [
     "FinalStateObservation",
     "ObservedAgent",
     "ObservedAsyncAgent",
+    "TrajectoryVerificationResult",
     "observe_agent",
     "observe_async_agent",
 ]

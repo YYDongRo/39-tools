@@ -18,7 +18,16 @@ from agent_devtools.replay import ReplayResult, replay_click, replay_fill
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.tool_recorder import RecordedTools, record_tools
+from agent_devtools.trajectory import TrajectoryVerificationResult
 from agent_devtools.verification import VerificationResult
+from agent_devtools.integrations.trajectory_judge import (
+    AsyncGeminiTrajectoryJudge,
+    AsyncOpenAITrajectoryJudge,
+    GeminiTrajectoryJudge,
+    OpenAITrajectoryJudge,
+    async_trajectory_judge_from_env,
+    trajectory_judge_from_env,
+)
 
 
 __all__ = [
@@ -36,7 +45,13 @@ __all__ = [
     "ReplayResult",
     "SessionRecorder",
     "TrajectoryFinding",
+    "TrajectoryVerificationResult",
     "VerificationResult",
+    "AsyncGeminiTrajectoryJudge",
+    "AsyncOpenAITrajectoryJudge",
+    "GeminiTrajectoryJudge",
+    "OpenAITrajectoryJudge",
+    "async_trajectory_judge_from_env",
     "analyze_session",
     "read_action_json",
     "read_session_json",
@@ -46,4 +61,5 @@ __all__ = [
     "record_tools",
     "replay_click",
     "replay_fill",
+    "trajectory_judge_from_env",
 ]

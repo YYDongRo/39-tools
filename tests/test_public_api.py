@@ -104,7 +104,16 @@ from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.tool_recorder import RecordedTools, record_tools
+from agent_devtools.trajectory import TrajectoryVerificationResult
 from agent_devtools.verification import VerificationResult
+from agent_devtools.integrations.trajectory_judge import (
+    AsyncGeminiTrajectoryJudge,
+    AsyncOpenAITrajectoryJudge,
+    GeminiTrajectoryJudge,
+    OpenAITrajectoryJudge,
+    async_trajectory_judge_from_env,
+    trajectory_judge_from_env,
+)
 
 
 def test_core_public_api_exports_supported_types() -> None:
@@ -123,7 +132,14 @@ def test_core_public_api_exports_supported_types() -> None:
         "ReplayResult": ReplayResult,
         "SessionRecorder": SessionRecorder,
         "TrajectoryFinding": TrajectoryFinding,
+        "TrajectoryVerificationResult": TrajectoryVerificationResult,
         "VerificationResult": VerificationResult,
+        "AsyncGeminiTrajectoryJudge": AsyncGeminiTrajectoryJudge,
+        "AsyncOpenAITrajectoryJudge": AsyncOpenAITrajectoryJudge,
+        "GeminiTrajectoryJudge": GeminiTrajectoryJudge,
+        "OpenAITrajectoryJudge": OpenAITrajectoryJudge,
+        "async_trajectory_judge_from_env": async_trajectory_judge_from_env,
+        "trajectory_judge_from_env": trajectory_judge_from_env,
         "analyze_session": analyze_session,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,

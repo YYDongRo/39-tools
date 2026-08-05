@@ -283,9 +283,46 @@ def judge(observation: FinalStateObservation) -> VerificationResult:
 ```
 
 The observation contains the task, final structured state, recorded actions,
-and the last after-screenshot when one was captured. A judge can later call an
-LLM, but the core stays provider-neutral. If the judge raises or returns
-invalid data, the report stays `unverified`; it never invents a success.
+and the last after-screenshot when one was captured. If the judge raises or
+returns invalid data, the report stays `unverified`; it never invents a
+success.
+
+### Optional BYOK trajectory judge
+
+If you want the tool to infer checks from the task instead of writing a
+deterministic verifier, configure one provider key once in the environment:
+
+```bash
+export AGENT_DEVTOOLS_LLM_PROVIDER=openai
+export OPENAI_API_KEY="your-key-from-the-provider"
+# Or use Gemini:
+# export AGENT_DEVTOOLS_LLM_PROVIDER=gemini
+# export GEMINI_API_KEY="your-key-from-the-provider"
+```
+
+Then add the judge once at the same wrapper boundary:
+
+```python
+from agent_devtools import observe_agent, trajectory_judge_from_env
+
+observed = observe_agent(
+    raw_agent,
+    my_tools,
+    "trace/my-agent",
+    observe_state=observe_state,
+    trajectory_verifier=trajectory_judge_from_env(),
+)
+```
+
+After each normal run, one structured LLM request receives the user task, all
+recorded action evidence, and the final structured state. It returns a check
+for every action plus a final task verdict, so the developer does not repeat
+the task or hard-code an expectation for each step. The key is read by the
+provider SDK and is never saved in traces or reports. Structured state and
+action arguments are sent to the selected provider; screenshots remain local
+evidence and are not uploaded by this judge. LLM results are probabilistic:
+provider errors, invalid responses, or insufficient evidence remain
+`unverified`.
 
 To try this boundary with a real local browser and no model API key:
 

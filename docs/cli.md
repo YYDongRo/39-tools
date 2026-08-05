@@ -125,10 +125,40 @@ def judge(observation: FinalStateObservation) -> VerificationResult:
     )
 ```
 
-The callback can later be backed by an LLM, but it is not tied to a provider.
 If it fails, Agent DevTools records an `unverified` result with a sanitized
 verification note. Configure either `task_verification` or
 `final_state_verifier`, not both.
+
+For a provider-backed check that infers the expected result from the task and
+reviews every recorded action in one request, configure a BYOK provider once:
+
+```bash
+export AGENT_DEVTOOLS_LLM_PROVIDER=openai
+export OPENAI_API_KEY="your-key-from-the-provider"
+# Or: export AGENT_DEVTOOLS_LLM_PROVIDER=gemini
+#     export GEMINI_API_KEY="your-key-from-the-provider"
+```
+
+Use the environment-backed judge at the same one-time wrapper setup:
+
+```python
+from agent_devtools import observe_agent, trajectory_judge_from_env
+
+observed_agent = observe_agent(
+    raw_agent,
+    MyTools(),
+    "trace/my-agent",
+    observe_state=observe_state,
+    trajectory_verifier=trajectory_judge_from_env(),
+)
+```
+
+The judge sees the task, structured action evidence, and final state. It writes
+one action verification per recorded action and one final task result. The
+provider SDK reads the key from the environment; Agent DevTools does not store
+it. Action arguments and structured state are sent to the provider, while
+screenshots stay local in this version. Missing credentials, provider errors,
+or uncertain evidence remain `unverified`.
 
 This is an explicit integration boundary. Direct calls such as
 `pyautogui.click(...)` made outside `tools` are not automatically visible.

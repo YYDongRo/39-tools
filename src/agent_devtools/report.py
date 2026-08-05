@@ -1260,10 +1260,13 @@ def write_session_html(
         )
     task_verification_section = ""
     if session.verification is not None:
+        assessment_type = session.verification.evidence.get(
+            "assessment_type"
+        )
         verification_title = (
             "AI task assessment"
-            if session.verification.evidence.get("assessment_type")
-            == "ai_final_state"
+            if isinstance(assessment_type, str)
+            and assessment_type in {"ai_final_state", "ai_trajectory"}
             else "Deterministic final checks"
             if session.verification.evidence.get("verification_type")
             == "browser-use-final-state"

@@ -5,6 +5,7 @@ import pytest
 
 from agent_devtools import (
     FinalStateObservation,
+    TrajectoryVerificationResult,
     VerificationResult,
     observe_agent,
     observe_async_agent,
@@ -315,6 +316,81 @@ def test_final_state_verifier_error_leaves_task_unverified(
     )
 
 
+def test_trajectory_verifier_stores_action_and_task_results(
+    tmp_path: Path,
+) -> None:
+    def verify(
+        observation: FinalStateObservation,
+    ) -> TrajectoryVerificationResult:
+        assert observation.task == "Click the target"
+        action_result = VerificationResult(
+            expected_state="the target receives the click",
+            observed_state="the click advanced the task",
+            passed=True,
+            evidence={"assessment_type": "ai_trajectory_action"},
+        )
+        final_result = VerificationResult(
+            expected_state=observation.task,
+            observed_state="the target is open",
+            passed=True,
+            evidence={"assessment_type": "ai_trajectory"},
+        )
+        return TrajectoryVerificationResult(
+            final=final_result,
+            actions=(action_result,),
+            source="fake:trajectory",
+        )
+
+    observed = observe_agent(
+        Agent("Click the target"),
+        Tools(),
+        tmp_path / "trace",
+        trajectory_verifier=verify,
+    )
+
+    observed.run()
+
+    assert observed.last_trace is not None
+    action = observed.last_trace.session.actions[0]
+    assert action.verification is not None
+    assert action.verification.passed
+    assert observed.last_trace.session.verification is not None
+    assert observed.last_trace.session.verification.passed
+    assert observed.last_trace.session.verification_source == (
+        "fake:trajectory"
+    )
+
+
+def test_trajectory_verifier_error_leaves_task_unverified(
+    tmp_path: Path,
+) -> None:
+    def verify(_: FinalStateObservation) -> TrajectoryVerificationResult:
+        raise RuntimeError("secret-trajectory-detail")
+
+    observed = observe_agent(
+        Agent("Click the target"),
+        Tools(),
+        tmp_path / "trace",
+        trajectory_verifier=verify,
+    )
+
+    observed.run()
+
+    assert observed.last_trace is not None
+    session = observed.last_trace.session
+    assert session.verification is None
+    assert session.verification_source == "generic:trajectory"
+    assert session.verification_note == (
+        "Trajectory verification unavailable (RuntimeError)."
+    )
+    assert all(action.verification is None for action in session.actions)
+    assert "secret-trajectory-detail" not in (
+        observed.last_report_path.read_text(encoding="utf-8")
+        if observed.last_report_path is not None
+        else ""
+    )
+
+
 def test_observed_agent_rejects_two_task_verification_modes(
     tmp_path: Path,
 ) -> None:
@@ -361,5 +437,41 @@ def test_observed_async_agent_supports_async_final_state_verifier(
         assert observed.last_trace is not None
         assert observed.last_trace.session.verification is not None
         assert observed.last_trace.session.verification.passed is True
+
+    asyncio.run(run())
+
+
+def test_observed_async_agent_supports_async_trajectory_verifier(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        async def verify(
+            observation: FinalStateObservation,
+        ) -> TrajectoryVerificationResult:
+            result = VerificationResult(
+                expected_state="the target receives the click",
+                observed_state=str(observation.state),
+                passed=True,
+            )
+            return TrajectoryVerificationResult(
+                final=result,
+                actions=(result,),
+                source="fake:async-trajectory",
+            )
+
+        observed = observe_async_agent(
+            AsyncAgent("Click the target asynchronously"),
+            AsyncTools(),
+            tmp_path / "trace",
+            observe_state=lambda: {"ready": True},
+            trajectory_verifier=verify,
+        )
+
+        await observed.run()
+        assert observed.last_trace is not None
+        assert observed.last_trace.session.verification_source == (
+            "fake:async-trajectory"
+        )
+        assert observed.last_trace.session.actions[0].verification is not None
 
     asyncio.run(run())
