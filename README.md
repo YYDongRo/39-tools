@@ -58,7 +58,8 @@ below to connect your own agent and provider key.
   supported integrations
 - Arguments, timing, execution status, failure category, and failure reason
 - Before-and-after screenshots, URLs, and compact structured state
-- Action-level checks and final task verification as different result levels
+- Automatic Browser Use navigation-host checks plus final task verification as
+  different result levels
 - Controlled post-run replay for validated `click` and `fill` actions
 - Repeated Playwright session replay with stable, intermittent, or unreproduced
   results, a concise first-difference summary, and automatic failed-action

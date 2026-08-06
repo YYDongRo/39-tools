@@ -91,11 +91,13 @@ class Agent:
         *,
         action_type: str = "navigate",
         arguments: dict[str, object] | None = None,
+        after_url: str = "https://example.com",
         history: History | None = None,
         step_callback: object | None = None,
     ) -> None:
         self.action_type = action_type
         self.arguments = arguments or {"url": "https://example.com"}
+        self.after_url = after_url
         self.finished_history = history or History()
         self.history = History()
         self.browser_session = BrowserSession()
@@ -123,7 +125,7 @@ class Agent:
 
         self.history = History()
         self.browser_session.state = State(
-            "https://example.com",
+            self.after_url,
             "Example Domain",
         )
         assert callable(on_step_end)
@@ -189,7 +191,66 @@ def test_observer_records_navigation_with_one_setup_call(
         assert session.actions[0].status is ActionStatus.SUCCESS
         assert session.actions[0].screenshot_before is not None
         assert session.actions[0].screenshot_after is not None
+        assert session.actions[0].verification is not None
+        assert session.actions[0].verification.passed is True
+        assert session.actions[0].verification.evidence["comparison"] == (
+            "hostname"
+        )
         assert session.outcome is ActionOutcome.SUCCESS
+
+    asyncio.run(run())
+
+
+def test_observer_marks_navigation_to_another_host_as_action_failure(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_agent = Agent(after_url="https://wrong.example")
+        agent = observe_browser_use_agent(
+            raw_agent,
+            "Open example.com",
+            tmp_path,
+        )
+
+        await agent.run(max_steps=3)
+
+        assert agent.last_session is not None
+        action = agent.last_session.actions[0]
+        assert action.status is ActionStatus.SUCCESS
+        assert action.verification is not None
+        assert action.verification.passed is False
+        assert "wrong.example" in (action.verification.failure_reason or "")
+        assert action.outcome is ActionOutcome.FAILURE
+        report_path = agent.last_report_path
+        assert report_path is not None
+        report = report_path.read_text(encoding="utf-8")
+        assert "browser-use-navigation-host" in report
+        assert "Action check" in report
+
+    asyncio.run(run())
+
+
+def test_observer_leaves_navigation_unverified_without_http_url(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_agent = Agent(
+            arguments={"url": "file:///tmp/example.html"},
+            after_url="file:///tmp/example.html",
+        )
+        agent = observe_browser_use_agent(
+            raw_agent,
+            "Open the local page",
+            tmp_path,
+        )
+
+        await agent.run(max_steps=3)
+
+        assert agent.last_session is not None
+        action = agent.last_session.actions[0]
+        assert action.status is ActionStatus.SUCCESS
+        assert action.verification is None
+        assert action.outcome is ActionOutcome.UNVERIFIED
 
     asyncio.run(run())
 

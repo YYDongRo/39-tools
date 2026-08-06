@@ -6,6 +6,7 @@ All notable changes to Agent DevTools are recorded here.
 
 - Add the installable `agent-devtools` command for the Browser Use workflow.
 - Add an optional versioned `--summary-json` output for CI result checks.
+- Add a tolerant hostname check for successful Browser Use `navigate` actions.
 - Keep `examples/browser_use_cli.py` as a compatibility wrapper.
 - Document the current Python, Browser Use, and Playwright support baseline.
 

@@ -169,6 +169,9 @@ each action it can preserve:
 - before-and-after screenshots;
 - URL, title, and bounded page state;
 - Browser Use action errors and results;
+- an automatic action check for HTTP/HTTPS `navigate` steps: the requested and
+  observed hostnames are compared, while normal path/query redirects are
+  tolerated;
 - the final Browser Use judge result as task verification.
 
 Read-only operations such as `done`, extraction, screenshots, and state reads
@@ -187,6 +190,15 @@ from whether individual actions executed successfully:
 - a click can execute successfully while the final task still fails;
 - a recovered intermediate failure can remain visible while the task passes;
 - a run without a usable judge result remains `unverified`.
+
+For HTTP/HTTPS `navigate` actions, Agent DevTools also performs a small local
+check without asking for another expectation: it compares the hostname in the
+action's requested URL with the hostname observed after the action. A different
+hostname is an action-verification failure even when Browser Use reported that
+the operation executed; a missing or non-HTTP URL remains unverified. This
+check is intentionally tolerant of redirects and does not prove that the
+correct product or page content was selected. Use the final task check for
+that broader question.
 
 Use this assertion in a test or CI job:
 

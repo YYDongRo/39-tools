@@ -11,6 +11,7 @@ from inspect import isawaitable
 from pathlib import Path
 from time import monotonic_ns
 from typing import Awaitable, Generic, TypeAlias, TypeVar
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
@@ -297,6 +298,16 @@ class _BrowserUseRecorder:
         if observation_error is not None:
             observations["state_after_error_type"] = observation_error
 
+        action_verification = (
+            None
+            if failed
+            else _navigate_verification(
+                pending.action_type,
+                pending.arguments,
+                state_after,
+            )
+        )
+
         action = ActionRecord(
             action_type=pending.action_type,
             arguments=pending.arguments,
@@ -311,6 +322,7 @@ class _BrowserUseRecorder:
             ),
             failure_evidence=failure_evidence,
             observations=observations,
+            verification=action_verification,
         )
         self.session.actions.append(action)
         self.session.verification = None
@@ -867,6 +879,66 @@ def _page_state(
         redact_sensitive_data=redact_sensitive_data,
     )
     return safe_state if isinstance(safe_state, dict) else {}
+
+
+def _navigation_host(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+
+    candidate = value.strip()
+    parsed = urlsplit(candidate)
+    if parsed.scheme and parsed.scheme.lower() not in {"http", "https"}:
+        return None
+    if not parsed.scheme and not candidate.startswith("//"):
+        parsed = urlsplit(f"//{candidate}")
+    try:
+        host = parsed.hostname
+    except ValueError:
+        return None
+    return host.lower().rstrip(".") if host else None
+
+
+def _navigate_verification(
+    action_type: str,
+    arguments: dict[str, object],
+    state_after: dict[str, object],
+) -> VerificationResult | None:
+    if action_type != "navigate":
+        return None
+
+    expected_url = arguments.get("url")
+    observed_url = state_after.get("url")
+    expected_host = _navigation_host(expected_url)
+    observed_host = _navigation_host(observed_url)
+    if expected_host is None or observed_host is None:
+        return None
+
+    passed = expected_host == observed_host
+    return VerificationResult(
+        expected_state=f"page host is {expected_host!r}",
+        observed_state=(
+            f"page host is {observed_host!r}"
+            if passed
+            else f"page URL is {observed_url!r}"
+        ),
+        passed=passed,
+        failure_reason=(
+            None
+            if passed
+            else (
+                f"navigation ended on host {observed_host!r}; "
+                f"expected {expected_host!r}"
+            )
+        ),
+        evidence={
+            "verification_type": "browser-use-navigation-host",
+            "comparison": "hostname",
+            "expected_url": expected_url,
+            "observed_url": observed_url,
+            "expected_host": expected_host,
+            "observed_host": observed_host,
+        },
+    )
 
 
 def _save_screenshot(

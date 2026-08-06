@@ -60,7 +60,8 @@ explain what happened. It does not by itself establish what should have
 happened. Verification requires one of:
 
 - a deterministic developer-supplied check;
-- a check derived directly from the action, such as fill value equality;
+- a check derived directly from the action, such as fill value equality or the
+  Browser Use navigation-host check;
 - a framework judge;
 - an optional model assessment grounded in bounded observed state.
 
