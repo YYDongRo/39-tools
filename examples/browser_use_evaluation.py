@@ -46,6 +46,14 @@ def _parser() -> argparse.ArgumentParser:
         help="task to repeat (default: Example Domain check)",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=(
+            "Agent DevTools TOML path (default: agent_devtools.toml if present)"
+        ),
+    )
+    parser.add_argument(
         "--title-contains",
         default="Example Domain",
         help="required text in the final page title (default: Example Domain)",
@@ -69,9 +77,15 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_local_config() -> AgentDevToolsConfig | None:
-    path = Path("agent_devtools.toml")
-    return AgentDevToolsConfig.from_file(path) if path.is_file() else None
+def _load_local_config(path: Path | None = None) -> AgentDevToolsConfig | None:
+    config_path = path or Path("agent_devtools.toml")
+    if not config_path.is_file():
+        if path is not None:
+            raise FileNotFoundError(
+                f"Agent DevTools config does not exist: {config_path}"
+            )
+        return None
+    return AgentDevToolsConfig.from_file(config_path)
 
 
 def _browser_kwargs(
@@ -114,7 +128,11 @@ def _print_summary(evaluation: AgentEvaluation) -> None:
 
 async def main() -> int:
     args = _parser().parse_args()
-    config = _load_local_config()
+    try:
+        config = _load_local_config(args.config)
+    except (FileNotFoundError, TypeError, ValueError) as error:
+        print(f"Configuration error: {error}")
+        return 2
 
     try:
         browser_kwargs = _browser_kwargs(config, headed=args.headed)

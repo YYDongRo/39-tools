@@ -129,6 +129,17 @@ reuse a personal browser profile or login session. Remove the section to use
 managed Chromium again. Browser Use accepts this custom executable path, but a
 custom browser version can be less reproducible than the managed default.
 
+When Windows and WSL need different browser paths, keep separate local TOML
+files and select one with the CLI:
+
+```bash
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --config agent_devtools.windows.toml \
+  --headed --open-report
+```
+
+Without `--config`, the CLI loads `agent_devtools.toml` when it exists.
+
 Pass an output directory when the default `trace/browser-use/` is not suitable:
 
 ```python

@@ -26,6 +26,14 @@ def _parser() -> argparse.ArgumentParser:
         help="task to run; prompt interactively when omitted",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=(
+            "Agent DevTools TOML path (default: agent_devtools.toml if present)"
+        ),
+    )
+    parser.add_argument(
         "--max-steps",
         type=int,
         default=10,
@@ -57,9 +65,15 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_config() -> AgentDevToolsConfig | None:
-    path = Path("agent_devtools.toml")
-    return AgentDevToolsConfig.from_file(path) if path.is_file() else None
+def _load_config(path: Path | None = None) -> AgentDevToolsConfig | None:
+    config_path = path or Path("agent_devtools.toml")
+    if not config_path.is_file():
+        if path is not None:
+            raise FileNotFoundError(
+                f"Agent DevTools config does not exist: {config_path}"
+            )
+        return None
+    return AgentDevToolsConfig.from_file(config_path)
 
 
 def _browser_kwargs(
@@ -139,7 +153,11 @@ async def main() -> int:
         print(f"Configuration error: {error}")
         return 2
 
-    config = _load_config()
+    try:
+        config = _load_config(args.config)
+    except (FileNotFoundError, TypeError, ValueError) as error:
+        print(f"Configuration error: {error}")
+        return 2
     try:
         browser = Browser(**_browser_kwargs(config, headed=args.headed))
     except (OSError, ValueError) as error:

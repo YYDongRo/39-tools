@@ -17,6 +17,32 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def test_cli_accepts_explicit_config_path() -> None:
+    args = MODULE._parser().parse_args(
+        ["--config", "agent_devtools.windows.toml"]
+    )
+
+    assert args.config == Path("agent_devtools.windows.toml")
+
+
+def test_cli_loads_explicit_config_path(tmp_path: Path) -> None:
+    config_path = tmp_path / "windows.toml"
+    config_path.write_text(
+        "[agent_devtools]\nenabled = false\n",
+        encoding="utf-8",
+    )
+
+    config = MODULE._load_config(config_path)
+
+    assert config is not None
+    assert config.enabled is False
+
+
+def test_cli_reports_missing_explicit_config_path(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        MODULE._load_config(tmp_path / "missing.toml")
+
+
 def test_browser_kwargs_use_managed_browser_by_default() -> None:
     assert MODULE._browser_kwargs(None, headed=True) == {"headless": False}
 

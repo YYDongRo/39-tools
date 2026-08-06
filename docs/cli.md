@@ -83,6 +83,20 @@ available to the WSL runtime rather than copying a Windows path blindly. The
 path selects the browser binary only; it does not select or reuse a personal
 browser profile. Remove the section to return to managed Chromium.
 
+To keep separate settings for different environments, pass a configuration
+file explicitly. The default is still `agent_devtools.toml` when that file is
+present:
+
+```bash
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --config agent_devtools.windows.toml \
+  --headed --open-report
+```
+
+For example, keep a Windows Brave file and a WSL Chromium file side by side.
+Files matching `agent_devtools.*.toml` are ignored by Git so machine-specific
+browser paths are not committed.
+
 ## Run a task from the terminal
 
 The included example prompts for a task when `--task` is omitted:

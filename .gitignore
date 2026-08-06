@@ -185,3 +185,5 @@ cython_debug/
 
 # Optional local Agent DevTools configuration
 agent_devtools.toml
+agent_devtools.*.toml
+!agent_devtools.example.toml

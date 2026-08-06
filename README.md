@@ -137,6 +137,18 @@ managed Chromium. This selects the browser executable only; it does not reuse
 your personal profile or login session. See the [CLI guide](docs/cli.md) for
 the Windows, Linux, and WSL path notes.
 
+If you use different browsers in different environments, keep separate local
+files and select one without editing it:
+
+```bash
+uv run --extra browser-use python examples/browser_use_cli.py \
+  --config agent_devtools.windows.toml \
+  --headed --open-report
+```
+
+The CLI still reads `agent_devtools.toml` automatically when `--config` is not
+provided. Platform-specific `agent_devtools.*.toml` files are ignored by Git.
+
 ### Advanced: wrap an existing Agent in Python
 
 For an application that already creates its own Browser Use Agent, install the
