@@ -120,9 +120,23 @@ automatically. If both are present, choose one explicitly with
 default model is not suitable.
 
 The CLI prints the exact report path and returns a non-zero exit code when the
-agent errors or the final task is failed or unverified. The configuration file
-controls screenshots, redaction, summaries, report opening, output directories,
-and the optional browser executable; it never stores provider credentials.
+agent errors or the final task is failed or unverified. For CI, also request a
+small machine-readable result without replacing the detailed report:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --summary-json ci/agent-devtools-summary.json
+```
+
+The summary is schema-versioned and contains the overall `status`
+(`passed`, `failed`, `unverified`, or `errored`), action counts, final-check
+status, and local paths to `report.html` and `session.json`. It stores only an
+exception type such as `TimeoutError`, never raw exception text or provider
+credentials. The full HTML/JSON trace remains the source for debugging. The
+configuration file controls screenshots, redaction, summaries, report opening,
+output directories, and the optional browser executable; it never stores
+provider credentials.
 
 #### Use Brave, Chrome, or Edge instead
 

@@ -126,6 +126,20 @@ prints the report path. A report is created even when the Agent raises or the
 final task verification fails. The command exits non-zero for a failed or
 unverified task, which makes it usable in a test script or CI job.
 
+For a stable machine-readable CI handoff, add `--summary-json`:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --summary-json ci/agent-devtools-summary.json
+```
+
+This writes a small schema-versioned JSON file with `status` (`passed`,
+`failed`, `unverified`, or `errored`), action counts, final-check status, and
+local paths to the full HTML report and `session.json`. The detailed report is
+still generated for debugging. Error summaries include only the exception type,
+not the raw message or provider credentials.
+
 To skip the prompt, pass the task directly:
 
 ```bash

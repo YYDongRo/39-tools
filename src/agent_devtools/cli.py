@@ -8,11 +8,15 @@ import os
 from pathlib import Path
 from typing import Literal, Sequence
 
+from agent_devtools.action import ActionStatus
 from agent_devtools.browser_use import observe_browser_use_agent
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.serialization import _write_json
+from agent_devtools.session import ActionSession
 
 
 Provider = Literal["auto", "gemini", "openai"]
+SummaryStatus = Literal["passed", "failed", "unverified", "errored"]
 
 
 def _browser_use_parser() -> argparse.ArgumentParser:
@@ -60,6 +64,14 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         "--open-report",
         action="store_true",
         help="open the report after the task finishes",
+    )
+    parser.add_argument(
+        "--summary-json",
+        type=Path,
+        help=(
+            "write a concise versioned CI summary JSON to this path; "
+            "the full report is still generated"
+        ),
     )
     return parser
 
@@ -145,11 +157,108 @@ def _create_llm(
     return ChatOpenAI(model=model or "gpt-4o", api_key=key)
 
 
+def _summary_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    resolved_path = path.resolve()
+    try:
+        return resolved_path.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return resolved_path.as_posix()
+
+
+def _summary_status(
+    session: ActionSession | None,
+    *,
+    run_error: BaseException | None = None,
+) -> SummaryStatus:
+    if run_error is not None:
+        return "errored"
+    if session is None or session.verification is None:
+        return "unverified"
+    return "passed" if session.verification.passed else "failed"
+
+
+def _build_summary(
+    *,
+    status: SummaryStatus,
+    report_path: Path | None,
+    session: ActionSession | None = None,
+    error_type: str | None = None,
+) -> dict[str, object]:
+    actions = session.actions if session is not None else []
+    verification = session.verification if session is not None else None
+    return {
+        "schema_version": 1,
+        "status": status,
+        "action_count": len(actions),
+        "action_success_count": sum(
+            action.status is ActionStatus.SUCCESS for action in actions
+        ),
+        "action_failure_count": sum(
+            action.status is ActionStatus.FAILURE for action in actions
+        ),
+        "final_check": (
+            "not_run"
+            if verification is None
+            else "passed"
+            if verification.passed
+            else "failed"
+        ),
+        "report_path": _summary_path(report_path),
+        "session_path": (
+            _summary_path(report_path.parent / "session.json")
+            if report_path is not None
+            else None
+        ),
+        "error_type": error_type,
+    }
+
+
+def _write_summary(
+    path: Path | None,
+    *,
+    status: SummaryStatus,
+    report_path: Path | None,
+    session: ActionSession | None = None,
+    error_type: str | None = None,
+) -> None:
+    if path is None:
+        return
+    _write_json(
+        _build_summary(
+            status=status,
+            report_path=report_path,
+            session=session,
+            error_type=error_type,
+        ),
+        path,
+    )
+    print(f"Summary: {path.resolve()}")
+
+
+def _write_errored_summary(
+    path: Path | None,
+    error_type: str,
+    *,
+    report_path: Path | None = None,
+    session: ActionSession | None = None,
+) -> None:
+    _write_summary(
+        path,
+        status="errored",
+        report_path=report_path,
+        session=session,
+        error_type=error_type,
+    )
+
+
 async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     args = _browser_use_parser().parse_args(argv)
     task = (args.task or input("Task: ")).strip()
     if not task:
         print("Task cannot be empty.")
+        _write_errored_summary(args.summary_json, "ValueError")
         return 2
 
     try:
@@ -160,6 +269,7 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
             "with: uv add '39-tools[browser-use] @ "
             "git+https://github.com/YYDongRo/39-tools.git'"
         )
+        _write_errored_summary(args.summary_json, "ImportError")
         return 2
 
     try:
@@ -167,17 +277,20 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         llm = _create_llm(provider, args.model)
     except ValueError as error:
         print(f"Configuration error: {error}")
+        _write_errored_summary(args.summary_json, type(error).__name__)
         return 2
 
     try:
         config = _load_config(args.config)
     except (FileNotFoundError, TypeError, ValueError) as error:
         print(f"Configuration error: {error}")
+        _write_errored_summary(args.summary_json, type(error).__name__)
         return 2
     try:
         browser = Browser(**_browser_kwargs(config, headed=args.headed))
     except (OSError, ValueError) as error:
         print(f"Configuration error: {error}")
+        _write_errored_summary(args.summary_json, type(error).__name__)
         return 2
     raw_agent = Agent(
         task=task,
@@ -198,11 +311,22 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     report_path = agent.last_report_path
     if report_path is None:
         print("No report was created.")
+        _write_errored_summary(
+            args.summary_json,
+            "ReportNotCreated",
+            session=agent.last_session,
+        )
         return 1
 
     print(f"Report: {report_path.resolve()}")
     if run_error is not None:
         print(f"Agent run failed: {type(run_error).__name__}")
+        _write_errored_summary(
+            args.summary_json,
+            type(run_error).__name__,
+            report_path=report_path,
+            session=agent.last_session,
+        )
         return 1
 
     try:
@@ -213,6 +337,13 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     else:
         print("Task result: PASS")
         result_is_verified = True
+
+    _write_summary(
+        args.summary_json,
+        status=_summary_status(agent.last_session),
+        report_path=report_path,
+        session=agent.last_session,
+    )
 
     if args.open_report and not (config is not None and config.open_report):
         try:
