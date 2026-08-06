@@ -147,6 +147,11 @@ contract, output layout, statistics, and limitations. A short machine-readable
 `--summary-json` file is also available for local scripts and CI; it does not
 replace the detailed HTML report.
 
+To compare future evaluations automatically, set
+`compare_previous = true` in the copied `agent_devtools.toml`. The first run
+has no baseline; later runs with the exact same task create a concise
+`comparison.html` and `comparison.json` beside the current evaluation.
+
 ## Other integrations
 
 For an existing Playwright or custom agent, use the observer that matches its

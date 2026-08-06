@@ -23,6 +23,10 @@ terminal_summary = true
 # Set to true for local development. Keep false in CI and headless jobs.
 open_report = false
 
+# Set to true to compare each repeated evaluation with the latest evaluation
+# of the same task. The first evaluation has no previous result to compare.
+compare_previous = true
+
 # Relative to the current working directory unless an absolute path is used.
 trace_directory = "trace/browser-use"
 

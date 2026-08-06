@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable
 from dataclasses import replace
@@ -15,9 +16,19 @@ from agent_devtools.evaluation import (
     EvaluationRun,
     EvaluationRunStatus,
 )
+from agent_devtools.evaluation_comparison import compare_evaluations
+from agent_devtools.evaluation_comparison_report import (
+    write_evaluation_comparison_html,
+)
+from agent_devtools.evaluation_comparison_serialization import (
+    write_evaluation_comparison_json,
+)
 from agent_devtools.evaluation_analysis import analyze_evaluation_runs
 from agent_devtools.evaluation_report import write_evaluation_html
-from agent_devtools.evaluation_serialization import write_evaluation_json
+from agent_devtools.evaluation_serialization import (
+    read_evaluation_json,
+    write_evaluation_json,
+)
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
@@ -83,6 +94,11 @@ async def evaluate_browser_use_agent(
         if output_root is not None
         else config_settings.evaluation_directory
     )
+    previous_evaluation = (
+        _find_previous_evaluation(root, task)
+        if config_settings.compare_previous
+        else None
+    )
     evaluation_id, output_dir = _create_evaluation_directory(root)
     evaluation_started_at = datetime.now(UTC)
     evaluation_runs: list[EvaluationRun] = []
@@ -119,7 +135,28 @@ async def evaluate_browser_use_agent(
         failure_patterns=patterns,
     )
     write_evaluation_json(evaluation, output_dir / "evaluation.json")
-    write_evaluation_html(evaluation, evaluation.report_path)
+    comparison = None
+    if previous_evaluation is not None:
+        comparison = compare_evaluations(previous_evaluation, evaluation)
+        write_evaluation_comparison_json(
+            comparison,
+            output_dir / "comparison.json",
+        )
+        write_evaluation_comparison_html(
+            comparison,
+            output_dir / "comparison.html",
+            baseline_report_href=_relative_report_href(
+                output_dir,
+                previous_evaluation.report_path,
+            ),
+        )
+    write_evaluation_html(
+        evaluation,
+        evaluation.report_path,
+        comparison_report_path=(
+            "comparison.html" if comparison is not None else None
+        ),
+    )
     if config_settings.open_report:
         try:
             evaluation.open_report()
@@ -262,6 +299,50 @@ def _write_trace(session: ActionSession, trace_directory: Path) -> None:
     trace_directory.mkdir(parents=True, exist_ok=True)
     write_session_json(session, trace_directory / "session.json")
     write_session_html(session, trace_directory / "report.html")
+
+
+def _find_previous_evaluation(
+    root: Path,
+    task: str,
+) -> AgentEvaluation | None:
+    """Find the newest complete evaluation for the exact same task."""
+
+    if not root.is_dir():
+        return None
+    resolved_root = root.resolve()
+    matches: list[tuple[datetime, str, AgentEvaluation]] = []
+    for candidate in root.iterdir():
+        if not candidate.is_dir():
+            continue
+        resolved_candidate = candidate.resolve()
+        if resolved_candidate.parent != resolved_root:
+            continue
+        evaluation_path = candidate / "evaluation.json"
+        report_path = candidate / "report.html"
+        if not evaluation_path.is_file() or not report_path.is_file():
+            continue
+        try:
+            evaluation = read_evaluation_json(evaluation_path)
+        except (OSError, ValueError):
+            continue
+        if evaluation.task == task:
+            matches.append(
+                (evaluation.ended_at, evaluation.evaluation_id, evaluation)
+            )
+    if not matches:
+        return None
+    return max(matches, key=lambda item: (item[0], item[1]))[2]
+
+
+def _relative_report_href(
+    current_output_dir: Path,
+    previous_report_path: Path,
+) -> str:
+    relative = os.path.relpath(
+        previous_report_path.resolve(),
+        start=current_output_dir.resolve(),
+    )
+    return relative.replace(os.sep, "/")
 
 
 def _resolve_config(

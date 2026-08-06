@@ -13,6 +13,7 @@ def test_config_defaults_preserve_observer_behavior() -> None:
     assert config.redact_sensitive_data is True
     assert config.terminal_summary is True
     assert config.open_report is False
+    assert config.compare_previous is False
     assert config.trace_directory == Path("trace") / "browser-use"
     assert config.evaluation_directory == Path("evaluations") / "browser-use"
     assert config.browser_executable_path is None
@@ -28,6 +29,7 @@ screenshots = false
 redact_sensitive_data = false
 terminal_summary = false
 open_report = true
+compare_previous = true
 trace_directory = "custom-trace"
 evaluation_directory = "custom-evaluations"
 
@@ -45,6 +47,7 @@ executable_path = "/usr/bin/brave-browser"
         redact_sensitive_data=False,
         terminal_summary=False,
         open_report=True,
+        compare_previous=True,
         trace_directory=Path("custom-trace"),
         evaluation_directory=Path("custom-evaluations"),
         browser_executable_path=Path("/usr/bin/brave-browser"),

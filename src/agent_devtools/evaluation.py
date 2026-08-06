@@ -5,6 +5,7 @@ import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from math import isfinite
 from pathlib import Path, PurePosixPath
 from statistics import fmean, median
 
@@ -14,6 +15,15 @@ class EvaluationRunStatus(StrEnum):
     FAILED = "failed"
     UNVERIFIED = "unverified"
     ERRORED = "errored"
+
+
+class EvaluationComparisonStatus(StrEnum):
+    """High-level result when two evaluations of one task are compared."""
+
+    IMPROVED = "improved"
+    UNCHANGED = "unchanged"
+    REGRESSED = "regressed"
+    INCOMPARABLE = "incomparable"
 
 
 class DivergenceKind(StrEnum):
@@ -268,6 +278,13 @@ class AgentEvaluation:
         return absolute_path
 
     @property
+    def comparison_report_path(self) -> Path | None:
+        """Return the automatic previous-evaluation report when present."""
+
+        path = self.output_dir / "comparison.html"
+        return path if path.is_file() else None
+
+    @property
     def _completed_runs(self) -> tuple[EvaluationRun, ...]:
         return tuple(
             run
@@ -277,6 +294,136 @@ class AgentEvaluation:
 
     def _count(self, status: EvaluationRunStatus) -> int:
         return sum(run.status is status for run in self.runs)
+
+
+@dataclass(frozen=True)
+class EvaluationStatusCounts:
+    """Counts for the four explicit outcomes in one evaluation."""
+
+    passed: int
+    failed: int
+    unverified: int
+    errored: int
+
+    @classmethod
+    def from_evaluation(cls, evaluation: AgentEvaluation) -> "EvaluationStatusCounts":
+        return cls(
+            passed=evaluation.passed_count,
+            failed=evaluation.failed_count,
+            unverified=evaluation.unverified_count,
+            errored=evaluation.errored_count,
+        )
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("passed", self.passed),
+            ("failed", self.failed),
+            ("unverified", self.unverified),
+            ("errored", self.errored),
+        ):
+            _require_non_negative_integer(value, name)
+
+    @property
+    def total(self) -> int:
+        return self.passed + self.failed + self.unverified + self.errored
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "passed": self.passed,
+            "failed": self.failed,
+            "unverified": self.unverified,
+            "errored": self.errored,
+        }
+
+
+@dataclass(frozen=True)
+class EvaluationComparison:
+    """Comparison between two evaluations of the same requested task."""
+
+    comparison_id: str
+    task: str
+    baseline_evaluation_id: str
+    current_evaluation_id: str
+    status: EvaluationComparisonStatus
+    baseline_counts: EvaluationStatusCounts
+    current_counts: EvaluationStatusCounts
+    baseline_pass_rate: float
+    current_pass_rate: float
+    baseline_average_duration_ms: float | None
+    current_average_duration_ms: float | None
+    baseline_average_action_count: float | None
+    current_average_action_count: float | None
+    new_patterns: tuple[FailurePattern, ...] = ()
+    resolved_patterns: tuple[FailurePattern, ...] = ()
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_text(self.comparison_id, "comparison_id")
+        _require_text(self.task, "task")
+        _require_text(self.baseline_evaluation_id, "baseline_evaluation_id")
+        _require_text(self.current_evaluation_id, "current_evaluation_id")
+        if not isinstance(self.status, EvaluationComparisonStatus):
+            raise TypeError("status must be an EvaluationComparisonStatus")
+        if not isinstance(self.baseline_counts, EvaluationStatusCounts):
+            raise TypeError("baseline_counts must be EvaluationStatusCounts")
+        if not isinstance(self.current_counts, EvaluationStatusCounts):
+            raise TypeError("current_counts must be EvaluationStatusCounts")
+        for name, value in (
+            ("baseline_pass_rate", self.baseline_pass_rate),
+            ("current_pass_rate", self.current_pass_rate),
+        ):
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not isfinite(value)
+                or not 0 <= value <= 1
+            ):
+                raise ValueError(f"{name} must be a finite value between 0 and 1")
+        for name, value in (
+            ("baseline_average_duration_ms", self.baseline_average_duration_ms),
+            ("current_average_duration_ms", self.current_average_duration_ms),
+            ("baseline_average_action_count", self.baseline_average_action_count),
+            ("current_average_action_count", self.current_average_action_count),
+        ):
+            if value is not None and (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not isfinite(value)
+                or value < 0
+            ):
+                raise ValueError(f"{name} must be a finite non-negative number or None")
+        for name, patterns in (
+            ("new_patterns", self.new_patterns),
+            ("resolved_patterns", self.resolved_patterns),
+        ):
+            if not isinstance(patterns, tuple) or not all(
+                isinstance(pattern, FailurePattern) for pattern in patterns
+            ):
+                raise TypeError(f"{name} must contain FailurePattern values")
+        if self.status is EvaluationComparisonStatus.INCOMPARABLE:
+            _require_text(self.reason, "reason")
+        elif self.reason is not None:
+            raise ValueError("reason is only allowed for incomparable comparisons")
+
+    @property
+    def pass_rate_delta(self) -> float:
+        return self.current_pass_rate - self.baseline_pass_rate
+
+    @property
+    def summary(self) -> str:
+        if self.status is EvaluationComparisonStatus.INCOMPARABLE:
+            return self.reason or "The evaluations cannot be compared."
+        if self.status is EvaluationComparisonStatus.IMPROVED:
+            return (
+                "Reliability improved: the current evaluation is better than "
+                "the previous evaluation."
+            )
+        if self.status is EvaluationComparisonStatus.REGRESSED:
+            return (
+                "Reliability regressed: the current evaluation is worse than "
+                "the previous evaluation."
+            )
+        return "Reliability was unchanged between the two evaluations."
 
 
 def _require_text(value: object, field_name: str) -> None:
@@ -330,8 +477,11 @@ def _validate_relative_path(path: object, field_name: str) -> None:
 __all__ = [
     "AgentEvaluation",
     "DivergenceKind",
+    "EvaluationComparison",
+    "EvaluationComparisonStatus",
     "EvaluationRun",
     "EvaluationRunStatus",
+    "EvaluationStatusCounts",
     "FailurePattern",
     "TrajectoryDivergence",
 ]

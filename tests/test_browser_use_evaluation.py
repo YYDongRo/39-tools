@@ -12,6 +12,9 @@ from agent_devtools.browser_use import (
     evaluate_browser_use_agent,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.evaluation_comparison_serialization import (
+    read_evaluation_comparison_json,
+)
 from agent_devtools.evaluation_serialization import read_evaluation_json
 from agent_devtools.serialization import read_session_json
 
@@ -179,6 +182,73 @@ def test_evaluator_uses_deterministic_final_check(tmp_path: Path) -> None:
     judge = session.verification.evidence["browser_use_judge"]
     assert isinstance(judge, dict)
     assert judge["passed"] is True
+
+
+def test_evaluator_compares_latest_same_task_when_configured(
+    tmp_path: Path,
+) -> None:
+    outcomes = [True, False]
+    config = AgentDevToolsConfig(
+        compare_previous=True,
+        evaluation_directory=tmp_path / "evaluations",
+    )
+
+    def factory(task: str) -> _Agent:
+        return _Agent(verdict=outcomes.pop(0))
+
+    first = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=factory,
+            task="Open the product.",
+            runs=1,
+            config=config,
+        )
+    )
+    second = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=factory,
+            task="Open the product.",
+            runs=1,
+            config=config,
+        )
+    )
+
+    assert first.comparison_report_path is None
+    assert second.comparison_report_path == second.output_dir / "comparison.html"
+    comparison = read_evaluation_comparison_json(
+        second.output_dir / "comparison.json"
+    )
+    assert comparison.status.value == "regressed"
+    assert "comparison.html" in (
+        second.output_dir / "report.html"
+    ).read_text(encoding="utf-8")
+
+
+def test_evaluator_does_not_compare_different_task_text(tmp_path: Path) -> None:
+    config = AgentDevToolsConfig(
+        compare_previous=True,
+        evaluation_directory=tmp_path / "evaluations",
+    )
+
+    first = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: _Agent(),
+            task="Open the first product.",
+            runs=1,
+            config=config,
+        )
+    )
+    second = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: _Agent(),
+            task="Open the second product.",
+            runs=1,
+            config=config,
+        )
+    )
+
+    assert first.comparison_report_path is None
+    assert second.comparison_report_path is None
 
 
 def test_evaluator_preserves_four_distinct_statuses(tmp_path: Path) -> None:

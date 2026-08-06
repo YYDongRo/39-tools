@@ -59,6 +59,7 @@ The file controls recording, output, and optional browser selection:
 | `redact_sensitive_data` | redact credential-shaped metadata |
 | `terminal_summary` | print a short result summary |
 | `open_report` | open the report automatically after a local run |
+| `compare_previous` | compare repeated evaluations with the latest same-task result |
 | `trace_directory` | root for individual task traces |
 | `evaluation_directory` | root for repeated-run evaluations |
 | `browser.executable_path` | optional installed Brave/Chrome/Edge executable |

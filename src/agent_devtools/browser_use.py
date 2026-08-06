@@ -9,6 +9,11 @@ from agent_devtools.integrations.browser_use_evaluation import (
     evaluate_browser_use_agent,
 )
 from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
+from agent_devtools.evaluation import (
+    EvaluationComparison,
+    EvaluationComparisonStatus,
+)
+from agent_devtools.evaluation_comparison import compare_evaluations
 
 
 __all__ = [
@@ -17,7 +22,10 @@ __all__ = [
     "BrowserUseFinalCheck",
     "BrowserUseFinalStateCheck",
     "EvaluationRunStatus",
+    "EvaluationComparison",
+    "EvaluationComparisonStatus",
     "ObservedBrowserUseAgent",
     "evaluate_browser_use_agent",
+    "compare_evaluations",
     "observe_browser_use_agent",
 ]

@@ -14,6 +14,7 @@ class AgentDevToolsConfig:
     redact_sensitive_data: bool = True
     terminal_summary: bool = True
     open_report: bool = False
+    compare_previous: bool = False
     trace_directory: Path = Path("trace") / "browser-use"
     evaluation_directory: Path = Path("evaluations") / "browser-use"
     browser_executable_path: Path | None = None
@@ -55,6 +56,7 @@ class AgentDevToolsConfig:
             "redact_sensitive_data",
             "terminal_summary",
             "open_report",
+            "compare_previous",
             "trace_directory",
             "evaluation_directory",
             "browser",
@@ -78,6 +80,11 @@ class AgentDevToolsConfig:
                 True,
             ),
             "open_report": _bool_option(section, "open_report", False),
+            "compare_previous": _bool_option(
+                section,
+                "compare_previous",
+                False,
+            ),
             "trace_directory": _path_option(
                 section,
                 "trace_directory",

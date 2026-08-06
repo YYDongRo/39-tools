@@ -163,6 +163,11 @@ def _print_summary(evaluation: AgentEvaluation) -> None:
     )
     print(f"Pass rate: {evaluation.empirical_pass_rate:.1%}")
     print(f"Report: {evaluation.report_path.resolve()}")
+    if evaluation.comparison_report_path is not None:
+        print(
+            "Comparison: "
+            f"{evaluation.comparison_report_path.resolve()}"
+        )
 
 
 async def main() -> int:

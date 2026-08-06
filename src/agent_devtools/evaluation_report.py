@@ -22,7 +22,11 @@ def _evaluation_label(evaluation: AgentEvaluation) -> str:
     return "All runs passed" if evaluation.all_runs_passed else "Runs need attention"
 
 
-def render_evaluation_html(evaluation: AgentEvaluation) -> str:
+def render_evaluation_html(
+    evaluation: AgentEvaluation,
+    *,
+    comparison_report_path: str | Path | None = None,
+) -> str:
     representative = evaluation.representative_success_run_number
     baseline_html = (
         '<a href="runs/{0:03d}/report.html">Run {0}</a>'.format(
@@ -47,6 +51,15 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
         """
         for pattern in repeated_patterns
     ) or '<p class="muted">No repeated unsuccessful pattern was observed.</p>'
+    comparison_html = ""
+    if comparison_report_path is not None:
+        comparison_href = escape(str(comparison_report_path), quote=True)
+        comparison_html = (
+            '<div class="comparison-link">'
+            "A previous evaluation is available. "
+            f'<a href="{comparison_href}">Open comparison report</a>'
+            "</div>"
+        )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -84,6 +97,8 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
     .errored {{ background: #ede9fe; color: #5b21b6; }}
     .baseline {{ border-left: 4px solid #2563eb; background: #eff6ff;
       border-radius: 8px; margin-top: 20px; padding: 14px 16px; }}
+    .comparison-link {{ background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: 8px; margin-top: 14px; padding: 12px 14px; }}
     .evaluation-status {{ border-radius: 10px; display: inline-block;
       font-size: .88rem; font-weight: 800; margin: 0 0 14px; padding: 8px 12px; }}
     .evaluation-status.passed {{ background: #dcfce7; color: #166534; }}
@@ -130,6 +145,7 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
     <div class="baseline"><strong>Representative successful run:</strong>
       {baseline_html}
     </div>
+    {comparison_html}
     <p class="note">The empirical pass rate describes these observed attempts.
       A small sample does not prove the agent's true reliability.</p>
   </section>
@@ -156,9 +172,14 @@ def render_evaluation_html(evaluation: AgentEvaluation) -> str:
 def write_evaluation_html(
     evaluation: AgentEvaluation,
     output_path: Path,
+    *,
+    comparison_report_path: str | Path | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    html = render_evaluation_html(evaluation)
+    html = render_evaluation_html(
+        evaluation,
+        comparison_report_path=comparison_report_path,
+    )
     normalized = "\n".join(line.rstrip() for line in html.splitlines()) + "\n"
     with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
         output_file.write(normalized)

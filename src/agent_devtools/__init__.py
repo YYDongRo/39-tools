@@ -11,6 +11,12 @@ from agent_devtools.async_tool_recorder import (
     record_async_tools,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.evaluation import (
+    EvaluationComparison,
+    EvaluationComparisonStatus,
+    EvaluationStatusCounts,
+)
+from agent_devtools.evaluation_comparison import compare_evaluations
 from agent_devtools.failure import FailureCategory
 from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.serialization import read_action_json, read_session_json
@@ -36,6 +42,9 @@ __all__ = [
     "ActionSession",
     "ActionStatus",
     "AgentDevToolsConfig",
+    "EvaluationComparison",
+    "EvaluationComparisonStatus",
+    "EvaluationStatusCounts",
     "FailureCategory",
     "FinalStateObservation",
     "ObservedAgent",
@@ -53,6 +62,7 @@ __all__ = [
     "OpenAITrajectoryJudge",
     "async_trajectory_judge_from_env",
     "analyze_session",
+    "compare_evaluations",
     "read_action_json",
     "read_session_json",
     "observe_agent",

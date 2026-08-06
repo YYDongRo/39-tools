@@ -16,7 +16,14 @@ from agent_devtools.async_tool_recorder import (
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.final_state import FinalStateObservation
-from agent_devtools.evaluation import AgentEvaluation, EvaluationRunStatus
+from agent_devtools.evaluation import (
+    AgentEvaluation,
+    EvaluationComparison,
+    EvaluationComparisonStatus,
+    EvaluationRunStatus,
+    EvaluationStatusCounts,
+)
+from agent_devtools.evaluation_comparison import compare_evaluations
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     BrowserUseFinalStateCheck,
@@ -123,6 +130,9 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
+        "EvaluationComparison": EvaluationComparison,
+        "EvaluationComparisonStatus": EvaluationComparisonStatus,
+        "EvaluationStatusCounts": EvaluationStatusCounts,
         "FailureCategory": FailureCategory,
         "FinalStateObservation": FinalStateObservation,
         "ObservedAgent": ObservedAgent,
@@ -141,6 +151,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "async_trajectory_judge_from_env": async_trajectory_judge_from_env,
         "trajectory_judge_from_env": trajectory_judge_from_env,
         "analyze_session": analyze_session,
+        "compare_evaluations": compare_evaluations,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
         "observe_agent": observe_agent,
@@ -227,7 +238,10 @@ def test_browser_use_public_api_exports_supported_types() -> None:
         "BrowserUseFinalCheck": BrowserUseFinalCheck,
         "BrowserUseFinalStateCheck": BrowserUseFinalStateCheck,
         "EvaluationRunStatus": EvaluationRunStatus,
+        "EvaluationComparison": EvaluationComparison,
+        "EvaluationComparisonStatus": EvaluationComparisonStatus,
         "ObservedBrowserUseAgent": ObservedBrowserUseAgent,
+        "compare_evaluations": compare_evaluations,
         "evaluate_browser_use_agent": evaluate_browser_use_agent,
         "observe_browser_use_agent": observe_browser_use_agent,
     }

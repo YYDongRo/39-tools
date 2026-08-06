@@ -31,7 +31,9 @@ trace with:
   or unavailable model results remain `unverified`.
 - sequential repeated-run Browser Use evaluation with fresh Agents, preserved
   per-run traces, empirical pass-rate statistics, trajectory divergence, and a
-  static aggregate stability report.
+  static aggregate stability report;
+- optional same-task comparison with the newest previous evaluation, including
+  pass-rate deltas and new or resolved failure patterns.
 - optional deterministic Browser Use final-state checks for URL/title
   components, with the framework judge retained as supporting evidence.
 - optional explicit TOML configuration for enabling recording, screenshots,

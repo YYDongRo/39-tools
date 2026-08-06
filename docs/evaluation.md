@@ -59,6 +59,23 @@ same `open_report` setting opens the aggregate report after an evaluation;
 individual run reports remain linked from it. All output is local unless the
 developer explicitly copies or uploads it.
 
+### Compare with the previous evaluation
+
+To make later runs compare automatically, copy the example configuration and
+leave this option enabled:
+
+```toml
+[agent_devtools]
+compare_previous = true
+```
+
+The first evaluation of a task has no baseline. The next evaluation with the
+exact same task text finds the newest previous result and writes
+`comparison.json` and `comparison.html` beside the current `evaluation.json`.
+The normal report links to the comparison, which shows pass-rate changes,
+new or resolved failure patterns, and average duration/action changes. A
+different task is never silently compared.
+
 Metadata redaction is enabled by default. Common credential-shaped keys,
 tokens, and URL query values are replaced with `[REDACTED]`; screenshots are
 kept as captured and must still be reviewed before sharing.
@@ -114,6 +131,8 @@ verification; the Browser Use judge is retained as supporting evidence.
 evaluations/browser-use/<timestamp>-<id>/
 ├── evaluation.json
 ├── report.html
+├── comparison.json       # when compare_previous is enabled and a baseline exists
+├── comparison.html       # when compare_previous is enabled and a baseline exists
 └── runs/
     ├── 001/
     │   ├── session.json
