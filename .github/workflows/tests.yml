@@ -111,3 +111,4 @@ jobs:
           uv venv --python 3.11 .build-venv
           uv pip install --python .build-venv/bin/python dist/*.whl
           .build-venv/bin/python -c "from agent_devtools import ActionRecord; from agent_devtools.playwright import RecordedPlaywrightExecutor"
+          .build-venv/bin/agent-devtools --help

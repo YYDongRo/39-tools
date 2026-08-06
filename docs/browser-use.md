@@ -11,6 +11,7 @@ The early alpha is not yet published on PyPI. Install it directly from GitHub:
 ```bash
 uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
+uv run agent-devtools --help
 ```
 
 The distribution is named `39-tools`; Python imports continue to use
@@ -37,7 +38,7 @@ writing integration code:
 export GOOGLE_API_KEY="your-key-from-Google"
 # Or: export OPENAI_API_KEY="your-key-from-OpenAI"
 cp agent_devtools.example.toml agent_devtools.toml
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --headed --open-report
 ```
 
@@ -133,7 +134,7 @@ When Windows and WSL need different browser paths, keep separate local TOML
 files and select one with the CLI:
 
 ```bash
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --config agent_devtools.windows.toml \
   --headed --open-report
 ```

@@ -71,7 +71,7 @@ uv run --extra browser python examples/quickstart.py
 uv run --extra browser python examples/browser_failure.py
 uv run --extra browser python examples/generic_agent_browser.py
 uv run python examples/generic_agent.py
-uv run --extra browser-use python examples/browser_use_cli.py --headed
+uv run --extra browser-use agent-devtools --headed
 uv run --extra browser-use python examples/browser_use_quickstart.py
 uv run --extra browser-use python examples/browser_use_failure.py
 uv run --extra browser-use python examples/browser_use_evaluation.py \

@@ -34,6 +34,9 @@ Homepage = "https://github.com/YYDongRo/39-tools"
 Repository = "https://github.com/YYDongRo/39-tools"
 Issues = "https://github.com/YYDongRo/39-tools/issues"
 
+[project.scripts]
+agent-devtools = "agent_devtools.cli:main"
+
 [project.optional-dependencies]
 browser = [
     "playwright>=1.61.0",

@@ -75,10 +75,15 @@ included Browser Use workflow is from a clone of this repository:
 ```bash
 uv sync --extra browser-use
 uv run --extra browser-use playwright install chromium
+uv run --extra browser-use agent-devtools --help
 ```
 
 The displayed project name is **Agent DevTools**. The Python distribution is
 `39-tools`, while imports use `agent_devtools`.
+
+The supported baseline is Python 3.11–3.14, Browser Use 0.13.x, and Playwright
+1.61 or newer. The package is still an alpha and is not published on PyPI;
+install it from this repository or GitHub for now.
 
 ### Recommended: one command-line workflow
 
@@ -105,7 +110,7 @@ Copy the recording settings once, then run tasks:
 
 ```bash
 cp agent_devtools.example.toml agent_devtools.toml
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --headed --open-report
 ```
 
@@ -141,10 +146,13 @@ If you use different browsers in different environments, keep separate local
 files and select one without editing it:
 
 ```bash
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --config agent_devtools.windows.toml \
   --headed --open-report
 ```
+
+The canonical command is `agent-devtools`; the Python file remains as a
+source-checkout compatibility example.
 
 The CLI still reads `agent_devtools.toml` automatically when `--config` is not
 provided. Platform-specific `agent_devtools.*.toml` files are ignored by Git.
@@ -157,6 +165,7 @@ package in that application first:
 ```bash
 uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
+uv run agent-devtools --help
 ```
 
 Then keep your normal agent code and wrap it once at the integration boundary:
@@ -478,7 +487,8 @@ uv build
 ```
 
 Browser tests and optional integrations use additional dependency groups. See
-the [development guide](docs/development.md) for the complete commands.
+the [development guide](docs/development.md) for the complete commands and the
+[release checklist](docs/release-checklist.md) before publishing a version.
 
 Regenerate the sanitized sample report with:
 

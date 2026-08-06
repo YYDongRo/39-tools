@@ -31,6 +31,7 @@ Install the optional Browser Use integration and Chromium:
 ```bash
 uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
 uv run playwright install chromium
+uv run agent-devtools --help
 ```
 
 Set exactly one model provider key in the environment. The included CLI
@@ -88,7 +89,7 @@ file explicitly. The default is still `agent_devtools.toml` when that file is
 present:
 
 ```bash
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --config agent_devtools.windows.toml \
   --headed --open-report
 ```
@@ -102,9 +103,13 @@ browser paths are not committed.
 The included example prompts for a task when `--task` is omitted:
 
 ```bash
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --headed --open-report
 ```
+
+When the package is installed into an application or tool environment, run
+`agent-devtools` directly. The `examples/browser_use_cli.py` file remains a
+compatibility wrapper for source checkouts.
 
 With exactly one supported key set, the CLI selects that provider. If both are
 set, choose one explicitly with `--provider gemini` or `--provider openai`.
@@ -124,7 +129,7 @@ unverified task, which makes it usable in a test script or CI job.
 To skip the prompt, pass the task directly:
 
 ```bash
-uv run --extra browser-use python examples/browser_use_cli.py \
+uv run --extra browser-use agent-devtools \
   --task "Open example.com and confirm the Example Domain page is open."
 ```
 
