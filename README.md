@@ -90,6 +90,19 @@ unverified. Copy `agent_devtools.example.toml` to
 screenshots, report opening, output directories, or an installed Brave/Chrome/
 Edge executable. See the [CLI guide](docs/cli.md) for platform-specific paths.
 
+To measure the same task across fresh agents, add `--runs N`:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --runs 3 --headed --open-report
+```
+
+The default `--runs 1` remains a normal single report. With more than one run,
+the command prints an aggregate stability report and keeps one linked report
+per attempt. Enable `compare_previous = true` in `agent_devtools.toml` to
+compare a later evaluation with the newest result for the exact same task.
+
 For a Python application that already creates its own Browser Use agent, wrap
 it once at the run boundary:
 

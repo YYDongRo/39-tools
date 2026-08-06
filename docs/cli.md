@@ -127,6 +127,26 @@ prints the report path. A report is created even when the Agent raises or the
 final task verification fails. The command exits non-zero for a failed or
 unverified task, which makes it usable in a test script or CI job.
 
+### Check stability with repeated runs
+
+Use `--runs N` when one attempt is not enough. The default `--runs 1` keeps the
+single-run workflow above. With a value greater than one, the CLI creates a
+fresh Browser Use Agent for each sequential attempt and writes one aggregate
+evaluation report plus a normal report for every attempt:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --runs 3 --headed --open-report
+```
+
+The terminal prints the evaluation JSON path and aggregate HTML report path.
+Each run is classified as `passed`, `failed`, `unverified`, or `errored` using
+explicit final verification. If `compare_previous = true` is enabled in the
+TOML file, a later evaluation of the exact same task also receives
+`comparison.json` and `comparison.html`. The command exits non-zero unless all
+requested runs are explicitly passed.
+
 For a stable machine-readable CI handoff, add `--summary-json`:
 
 ```bash
@@ -138,8 +158,10 @@ uv run --extra browser-use agent-devtools \
 This writes a small schema-versioned JSON file with `status` (`passed`,
 `failed`, `unverified`, or `errored`), action counts, final-check status, and
 local paths to the full HTML report and `session.json`. The detailed report is
-still generated for debugging. Error summaries include only the exception type,
-not the raw message or provider credentials.
+still generated for debugging. With `--runs N`, the same option writes the
+evaluation counts, empirical pass rate, and paths to `evaluation.json` and the
+aggregate report instead. Error summaries include only the exception type, not
+the raw message or provider credentials.
 
 To skip the prompt, pass the task directly:
 

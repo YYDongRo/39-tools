@@ -5,11 +5,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal, Sequence
 
 from agent_devtools.action import ActionStatus
-from agent_devtools.browser_use import observe_browser_use_agent
+from agent_devtools.browser_use import (
+    AgentEvaluation,
+    evaluate_browser_use_agent,
+    observe_browser_use_agent,
+)
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.serialization import _write_json
 from agent_devtools.session import ActionSession
@@ -19,10 +24,23 @@ Provider = Literal["auto", "gemini", "openai"]
 SummaryStatus = Literal["passed", "failed", "unverified", "errored"]
 
 
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 def _browser_use_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-devtools",
-        description="Run one Browser Use task and create an Agent DevTools report.",
+        description=(
+            "Run a Browser Use task and create an Agent DevTools report; "
+            "use --runs for stability evaluation."
+        ),
     )
     parser.add_argument(
         "--task",
@@ -41,6 +59,15 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         type=int,
         default=10,
         help="maximum Browser Use steps (default: 10)",
+    )
+    parser.add_argument(
+        "--runs",
+        type=_positive_int,
+        default=1,
+        help=(
+            "fresh sequential attempts; values above 1 create a stability "
+            "evaluation (default: 1)"
+        ),
     )
     parser.add_argument(
         "--provider",
@@ -253,6 +280,73 @@ def _write_errored_summary(
     )
 
 
+def _evaluation_summary_status(evaluation: AgentEvaluation) -> SummaryStatus:
+    if evaluation.all_runs_passed:
+        return "passed"
+    if evaluation.errored_count:
+        return "errored"
+    if evaluation.failed_count:
+        return "failed"
+    return "unverified"
+
+
+def _build_evaluation_summary(
+    evaluation: AgentEvaluation,
+) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "kind": "evaluation",
+        "status": _evaluation_summary_status(evaluation),
+        "task": evaluation.task,
+        "requested_run_count": evaluation.requested_run_count,
+        "attempted_run_count": evaluation.attempted_run_count,
+        "passed_count": evaluation.passed_count,
+        "failed_count": evaluation.failed_count,
+        "unverified_count": evaluation.unverified_count,
+        "errored_count": evaluation.errored_count,
+        "empirical_pass_rate": evaluation.empirical_pass_rate,
+        "report_path": _summary_path(evaluation.report_path),
+        "evaluation_path": _summary_path(
+            evaluation.output_dir / "evaluation.json"
+        ),
+        "comparison_path": _summary_path(
+            evaluation.comparison_report_path
+        ),
+    }
+
+
+def _write_evaluation_summary(
+    path: Path | None,
+    evaluation: AgentEvaluation,
+) -> None:
+    if path is None:
+        return
+    _write_json(_build_evaluation_summary(evaluation), path)
+    print(f"Summary: {path.resolve()}")
+
+
+def _print_evaluation_summary(evaluation: AgentEvaluation) -> None:
+    result = "PASS" if evaluation.all_runs_passed else "FAIL"
+    print("Agent DevTools stability evaluation")
+    print(f"Result: {result}")
+    print(
+        "Runs: "
+        f"{evaluation.requested_run_count} requested, "
+        f"{evaluation.passed_count} passed, "
+        f"{evaluation.failed_count} failed, "
+        f"{evaluation.unverified_count} unverified, "
+        f"{evaluation.errored_count} errored"
+    )
+    print(f"Pass rate: {evaluation.empirical_pass_rate:.1%}")
+    print(
+        "Evaluation: "
+        f"{(evaluation.output_dir / 'evaluation.json').resolve()}"
+    )
+    print(f"Report: {evaluation.report_path.resolve()}")
+    if evaluation.comparison_report_path is not None:
+        print(f"Comparison: {evaluation.comparison_report_path.resolve()}")
+
+
 async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     args = _browser_use_parser().parse_args(argv)
     task = (args.task or input("Task: ")).strip()
@@ -286,8 +380,54 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         print(f"Configuration error: {error}")
         _write_errored_summary(args.summary_json, type(error).__name__)
         return 2
+
     try:
-        browser = Browser(**_browser_kwargs(config, headed=args.headed))
+        browser_kwargs = _browser_kwargs(config, headed=args.headed)
+    except (OSError, ValueError) as error:
+        print(f"Configuration error: {error}")
+        _write_errored_summary(args.summary_json, type(error).__name__)
+        return 2
+
+    if args.runs > 1:
+        evaluation_config = config
+        if args.open_report and not (
+            evaluation_config is not None and evaluation_config.open_report
+        ):
+            evaluation_config = replace(
+                evaluation_config or AgentDevToolsConfig(),
+                open_report=True,
+            )
+
+        def create_agent(agent_task: str) -> object:
+            return Agent(
+                task=agent_task,
+                llm=llm,
+                browser=Browser(**browser_kwargs),
+                use_judge=True,
+            )
+
+        try:
+            evaluation = await evaluate_browser_use_agent(
+                agent_factory=create_agent,
+                task=task,
+                runs=args.runs,
+                max_steps=args.max_steps,
+                config=evaluation_config,
+            )
+        except Exception as error:
+            print(f"Evaluation error: {type(error).__name__}: {error}")
+            _write_errored_summary(
+                args.summary_json,
+                type(error).__name__,
+            )
+            return 2
+
+        _print_evaluation_summary(evaluation)
+        _write_evaluation_summary(args.summary_json, evaluation)
+        return 0 if evaluation.all_runs_passed else 1
+
+    try:
+        browser = Browser(**browser_kwargs)
     except (OSError, ValueError) as error:
         print(f"Configuration error: {error}")
         _write_errored_summary(args.summary_json, type(error).__name__)

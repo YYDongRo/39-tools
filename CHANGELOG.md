@@ -9,6 +9,8 @@ All notable changes to Agent DevTools are recorded here.
 - Add a tolerant hostname check for successful Browser Use `navigate` actions.
 - Add optional same-task evaluation comparisons with concise JSON and HTML
   regression reports.
+- Add `--runs N` to the installed Browser Use CLI for fresh-agent stability
+  evaluations and aggregate reports.
 - Keep `examples/browser_use_cli.py` as a compatibility wrapper.
 - Document the current Python, Browser Use, and Playwright support baseline.
 

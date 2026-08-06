@@ -1,12 +1,28 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
+
+import agent_devtools.cli as cli_module
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.cli import _browser_use_parser
-from agent_devtools.cli import _summary_status, _write_summary
+from agent_devtools.cli import (
+    _build_evaluation_summary,
+    _summary_status,
+    _write_evaluation_summary,
+    _write_summary,
+)
+from agent_devtools.evaluation import (
+    AgentEvaluation,
+    EvaluationRun,
+    EvaluationRunStatus,
+)
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
 
@@ -19,6 +35,8 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
             "Open the page.",
             "--max-steps",
             "4",
+            "--runs",
+            "3",
             "--summary-json",
             "ci/summary.json",
         ]
@@ -27,7 +45,15 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
     assert parser.prog == "agent-devtools"
     assert args.task == "Open the page."
     assert args.max_steps == 4
+    assert args.runs == 3
     assert args.summary_json.name == "summary.json"
+
+
+def test_installed_cli_parser_rejects_non_positive_runs() -> None:
+    parser = _browser_use_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--runs", "0"])
 
 
 def _session_with_verification(passed: bool) -> ActionSession:
@@ -89,3 +115,108 @@ def test_summary_json_is_short_versioned_and_uses_relative_report_paths(
         "session_path": "trace/session.json",
         "error_type": None,
     }
+
+
+def _evaluation_for_cli_summary() -> AgentEvaluation:
+    started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    run = EvaluationRun(
+        run_number=1,
+        status=EvaluationRunStatus.FAILED,
+        started_at=started_at,
+        ended_at=datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC),
+        duration_ms=1000,
+        action_count=2,
+        trace_directory=Path("runs/001"),
+        report_path=Path("runs/001/report.html"),
+    )
+    return AgentEvaluation(
+        evaluation_id="cli-summary",
+        task="Open the page.",
+        started_at=started_at,
+        ended_at=datetime(2026, 1, 1, 0, 0, 2, tzinfo=UTC),
+        requested_run_count=1,
+        runs=(run,),
+        output_dir=Path("evaluations/cli-summary"),
+    )
+
+
+def test_evaluation_summary_preserves_counts_and_report_paths(
+    tmp_path: Path,
+) -> None:
+    evaluation = _evaluation_for_cli_summary()
+    summary_path = tmp_path / "evaluation-summary.json"
+
+    _write_evaluation_summary(summary_path, evaluation)
+    data = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert data == _build_evaluation_summary(evaluation)
+    assert data["kind"] == "evaluation"
+    assert data["status"] == "failed"
+    assert data["failed_count"] == 1
+    assert data["report_path"] == "evaluations/cli-summary/report.html"
+    assert data["evaluation_path"] == "evaluations/cli-summary/evaluation.json"
+    assert data["comparison_path"] is None
+
+
+def test_cli_repeated_runs_use_fresh_agents_and_evaluation_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "agent_devtools.toml"
+    config_path.write_text(
+        "[agent_devtools]\nenabled = true\nopen_report = false\n",
+        encoding="utf-8",
+    )
+    summary_path = tmp_path / "summary.json"
+    created_agents: list[object] = []
+    captured: dict[str, object] = {}
+
+    class FakeBrowser:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeAgent:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    async def fake_evaluate(**kwargs: object) -> AgentEvaluation:
+        captured.update(kwargs)
+        factory = kwargs["agent_factory"]
+        assert callable(factory)
+        task = kwargs["task"]
+        assert isinstance(task, str)
+        for _ in range(2):
+            created_agents.append(factory(task))  # type: ignore[operator]
+        return _evaluation_for_cli_summary()
+
+    monkeypatch.setattr(cli_module, "_resolve_provider", lambda requested: "openai")
+    monkeypatch.setattr(cli_module, "_create_llm", lambda provider, model: object())
+    monkeypatch.setattr(cli_module, "evaluate_browser_use_agent", fake_evaluate)
+    monkeypatch.setitem(
+        sys.modules,
+        "browser_use",
+        SimpleNamespace(Agent=FakeAgent, Browser=FakeBrowser),
+    )
+
+    result = asyncio.run(
+        cli_module._browser_use_main(
+            [
+                "--config",
+                str(config_path),
+                "--task",
+                "Open the page.",
+                "--runs",
+                "2",
+                "--summary-json",
+                str(summary_path),
+            ]
+        )
+    )
+
+    assert result == 1
+    assert len(created_agents) == 2
+    assert created_agents[0] is not created_agents[1]
+    assert captured["runs"] == 2
+    assert captured["task"] == "Open the page."
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["kind"] == "evaluation"
