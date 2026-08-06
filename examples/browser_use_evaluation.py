@@ -2,7 +2,9 @@
 
 This is a product-shaped example rather than a test fixture. It uses a fresh
 Browser Use Agent for every attempt, preserves each normal trace, and returns
-exit code 1 when any requested run is not explicitly passed.
+exit code 1 when any requested run is not explicitly passed. Use
+``--allowed-domain`` and the optional URL/title checks for a site other than
+the default Example Domain demo.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from agent_devtools.config import AgentDevToolsConfig
 
 
 DEFAULT_TASK = "Open https://example.com and confirm the Example Domain page is open."
+DEFAULT_ALLOWED_DOMAIN = "example.com"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -54,9 +57,24 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--allowed-domain",
+        action="append",
+        dest="allowed_domains",
+        metavar="DOMAIN",
+        help=(
+            "domain the browser may visit; repeat for multiple domains "
+            f"(default: {DEFAULT_ALLOWED_DOMAIN})"
+        ),
+    )
+    parser.add_argument(
         "--title-contains",
-        default="Example Domain",
-        help="required text in the final page title (default: Example Domain)",
+        default=None,
+        help="optional text required in the final page title",
+    )
+    parser.add_argument(
+        "--url-contains",
+        default=None,
+        help="optional text required in the final page URL",
     )
     parser.add_argument(
         "--output-root",
@@ -92,10 +110,18 @@ def _browser_kwargs(
     config: AgentDevToolsConfig | None,
     *,
     headed: bool,
+    allowed_domains: list[str] | None = None,
 ) -> dict[str, object]:
+    if allowed_domains is None:
+        domains = [DEFAULT_ALLOWED_DOMAIN]
+    else:
+        domains = [domain.strip() for domain in allowed_domains]
+        if not domains or any(not domain for domain in domains):
+            raise ValueError("allowed domains cannot be empty")
+
     kwargs: dict[str, object] = {
         "headless": not headed,
-        "allowed_domains": ["example.com"],
+        "allowed_domains": domains,
     }
     if config is None or config.browser_executable_path is None:
         return kwargs
@@ -108,6 +134,19 @@ def _browser_kwargs(
         )
     kwargs["executable_path"] = str(executable_path)
     return kwargs
+
+
+def _final_check(
+    *,
+    url_contains: str | None,
+    title_contains: str | None,
+) -> BrowserUseFinalStateCheck | None:
+    if url_contains is None and title_contains is None:
+        return None
+    return BrowserUseFinalStateCheck(
+        url_contains=url_contains,
+        title_contains=title_contains,
+    )
 
 
 def _print_summary(evaluation: AgentEvaluation) -> None:
@@ -135,7 +174,11 @@ async def main() -> int:
         return 2
 
     try:
-        browser_kwargs = _browser_kwargs(config, headed=args.headed)
+        browser_kwargs = _browser_kwargs(
+            config,
+            headed=args.headed,
+            allowed_domains=args.allowed_domains,
+        )
     except ValueError as error:
         print(f"Configuration error: {error}")
         return 2
@@ -155,7 +198,8 @@ async def main() -> int:
         max_steps=args.max_steps,
         output_root=args.output_root,
         config=config,
-        final_check=BrowserUseFinalStateCheck(
+        final_check=_final_check(
+            url_contains=args.url_contains,
             title_contains=args.title_contains,
         ),
     )

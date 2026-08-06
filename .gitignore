@@ -182,6 +182,7 @@ cython_debug/
 
 # Generated action traces
 /trace/
+/evaluations/
 
 # Optional local Agent DevTools configuration
 agent_devtools.toml

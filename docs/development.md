@@ -74,7 +74,8 @@ uv run python examples/generic_agent.py
 uv run --extra browser-use python examples/browser_use_cli.py --headed
 uv run --extra browser-use python examples/browser_use_quickstart.py
 uv run --extra browser-use python examples/browser_use_failure.py
-uv run --extra browser-use python examples/browser_use_evaluation.py --runs 3
+uv run --extra browser-use python examples/browser_use_evaluation.py \
+  --runs 3 --allowed-domain example.com --title-contains "Example Domain"
 ```
 
 Examples that call a model provider require the corresponding environment

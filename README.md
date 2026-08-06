@@ -280,7 +280,10 @@ your Browser Use provider key in the shell (never in the TOML file):
 ```bash
 cp agent_devtools.example.toml agent_devtools.toml
 uv run --extra browser-use python examples/browser_use_evaluation.py \
-  --runs 3 --open-report
+  --runs 3 \
+  --allowed-domain example.com \
+  --title-contains "Example Domain" \
+  --open-report
 ```
 
 The script creates a fresh agent for every attempt, writes one aggregate report
@@ -288,6 +291,22 @@ under `evaluations/browser-use/`, and returns exit code `1` if any run is not
 explicitly passed. A failed evaluation still keeps all generated traces, so
 CI can save the report as an artifact. Add `--headed` to watch the browser.
 Python callers can use `evaluation.assert_all_passed()` for the same CI check.
+For another site, repeat `--allowed-domain DOMAIN` as needed and use
+`--url-contains TEXT` or `--title-contains TEXT` for a deterministic final
+check. For example, a YouTube search that should open a video page can use:
+
+```bash
+uv run --extra browser-use python examples/browser_use_evaluation.py \
+  --config agent_devtools.toml \
+  --task "Open YouTube, search for Miku Expo, click the first video, and watch it." \
+  --allowed-domain youtube.com \
+  --url-contains "youtube.com/watch" \
+  --runs 3 --headed --open-report
+```
+
+The URL check confirms that a video page opened; it does not prove a video
+played for a specific duration. If no `--url-contains` or `--title-contains`
+is supplied, the Browser Use judge remains the final verification source.
 The complete workflow and configuration options are in the
 [stability evaluation guide](docs/evaluation.md).
 

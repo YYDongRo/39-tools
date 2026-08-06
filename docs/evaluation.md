@@ -2,7 +2,8 @@
 
 Agent DevTools can run one Browser Use task several times, preserve every
 individual trace, and summarize the observed stability in one local HTML
-report. Runs are sequential and each attempt uses a fresh Agent.
+report. Runs are sequential and each attempt uses a fresh Agent. The provided
+script defaults to the safe `example.com` demo, but accepts any allowed domain.
 
 ## Create an evaluation
 
@@ -46,7 +47,10 @@ returns exit code `1` when any requested run is failed, unverified, or errored.
 cp agent_devtools.example.toml agent_devtools.toml
 # Set GOOGLE_API_KEY in the shell; never put it in the TOML file.
 uv run --extra browser-use python examples/browser_use_evaluation.py \
-  --runs 3 --open-report
+  --runs 3 \
+  --allowed-domain example.com \
+  --title-contains "Example Domain" \
+  --open-report
 ```
 
 The aggregate report is written below `evaluations/browser-use/` by default.
@@ -62,6 +66,23 @@ kept as captured and must still be reviewed before sharing.
 Use `--headed` when you want to watch the browser. Leave it off for a faster
 headless run or CI. A failed evaluation still writes every available trace
 before returning the non-zero status.
+
+For a real site, pass one or more `--allowed-domain` values and choose the
+smallest useful final check. For example:
+
+```bash
+uv run --extra browser-use python examples/browser_use_evaluation.py \
+  --config agent_devtools.toml \
+  --task "Open YouTube, search for Miku Expo, click the first video, and watch it." \
+  --allowed-domain youtube.com \
+  --url-contains "youtube.com/watch" \
+  --runs 3 --headed --open-report
+```
+
+`--url-contains` and `--title-contains` are optional and can be combined. They
+are deterministic checks of the final browser state; without either option,
+the Browser Use judge supplies the final verification. A URL check can confirm
+that YouTube opened a video page, but cannot by itself prove playback duration.
 
 When calling the Python API from a test, use
 `evaluation.assert_all_passed()` for the same CI-friendly behavior. The
