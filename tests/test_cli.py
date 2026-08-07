@@ -11,10 +11,15 @@ import pytest
 
 import agent_devtools.cli as cli_module
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.browser_use import (
+    BrowserUsePreflightCheck,
+    BrowserUsePreflightResult,
+)
 from agent_devtools.cli import _browser_use_parser
 from agent_devtools.cli import (
     _build_evaluation_summary,
     _format_run_summary,
+    _format_preflight,
     _summary_status,
     _write_evaluation_summary,
     _write_summary,
@@ -48,6 +53,12 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
     assert args.max_steps == 4
     assert args.runs == 3
     assert args.summary_json.name == "summary.json"
+
+
+def test_installed_cli_parser_accepts_preflight() -> None:
+    args = _browser_use_parser().parse_args(["--preflight"])
+
+    assert args.preflight is True
 
 
 def test_installed_cli_parser_rejects_non_positive_runs() -> None:
@@ -146,6 +157,30 @@ def test_run_summary_is_concise_and_explains_final_failure(tmp_path: Path) -> No
     assert "Final check: failed" in summary
     assert "Reason: the wrong page is open" in summary
     assert "Task result:" not in summary
+
+
+def test_preflight_summary_is_short_and_explicit() -> None:
+    summary = _format_preflight(
+        BrowserUsePreflightResult(
+            checks=(
+                BrowserUsePreflightCheck(
+                    name="recording hook",
+                    passed=True,
+                    detail="model actions will enter the recorder",
+                ),
+                BrowserUsePreflightCheck(
+                    name="trace directory",
+                    passed=False,
+                    detail="trace directory is not writable (PermissionError)",
+                ),
+            )
+        )
+    )
+
+    assert "Agent DevTools preflight" in summary
+    assert "Result: FAIL" in summary
+    assert "[PASS] recording hook" in summary
+    assert "[FAIL] trace directory" in summary
 
 
 def test_summary_json_is_short_versioned_and_uses_relative_report_paths(
@@ -343,6 +378,76 @@ def test_cli_single_run_prints_one_concise_summary(
     assert output.count("Report:") == 1
     assert output.count("Result: PASS") == 1
     assert "Task result:" not in output
+
+
+def test_cli_preflight_exits_without_running_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "agent_devtools.toml"
+    config_path.write_text(
+        "[agent_devtools]\nenabled = true\nopen_report = false\n",
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+
+    class FakeBrowser:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+        async def stop(self) -> None:
+            calls.append("browser.stop")
+
+    class FakeAgent:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeObservedAgent:
+        def preflight(self) -> BrowserUsePreflightResult:
+            calls.append("preflight")
+            return BrowserUsePreflightResult(
+                checks=(
+                    BrowserUsePreflightCheck(
+                        name="recording hook",
+                        passed=True,
+                        detail="model actions will enter the recorder",
+                    ),
+                )
+            )
+
+        async def run(self, **kwargs: object) -> None:
+            calls.append("run")
+
+    monkeypatch.setattr(cli_module, "_resolve_provider", lambda requested: "openai")
+    monkeypatch.setattr(cli_module, "_create_llm", lambda provider, model: object())
+    monkeypatch.setattr(
+        cli_module,
+        "observe_browser_use_agent",
+        lambda *args, **kwargs: FakeObservedAgent(),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "browser_use",
+        SimpleNamespace(Agent=FakeAgent, Browser=FakeBrowser),
+    )
+
+    result = asyncio.run(
+        cli_module._browser_use_main(
+            [
+                "--config",
+                str(config_path),
+                "--task",
+                "Complete the task.",
+                "--preflight",
+            ]
+        )
+    )
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert calls == ["preflight", "browser.stop"]
+    assert "Result: PASS" in output
 
 
 def test_cli_strict_coverage_returns_nonzero_for_zero_action_success(

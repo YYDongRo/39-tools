@@ -134,6 +134,32 @@ class BrowserUseFinalStateCheck:
         )
 
 
+@dataclass(frozen=True)
+class BrowserUsePreflightCheck:
+    """One local setup check performed before a Browser Use run."""
+
+    name: str
+    passed: bool
+    detail: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("preflight check name cannot be empty")
+        if not isinstance(self.detail, str) or not self.detail.strip():
+            raise ValueError("preflight check detail cannot be empty")
+
+
+@dataclass(frozen=True)
+class BrowserUsePreflightResult:
+    """Local Browser Use setup checks; no model call or browser run occurs."""
+
+    checks: tuple[BrowserUsePreflightCheck, ...]
+
+    @property
+    def passed(self) -> bool:
+        return bool(self.checks) and all(check.passed for check in self.checks)
+
+
 @dataclass
 class _PendingAction:
     action_type: str
@@ -565,6 +591,89 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             return None
         return self.last_trace.session
 
+    def preflight(self) -> BrowserUsePreflightResult:
+        """Check the recording boundary without running the agent."""
+
+        checks: list[BrowserUsePreflightCheck] = []
+        if not self._recording_enabled:
+            checks.append(
+                BrowserUsePreflightCheck(
+                    name="recording enabled",
+                    passed=False,
+                    detail=(
+                        "recording is disabled; set enabled = true to create "
+                        "a trace"
+                    ),
+                )
+            )
+            return BrowserUsePreflightResult(tuple(checks))
+
+        checks.append(
+            BrowserUsePreflightCheck(
+                name="agent contract",
+                passed=True,
+                detail="Browser Use run and browser session interfaces are available",
+            )
+        )
+        callback = getattr(self.agent, "register_new_step_callback", None)
+        hook_attached = (
+            getattr(callback, "__self__", None) is self
+            and getattr(callback, "__func__", None)
+            is type(self)._on_model_action
+            and getattr(self.agent, "directly_open_url", None) is False
+            and getattr(
+                getattr(self.agent, "settings", None),
+                "max_actions_per_step",
+                None,
+            )
+            == 1
+        )
+        checks.append(
+            BrowserUsePreflightCheck(
+                name="recording hook",
+                passed=hook_attached,
+                detail=(
+                    "model actions will enter the recorder one step at a time"
+                    if hook_attached
+                    else (
+                        "recording callback or Browser Use action controls are "
+                        "not configured"
+                    )
+                ),
+            )
+        )
+        browser_path = self.config.browser_executable_path
+        if browser_path is None:
+            browser_detail = "using the Browser Use default executable"
+            browser_ok = True
+        else:
+            browser_ok = browser_path.is_file()
+            browser_detail = (
+                f"configured executable exists: {browser_path}"
+                if browser_ok
+                else f"configured executable was not found: {browser_path}"
+            )
+        checks.append(
+            BrowserUsePreflightCheck(
+                name="browser executable",
+                passed=browser_ok,
+                detail=browser_detail,
+            )
+        )
+        checks.append(_preflight_trace_directory(self.output_root))
+        checks.append(
+            BrowserUsePreflightCheck(
+                name="screenshots",
+                passed=True,
+                detail=(
+                    "before/after screenshots are enabled"
+                    if self.config.screenshots
+                    else "screenshots are disabled; actions and state are still recorded"
+                ),
+            )
+        )
+        return BrowserUsePreflightResult(tuple(checks))
+
     async def run(self, *args: object, **kwargs: object) -> object:
         if self._active:
             raise RuntimeError("an observed Browser Use run is already active")
@@ -769,6 +878,46 @@ async def _call_callback(
 def _new_trace_directory(output_root: Path) -> Path:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     return output_root / f"{timestamp}-{uuid4().hex[:8]}"
+
+
+def _preflight_trace_directory(output_root: Path) -> BrowserUsePreflightCheck:
+    try:
+        output_root.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        return BrowserUsePreflightCheck(
+            name="trace directory",
+            passed=False,
+            detail=(
+                f"cannot create the trace directory ({type(error).__name__})"
+            ),
+        )
+
+    probe = output_root / f".agent-devtools-preflight-{uuid4().hex}"
+    try:
+        probe.write_text("ok", encoding="utf-8")
+    except OSError as error:
+        return BrowserUsePreflightCheck(
+            name="trace directory",
+            passed=False,
+            detail=(
+                f"trace directory is not writable ({type(error).__name__})"
+            ),
+        )
+    try:
+        probe.unlink()
+    except OSError as error:
+        return BrowserUsePreflightCheck(
+            name="trace directory",
+            passed=False,
+            detail=(
+                f"trace directory cleanup is not writable ({type(error).__name__})"
+            ),
+        )
+    return BrowserUsePreflightCheck(
+        name="trace directory",
+        passed=True,
+        detail=f"writable: {output_root}",
+    )
 
 
 def _action_from_model_output(
@@ -1088,6 +1237,8 @@ def _redact_text(value: str) -> str:
 __all__ = [
     "BrowserUseFinalCheck",
     "BrowserUseFinalStateCheck",
+    "BrowserUsePreflightCheck",
+    "BrowserUsePreflightResult",
     "ObservedBrowserUseAgent",
     "observe_browser_use_agent",
 ]

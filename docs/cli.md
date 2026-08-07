@@ -24,6 +24,21 @@ network access. Reports are written below `trace/generic-agent-browser/`.
 
 After this run succeeds, choose the Browser Use or custom-agent setup below.
 
+Before spending an API request on a real task, you can check the Browser Use
+connection and local output setup without running the agent:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com" \
+  --preflight
+```
+
+Preflight checks the agent contract, recording hook, browser executable,
+trace-directory writability, and screenshot setting. It does not call the
+model, launch a browser page, or create a task report. It still needs the same
+provider key so the CLI can construct the configured Browser Use agent. A
+failed preflight exits non-zero with the failing check and a repair hint.
+
 ## Browser Use: one-time setup
 
 Install the optional Browser Use integration and Chromium:

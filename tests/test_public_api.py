@@ -27,6 +27,8 @@ from agent_devtools.evaluation_comparison import compare_evaluations
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     BrowserUseFinalStateCheck,
+    BrowserUsePreflightCheck,
+    BrowserUsePreflightResult,
     ObservedBrowserUseAgent,
     observe_browser_use_agent,
 )
@@ -237,6 +239,8 @@ def test_browser_use_public_api_exports_supported_types() -> None:
         "AgentDevToolsConfig": AgentDevToolsConfig,
         "BrowserUseFinalCheck": BrowserUseFinalCheck,
         "BrowserUseFinalStateCheck": BrowserUseFinalStateCheck,
+        "BrowserUsePreflightCheck": BrowserUsePreflightCheck,
+        "BrowserUsePreflightResult": BrowserUsePreflightResult,
         "EvaluationRunStatus": EvaluationRunStatus,
         "EvaluationComparison": EvaluationComparison,
         "EvaluationComparisonStatus": EvaluationComparisonStatus,

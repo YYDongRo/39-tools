@@ -12,6 +12,7 @@ from typing import Literal, Sequence
 from agent_devtools.action import ActionStatus
 from agent_devtools.browser_use import (
     AgentEvaluation,
+    BrowserUsePreflightResult,
     evaluate_browser_use_agent,
     observe_browser_use_agent,
 )
@@ -91,6 +92,11 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         "--open-report",
         action="store_true",
         help="open the report after the task finishes",
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="check recording setup and exit without running the task",
     )
     parser.add_argument(
         "--summary-json",
@@ -361,6 +367,15 @@ def _compact_output(value: str, *, limit: int = 160) -> str:
     return compact[: limit - 1].rstrip() + "…"
 
 
+def _format_preflight(result: BrowserUsePreflightResult) -> str:
+    lines = ["Agent DevTools preflight"]
+    lines.append(f"Result: {'PASS' if result.passed else 'FAIL'}")
+    for check in result.checks:
+        status = "PASS" if check.passed else "FAIL"
+        lines.append(f"[{status}] {check.name}: {check.detail}")
+    return "\n".join(lines)
+
+
 def _format_run_summary(
     session: ActionSession | None,
     report_path: Path,
@@ -462,6 +477,10 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         _write_errored_summary(args.summary_json, type(error).__name__)
         return 2
 
+    if args.preflight and args.runs != 1:
+        print("Configuration error: --preflight cannot be combined with --runs")
+        return 2
+
     try:
         browser_kwargs = _browser_kwargs(config, headed=args.headed)
     except (OSError, ValueError) as error:
@@ -523,11 +542,23 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     require_recorded_actions = (
         config is not None and config.require_recorded_actions
     )
-    agent = observe_browser_use_agent(
-        raw_agent,
-        config=config,
-        print_summary=False,
-    )
+    try:
+        agent = observe_browser_use_agent(
+            raw_agent,
+            config=config,
+            print_summary=False,
+        )
+    except (OSError, TypeError, ValueError) as error:
+        await browser.stop()
+        print(f"Preflight: FAIL ({type(error).__name__})")
+        print(f"Reason: {error}")
+        return 1
+
+    if args.preflight:
+        result = agent.preflight()
+        print(_format_preflight(result))
+        await browser.stop()
+        return 0 if result.passed else 1
 
     run_error: Exception | None = None
     try:

@@ -2,6 +2,8 @@ from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     BrowserUseFinalStateCheck,
+    BrowserUsePreflightCheck,
+    BrowserUsePreflightResult,
     ObservedBrowserUseAgent,
     observe_browser_use_agent,
 )
@@ -21,6 +23,8 @@ __all__ = [
     "AgentDevToolsConfig",
     "BrowserUseFinalCheck",
     "BrowserUseFinalStateCheck",
+    "BrowserUsePreflightCheck",
+    "BrowserUsePreflightResult",
     "EvaluationRunStatus",
     "EvaluationComparison",
     "EvaluationComparisonStatus",

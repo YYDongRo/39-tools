@@ -128,6 +128,8 @@ package.
 - Distribution name: `39-tools`.
 - Python import name: `agent_devtools`.
 - Browser Use observer: `observe_browser_use_agent(...)`.
+- Browser Use setup check: `ObservedBrowserUseAgent.preflight()` and CLI
+  `--preflight`.
 - Generic agent observer: `observe_agent(...)` and `observe_async_agent(...)`.
 - Repeated evaluator: `evaluate_browser_use_agent(...)`.
 - Replay stability evaluator: `evaluate_playwright_session_replay(...)`.

@@ -195,6 +195,14 @@ For CI or strict local checks, set `require_recorded_actions = true` in
 actions is then marked `unverified` and the CLI exits non-zero. The default is
 `false` for compatibility with tasks that can finish without browser actions.
 
+Before a first real run, use `--preflight` to check the observer connection and
+trace directory without executing the task or calling the model:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com" --preflight
+```
+
 See the [CLI and custom-agent guide](docs/cli.md) and the
 [Playwright guide](docs/playwright.md) for the supported contracts. Optional
 BYOK trajectory judging is described in the [concepts guide](docs/concepts.md).

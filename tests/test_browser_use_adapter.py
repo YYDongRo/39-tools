@@ -201,6 +201,81 @@ def test_observer_records_navigation_with_one_setup_call(
     asyncio.run(run())
 
 
+def test_observer_preflight_checks_hook_and_trace_directory(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        trace_root = tmp_path / "trace"
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            config=AgentDevToolsConfig(
+                trace_directory=trace_root,
+            ),
+        )
+
+        result = agent.preflight()
+
+        assert result.passed is True
+        assert [check.name for check in result.checks] == [
+            "agent contract",
+            "recording hook",
+            "browser executable",
+            "trace directory",
+            "screenshots",
+        ]
+        assert not list(trace_root.iterdir())
+
+    asyncio.run(run())
+
+
+def test_observer_preflight_rejects_disabled_recording(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            config=AgentDevToolsConfig(
+                enabled=False,
+                trace_directory=tmp_path / "trace",
+            ),
+        )
+
+        result = agent.preflight()
+
+        assert result.passed is False
+        assert result.checks[0].name == "recording enabled"
+        assert "enabled = true" in result.checks[0].detail
+
+    asyncio.run(run())
+
+
+def test_observer_preflight_reports_unwritable_trace_path(
+    tmp_path: Path,
+) -> None:
+    trace_path = tmp_path / "trace-file"
+    trace_path.write_text("not a directory", encoding="utf-8")
+
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(),
+            "Open example.com",
+            config=AgentDevToolsConfig(trace_directory=trace_path),
+        )
+
+        result = agent.preflight()
+
+        assert result.passed is False
+        trace_check = next(
+            check for check in result.checks if check.name == "trace directory"
+        )
+        assert trace_check.passed is False
+        assert "FileExistsError" in trace_check.detail
+
+    asyncio.run(run())
+
+
 def test_observer_marks_navigation_to_another_host_as_action_failure(
     tmp_path: Path,
 ) -> None:
