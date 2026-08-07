@@ -190,6 +190,11 @@ recording boundary. Check the integration before treating the task result as
 fully observed; direct browser, desktop, or Android calls may be outside the
 observer.
 
+For CI or strict local checks, set `require_recorded_actions = true` in
+`agent_devtools.toml`. A successful-looking run with zero captured browser
+actions is then marked `unverified` and the CLI exits non-zero. The default is
+`false` for compatibility with tasks that can finish without browser actions.
+
 See the [CLI and custom-agent guide](docs/cli.md) and the
 [Playwright guide](docs/playwright.md) for the supported contracts. Optional
 BYOK trajectory judging is described in the [concepts guide](docs/concepts.md).

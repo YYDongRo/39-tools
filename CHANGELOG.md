@@ -17,6 +17,7 @@ All notable changes to Agent DevTools are recorded here.
   session reports for faster failure triage.
 - Warn clearly when a run contains no captured browser actions, including the
   boundary where direct calls may be outside observation.
+- Add an optional strict recording-coverage gate for zero-action runs.
 - Allow generic sync and async observers to bind their recording proxy to an
   agent's existing tool attribute for one-time dispatcher integration.
 - Keep `examples/browser_use_cli.py` as a compatibility wrapper.

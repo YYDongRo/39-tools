@@ -17,6 +17,11 @@ screenshots = true
 # are binary evidence and are not altered; review them before sharing.
 redact_sensitive_data = true
 
+# Set to true when every successful run must capture at least one browser
+# action. A zero-action run becomes unverified and exits non-zero in the CLI.
+# Keep false for tasks that can legitimately finish without browser actions.
+require_recorded_actions = false
+
 # Set to false when the host application has its own terminal logging.
 terminal_summary = true
 

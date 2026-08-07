@@ -654,6 +654,16 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             raise RuntimeError("the observed Browser Use agent has not run yet")
         verification = self.last_trace.session.verification
         report_path = self.last_trace.report_path.resolve()
+        if (
+            self.config.require_recorded_actions
+            and self.last_trace.session.action_count == 0
+            and (verification is None or verification.passed)
+        ):
+            raise AssertionError(
+                "Task was not fully observed: no browser actions were "
+                "captured while strict recording coverage is enabled. "
+                f"Report: {report_path}"
+            )
         if verification is None:
             raise AssertionError(
                 "Task was not verified by Browser Use. "

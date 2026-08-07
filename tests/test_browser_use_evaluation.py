@@ -286,6 +286,32 @@ def test_evaluator_preserves_four_distinct_statuses(tmp_path: Path) -> None:
     assert evaluation.runs[3].error_type == "RuntimeError"
 
 
+def test_evaluator_marks_zero_action_success_unverified_in_strict_mode(
+    tmp_path: Path,
+) -> None:
+    class DoneAgent(_Agent):
+        async def run(self, *, on_step_end: object, max_steps: int) -> _History:
+            return _History(True)
+
+    evaluation = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: DoneAgent(),
+            task="Complete the task.",
+            runs=1,
+            output_root=tmp_path,
+            config=AgentDevToolsConfig(require_recorded_actions=True),
+        )
+    )
+
+    assert evaluation.runs[0].status is EvaluationRunStatus.UNVERIFIED
+    assert evaluation.unverified_count == 1
+    assert evaluation.all_runs_passed is False
+    session = read_session_json(
+        evaluation.output_dir / "runs/001/session.json"
+    )
+    assert session.action_count == 0
+
+
 def test_factory_error_creates_trace_and_does_not_stop_later_runs(
     tmp_path: Path,
 ) -> None:

@@ -115,6 +115,12 @@ still read from `Agent(task=...)`; API keys remain environment variables. If no
 config is passed, the defaults remain in effect. A disabled configuration
 passes the call through to the original Agent and creates no report.
 
+For a stricter coverage gate, set `require_recorded_actions = true`. A run that
+finishes without any captured browser action is then reported as `unverified`
+and the CLI exits non-zero, while the report keeps the coverage warning and
+any final-check evidence. The default is `false` so tasks that legitimately do
+not touch a browser remain compatible.
+
 The included CLI and Browser Use evaluation example use Playwright's managed
 Chromium by default. To use an installed Brave, Chrome, or Edge binary, add
 the optional browser section to the same TOML file:

@@ -91,6 +91,49 @@ def test_summary_status_distinguishes_final_verification_and_errors() -> None:
     )
 
 
+def test_summary_status_marks_zero_action_success_unverified_in_strict_mode() -> None:
+    session = ActionSession(
+        goal="Complete the task",
+        verification=VerificationResult(
+            expected_state="done",
+            observed_state="done",
+            passed=True,
+        ),
+    )
+
+    assert (
+        _summary_status(session, require_recorded_actions=True)
+        == "unverified"
+    )
+    assert (
+        _summary_status(
+            _session_with_verification(True),
+            require_recorded_actions=True,
+        )
+        == "passed"
+    )
+
+
+def test_run_summary_explains_strict_zero_action_coverage(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Complete the task",
+        verification=VerificationResult(
+            expected_state="done",
+            observed_state="done",
+            passed=True,
+        ),
+    )
+
+    summary = _format_run_summary(
+        session,
+        tmp_path / "report.html",
+        require_recorded_actions=True,
+    )
+
+    assert "Result: UNVERIFIED" in summary
+    assert "no browser actions captured" in summary
+
+
 def test_run_summary_is_concise_and_explains_final_failure(tmp_path: Path) -> None:
     summary = _format_run_summary(
         _session_with_verification(False),
@@ -300,3 +343,75 @@ def test_cli_single_run_prints_one_concise_summary(
     assert output.count("Report:") == 1
     assert output.count("Result: PASS") == 1
     assert "Task result:" not in output
+
+
+def test_cli_strict_coverage_returns_nonzero_for_zero_action_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "agent_devtools.toml"
+    config_path.write_text(
+        "[agent_devtools]\n"
+        "enabled = true\n"
+        "require_recorded_actions = true\n"
+        "open_report = false\n",
+        encoding="utf-8",
+    )
+
+    class FakeBrowser:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+        async def stop(self) -> None:
+            return None
+
+    class FakeAgent:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeObservedAgent:
+        last_report_path = tmp_path / "trace" / "report.html"
+        last_session = ActionSession(
+            goal="Complete the task.",
+            verification=VerificationResult(
+                expected_state="done",
+                observed_state="done",
+                passed=True,
+            ),
+        )
+
+        async def run(self, **kwargs: object) -> None:
+            return None
+
+        def assert_last_task_passed(self) -> None:
+            raise AssertionError("no browser actions captured")
+
+    monkeypatch.setattr(cli_module, "_resolve_provider", lambda requested: "openai")
+    monkeypatch.setattr(cli_module, "_create_llm", lambda provider, model: object())
+    monkeypatch.setattr(
+        cli_module,
+        "observe_browser_use_agent",
+        lambda *args, **kwargs: FakeObservedAgent(),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "browser_use",
+        SimpleNamespace(Agent=FakeAgent, Browser=FakeBrowser),
+    )
+
+    result = asyncio.run(
+        cli_module._browser_use_main(
+            [
+                "--config",
+                str(config_path),
+                "--task",
+                "Complete the task.",
+            ]
+        )
+    )
+
+    output = capsys.readouterr().out
+    assert result == 1
+    assert "Result: UNVERIFIED" in output
+    assert "no browser actions captured" in output

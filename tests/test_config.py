@@ -11,6 +11,7 @@ def test_config_defaults_preserve_observer_behavior() -> None:
     assert config.enabled is True
     assert config.screenshots is True
     assert config.redact_sensitive_data is True
+    assert config.require_recorded_actions is False
     assert config.terminal_summary is True
     assert config.open_report is False
     assert config.compare_previous is False
@@ -27,6 +28,7 @@ def test_config_reads_human_editable_toml(tmp_path: Path) -> None:
 enabled = false
 screenshots = false
 redact_sensitive_data = false
+require_recorded_actions = true
 terminal_summary = false
 open_report = true
 compare_previous = true
@@ -45,6 +47,7 @@ executable_path = "/usr/bin/brave-browser"
         enabled=False,
         screenshots=False,
         redact_sensitive_data=False,
+        require_recorded_actions=True,
         terminal_summary=False,
         open_report=True,
         compare_previous=True,
@@ -75,6 +78,11 @@ def test_config_rejects_wrong_option_types() -> None:
     with pytest.raises(TypeError, match="must be a boolean"):
         AgentDevToolsConfig.from_mapping(
             {"agent_devtools": {"redact_sensitive_data": "yes"}}
+        )
+
+    with pytest.raises(TypeError, match="must be a boolean"):
+        AgentDevToolsConfig.from_mapping(
+            {"agent_devtools": {"require_recorded_actions": "yes"}}
         )
 
     with pytest.raises(TypeError, match="must be a path"):

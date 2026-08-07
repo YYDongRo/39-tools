@@ -198,10 +198,17 @@ def _summary_status(
     session: ActionSession | None,
     *,
     run_error: BaseException | None = None,
+    require_recorded_actions: bool = False,
 ) -> SummaryStatus:
     if run_error is not None:
         return "errored"
     if session is None or session.verification is None:
+        return "unverified"
+    if (
+        require_recorded_actions
+        and session.action_count == 0
+        and session.verification.passed
+    ):
         return "unverified"
     return "passed" if session.verification.passed else "failed"
 
@@ -359,6 +366,7 @@ def _format_run_summary(
     report_path: Path,
     *,
     run_error: BaseException | None = None,
+    require_recorded_actions: bool = False,
 ) -> str:
     actions = session.actions if session is not None else []
     action_failures = sum(
@@ -366,9 +374,16 @@ def _format_run_summary(
     )
     action_successes = len(actions) - action_failures
     verification = session.verification if session is not None else None
+    coverage_unverified = (
+        require_recorded_actions
+        and not actions
+        and (verification is None or verification.passed)
+    )
 
     if run_error is not None:
         result = "ERROR"
+    elif coverage_unverified:
+        result = "UNVERIFIED"
     elif verification is None:
         result = "UNVERIFIED"
     elif verification.passed:
@@ -393,6 +408,11 @@ def _format_run_summary(
 
     if run_error is not None:
         lines.append(f"Reason: agent run failed ({type(run_error).__name__})")
+    elif coverage_unverified:
+        lines.append(
+            "Reason: no browser actions captured "
+            "(strict recording coverage is enabled)"
+        )
     elif verification is not None and not verification.passed:
         reason = verification.failure_reason
         if reason:
@@ -500,6 +520,9 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         use_judge=True,
     )
     show_summary = config is None or config.terminal_summary
+    require_recorded_actions = (
+        config is not None and config.require_recorded_actions
+    )
     agent = observe_browser_use_agent(
         raw_agent,
         config=config,
@@ -549,11 +572,20 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         result_is_verified = True
 
     if show_summary:
-        print(_format_run_summary(agent.last_session, report_path))
+        print(
+            _format_run_summary(
+                agent.last_session,
+                report_path,
+                require_recorded_actions=require_recorded_actions,
+            )
+        )
 
     _write_summary(
         args.summary_json,
-        status=_summary_status(agent.last_session),
+        status=_summary_status(
+            agent.last_session,
+            require_recorded_actions=require_recorded_actions,
+        ),
         report_path=report_path,
         session=agent.last_session,
     )

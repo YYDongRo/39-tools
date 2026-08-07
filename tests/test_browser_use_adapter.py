@@ -528,6 +528,31 @@ def test_done_step_is_not_recorded_as_a_computer_action(
     asyncio.run(run())
 
 
+def test_strict_coverage_rejects_zero_action_success(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        agent = observe_browser_use_agent(
+            Agent(action_type="done", arguments={"success": True}),
+            "Complete the task",
+            tmp_path,
+            config=AgentDevToolsConfig(
+                require_recorded_actions=True,
+            ),
+        )
+
+        await agent.run()
+
+        assert agent.last_session is not None
+        assert agent.last_session.action_count == 0
+        assert agent.last_session.verification is not None
+        assert agent.last_session.verification.passed is True
+        with pytest.raises(AssertionError, match="no browser actions"):
+            agent.assert_last_task_passed()
+
+    asyncio.run(run())
+
+
 def test_auxiliary_file_actions_are_separate_from_browser_timeline(
     tmp_path: Path,
 ) -> None:

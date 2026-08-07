@@ -12,6 +12,7 @@ class AgentDevToolsConfig:
     enabled: bool = True
     screenshots: bool = True
     redact_sensitive_data: bool = True
+    require_recorded_actions: bool = False
     terminal_summary: bool = True
     open_report: bool = False
     compare_previous: bool = False
@@ -54,6 +55,7 @@ class AgentDevToolsConfig:
             "enabled",
             "screenshots",
             "redact_sensitive_data",
+            "require_recorded_actions",
             "terminal_summary",
             "open_report",
             "compare_previous",
@@ -73,6 +75,11 @@ class AgentDevToolsConfig:
                 section,
                 "redact_sensitive_data",
                 True,
+            ),
+            "require_recorded_actions": _bool_option(
+                section,
+                "require_recorded_actions",
+                False,
             ),
             "terminal_summary": _bool_option(
                 section,

@@ -248,7 +248,10 @@ async def _evaluate_attempt(
     status = (
         EvaluationRunStatus.ERRORED
         if error_type is not None
-        else _verification_status(session)
+        else _verification_status(
+            session,
+            require_recorded_actions=config.require_recorded_actions,
+        )
     )
     ended_at = datetime.now(UTC)
     run = EvaluationRun(
@@ -266,7 +269,17 @@ async def _evaluate_attempt(
     return run, session
 
 
-def _verification_status(session: ActionSession) -> EvaluationRunStatus:
+def _verification_status(
+    session: ActionSession,
+    *,
+    require_recorded_actions: bool = False,
+) -> EvaluationRunStatus:
+    if (
+        require_recorded_actions
+        and session.action_count == 0
+        and (session.verification is None or session.verification.passed)
+    ):
+        return EvaluationRunStatus.UNVERIFIED
     if session.verification is None:
         return EvaluationRunStatus.UNVERIFIED
     return (
