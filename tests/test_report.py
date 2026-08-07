@@ -149,6 +149,37 @@ def test_report_shows_friendly_arguments_and_collapses_raw_values(
         assert "browser_use_step" in content
 
 
+def test_session_report_prioritizes_visual_evidence_before_technical_details(
+    tmp_path: Path,
+) -> None:
+    action = ActionRecord(
+        action_type="click",
+        arguments={"selector": "#play", "browser_use_step": 2},
+        start_time=datetime(2026, 7, 18, 7, 0, tzinfo=UTC),
+        duration_ms=32,
+        status=ActionStatus.SUCCESS,
+        screenshot_before=Path("screenshots/before.png"),
+        screenshot_after=Path("screenshots/after.png"),
+    )
+    report_path = tmp_path / "session.html"
+
+    write_session_html(ActionSession(actions=[action]), report_path)
+    content = report_path.read_text(encoding="utf-8")
+
+    assert '<h3 id="action-1-evidence-title">Visual evidence</h3>' in content
+    assert "What changed around this action." in content
+    assert '<span class="evidence-flow">Before → After</span>' in content
+    assert '<details class="action-technical">' in content
+    assert '<summary>Technical details</summary>' in content
+    assert "Visual evidence" in content
+    assert content.index("Visual evidence") < content.index(
+        '<summary>Technical details</summary>'
+    )
+    assert '<details class="action-technical" open>' not in content
+    assert 'src="screenshots/before.png"' in content
+    assert 'src="screenshots/after.png"' in content
+
+
 def test_report_displays_changed_page_urls_compactly(tmp_path: Path) -> None:
     action = ActionRecord(
         action_type="navigate",

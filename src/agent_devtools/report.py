@@ -475,7 +475,7 @@ def _key_value_grid(values: dict[str, object]) -> str:
     return f'<dl class="key-value-grid">{items}</dl>'
 
 
-def _arguments_content(arguments: object) -> str:
+def _arguments_content(arguments: object, *, include_raw: bool = True) -> str:
     encoded_arguments = escape(
         json.dumps(arguments, ensure_ascii=False, indent=2)
     )
@@ -501,6 +501,9 @@ def _arguments_content(arguments: object) -> str:
         summary = f'<dl class="key-value-grid">{items}</dl>'
     else:
         summary = '<p class="missing">No user-facing arguments.</p>'
+
+    if not include_raw:
+        return summary
 
     return f"""
         {summary}
@@ -812,10 +815,30 @@ def _session_action_card(index: int, action: ActionRecord) -> str:
               <div><dt>Duration</dt><dd>{data["duration_ms"]} ms</dd></div>
               {page_url_details}
             </dl>
-            <h3>Arguments</h3>
-            {_arguments_content(data["arguments"])}{observations_section}{structured_state_section}{browser_events_section}{failure_section}{verification_section}
-            <div class="action-screenshots">{screenshot_section}
-            </div>
+            <section class="action-evidence" aria-labelledby="action-{index}-evidence-title">
+              <div class="action-evidence-heading">
+                <div>
+                  <h3 id="action-{index}-evidence-title">Visual evidence</h3>
+                  <p class="section-note">What changed around this action.</p>
+                </div>
+                <span class="evidence-flow">Before → After</span>
+              </div>
+              <div class="action-screenshots">{screenshot_section}
+              </div>
+            </section>{failure_section}{verification_section}
+            <details class="action-technical">
+              <summary>Technical details</summary>
+              <div class="action-technical-content">
+                <div class="technical-details">
+                  <section class="technical-group">
+                    <h3>Action inputs</h3>
+                    <p class="section-note">Values sent to the browser action.</p>
+                    {_arguments_content(data["arguments"], include_raw=False)}
+                    <pre>{escape(json.dumps(data["arguments"], ensure_ascii=False, indent=2))}</pre>
+                  </section>{observations_section}{structured_state_section}{browser_events_section}
+                </div>
+              </div>
+            </details>
           </div>
         </article>"""
 
@@ -1477,6 +1500,28 @@ def write_session_html(
                  border-radius: 50%; color: white; display: flex; font-weight: 700;
                  height: 32px; justify-content: center; width: 32px; z-index: 1; }}
       .action-card {{ box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 24px; }}
+      .action-evidence {{ border-top: 1px solid #e2e8f0; margin-top: 22px;
+                          padding-top: 20px; }}
+      .action-evidence-heading {{ align-items: flex-start; display: flex;
+                                  gap: 16px; justify-content: space-between; }}
+      .action-evidence-heading h3 {{ margin-bottom: 0; }}
+      .section-note {{ color: #64748b; font-size: 14px; margin: 6px 0 0; }}
+      .evidence-flow {{ background: #eff6ff; border-radius: 999px; color: #1d4ed8;
+                        font-size: 12px; font-weight: 800; padding: 6px 10px;
+                        white-space: nowrap; }}
+      .action-screenshots {{ margin-top: 16px; }}
+      .action-screenshots figure {{ background: #f8fafc; border: 1px solid #e2e8f0;
+                                    border-radius: 10px; padding: 10px; }}
+      .action-screenshots figure img {{ max-height: 440px; object-fit: contain; }}
+      .action-technical {{ border-top: 1px solid #e2e8f0; color: #334155;
+                           margin-top: 22px; padding-top: 16px; }}
+      .action-technical > summary {{ color: #0f172a; cursor: pointer;
+                                     font-weight: 800; }}
+      .action-technical-content {{ margin-top: 16px; }}
+      .action-technical-content > .technical-details {{ margin-top: 12px; }}
+      .technical-group {{ margin: 0 0 20px; }}
+      .technical-group h3 {{ margin-bottom: 0; }}
+      .technical-group pre {{ margin: 12px 0 0; }}
       dl {{ display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }}
       dt {{ color: #64748b; font-size: 13px; font-weight: 700; }}
       dd {{ margin: 6px 0 0; overflow-wrap: anywhere; }}
@@ -1598,5 +1643,6 @@ def write_session_html(
 
 def _write_utf8_text(output_path: Path, document: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    document = "\n".join(line.rstrip() for line in document.splitlines()) + "\n"
     with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
         output_file.write(document)

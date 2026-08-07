@@ -141,6 +141,28 @@
                  border-radius: 50%; color: white; display: flex; font-weight: 700;
                  height: 32px; justify-content: center; width: 32px; z-index: 1; }
       .action-card { box-shadow: 0 6px 20px rgba(15, 23, 42, .04); padding: 24px; }
+      .action-evidence { border-top: 1px solid #e2e8f0; margin-top: 22px;
+                          padding-top: 20px; }
+      .action-evidence-heading { align-items: flex-start; display: flex;
+                                  gap: 16px; justify-content: space-between; }
+      .action-evidence-heading h3 { margin-bottom: 0; }
+      .section-note { color: #64748b; font-size: 14px; margin: 6px 0 0; }
+      .evidence-flow { background: #eff6ff; border-radius: 999px; color: #1d4ed8;
+                        font-size: 12px; font-weight: 800; padding: 6px 10px;
+                        white-space: nowrap; }
+      .action-screenshots { margin-top: 16px; }
+      .action-screenshots figure { background: #f8fafc; border: 1px solid #e2e8f0;
+                                    border-radius: 10px; padding: 10px; }
+      .action-screenshots figure img { max-height: 440px; object-fit: contain; }
+      .action-technical { border-top: 1px solid #e2e8f0; color: #334155;
+                           margin-top: 22px; padding-top: 16px; }
+      .action-technical > summary { color: #0f172a; cursor: pointer;
+                                     font-weight: 800; }
+      .action-technical-content { margin-top: 16px; }
+      .action-technical-content > .technical-details { margin-top: 12px; }
+      .technical-group { margin: 0 0 20px; }
+      .technical-group h3 { margin-bottom: 0; }
+      .technical-group pre { margin: 12px 0 0; }
       dl { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }
       dt { color: #64748b; font-size: 13px; font-weight: 700; }
       dd { margin: 6px 0 0; overflow-wrap: anywhere; }
@@ -305,14 +327,41 @@
               <div><dt>Duration</dt><dd>97 ms</dd></div>
               <div><dt>Page URL before</dt><dd>about:blank</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/</dd></div>
             </dl>
-            <h3>Arguments</h3>
-            <dl class="key-value-grid"><div><dt>Target URL</dt><dd>https://shop.example.test/</dd></div></dl>
-        <details class="technical-details">
-          <summary>Technical details</summary>
-          <pre>{
+            <section class="action-evidence" aria-labelledby="action-1-evidence-title">
+              <div class="action-evidence-heading">
+                <div>
+                  <h3 id="action-1-evidence-title">Visual evidence</h3>
+                  <p class="section-note">What changed around this action.</p>
+                </div>
+                <span class="evidence-flow">Before → After</span>
+              </div>
+              <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/001/before.svg">
+                  <img src="actions/001/before.svg" alt="Before action 1 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/001/after.svg">
+                  <img src="actions/001/after.svg" alt="After action 1 screenshot">
+                </a>
+              </figure>
+              </div>
+            </section>
+            <details class="action-technical">
+              <summary>Technical details</summary>
+              <div class="action-technical-content">
+                <div class="technical-details">
+                  <section class="technical-group">
+                    <h3>Action inputs</h3>
+                    <p class="section-note">Values sent to the browser action.</p>
+                    <dl class="key-value-grid"><div><dt>Target URL</dt><dd>https://shop.example.test/</dd></div></dl>
+                    <pre>{
   &quot;url&quot;: &quot;https://shop.example.test/&quot;
 }</pre>
-        </details>
+                  </section>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
@@ -334,20 +383,9 @@
 }</pre>
         </details>
       </section>
-            <div class="action-screenshots">
-              <figure>
-                <figcaption>Before</figcaption>
-                <a href="actions/001/before.svg">
-                  <img src="actions/001/before.svg" alt="Before action 1 screenshot">
-                </a>
-              </figure>
-              <figure>
-                <figcaption>After</figcaption>
-                <a href="actions/001/after.svg">
-                  <img src="actions/001/after.svg" alt="After action 1 screenshot">
-                </a>
-              </figure>
-            </div>
+                </div>
+              </div>
+            </details>
           </div>
         </article>
 
@@ -368,15 +406,42 @@
               <div><dt>Duration</dt><dd>114 ms</dd></div>
               <div><dt>Page URL before</dt><dd>https://shop.example.test/</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div>
             </dl>
-            <h3>Arguments</h3>
-            <dl class="key-value-grid"><div><dt>Target</dt><dd>#product-search</dd></div><div><dt>Text</dt><dd>Wireless Headphones</dd></div></dl>
-        <details class="technical-details">
-          <summary>Technical details</summary>
-          <pre>{
+            <section class="action-evidence" aria-labelledby="action-2-evidence-title">
+              <div class="action-evidence-heading">
+                <div>
+                  <h3 id="action-2-evidence-title">Visual evidence</h3>
+                  <p class="section-note">What changed around this action.</p>
+                </div>
+                <span class="evidence-flow">Before → After</span>
+              </div>
+              <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/002/before.svg">
+                  <img src="actions/002/before.svg" alt="Before action 2 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/002/after.svg">
+                  <img src="actions/002/after.svg" alt="After action 2 screenshot">
+                </a>
+              </figure>
+              </div>
+            </section>
+            <details class="action-technical">
+              <summary>Technical details</summary>
+              <div class="action-technical-content">
+                <div class="technical-details">
+                  <section class="technical-group">
+                    <h3>Action inputs</h3>
+                    <p class="section-note">Values sent to the browser action.</p>
+                    <dl class="key-value-grid"><div><dt>Target</dt><dd>#product-search</dd></div><div><dt>Text</dt><dd>Wireless Headphones</dd></div></dl>
+                    <pre>{
   &quot;selector&quot;: &quot;#product-search&quot;,
   &quot;text&quot;: &quot;Wireless Headphones&quot;
 }</pre>
-        </details>
+                  </section>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
@@ -398,20 +463,9 @@
 }</pre>
         </details>
       </section>
-            <div class="action-screenshots">
-              <figure>
-                <figcaption>Before</figcaption>
-                <a href="actions/002/before.svg">
-                  <img src="actions/002/before.svg" alt="Before action 2 screenshot">
-                </a>
-              </figure>
-              <figure>
-                <figcaption>After</figcaption>
-                <a href="actions/002/after.svg">
-                  <img src="actions/002/after.svg" alt="After action 2 screenshot">
-                </a>
-              </figure>
-            </div>
+                </div>
+              </div>
+            </details>
           </div>
         </article>
 
@@ -432,14 +486,41 @@
               <div><dt>Duration</dt><dd>131 ms</dd></div>
               <div><dt>Page URL before</dt><dd>https://shop.example.test/search?q=wireless-headphones</dd></div><div><dt>Page URL after</dt><dd>https://shop.example.test/products/usb-c-cable</dd></div>
             </dl>
-            <h3>Arguments</h3>
-            <dl class="key-value-grid"><div><dt>Target</dt><dd>#usb-c-cable</dd></div></dl>
-        <details class="technical-details">
-          <summary>Technical details</summary>
-          <pre>{
+            <section class="action-evidence" aria-labelledby="action-3-evidence-title">
+              <div class="action-evidence-heading">
+                <div>
+                  <h3 id="action-3-evidence-title">Visual evidence</h3>
+                  <p class="section-note">What changed around this action.</p>
+                </div>
+                <span class="evidence-flow">Before → After</span>
+              </div>
+              <div class="action-screenshots">
+              <figure>
+                <figcaption>Before</figcaption>
+                <a href="actions/003/before.svg">
+                  <img src="actions/003/before.svg" alt="Before action 3 screenshot">
+                </a>
+              </figure>
+              <figure>
+                <figcaption>After</figcaption>
+                <a href="actions/003/after.svg">
+                  <img src="actions/003/after.svg" alt="After action 3 screenshot">
+                </a>
+              </figure>
+              </div>
+            </section>
+            <details class="action-technical">
+              <summary>Technical details</summary>
+              <div class="action-technical-content">
+                <div class="technical-details">
+                  <section class="technical-group">
+                    <h3>Action inputs</h3>
+                    <p class="section-note">Values sent to the browser action.</p>
+                    <dl class="key-value-grid"><div><dt>Target</dt><dd>#usb-c-cable</dd></div></dl>
+                    <pre>{
   &quot;selector&quot;: &quot;#usb-c-cable&quot;
 }</pre>
-        </details>
+                  </section>
       <section class="structured-state">
         <h2>Structured state</h2>
         <h3>Detected changes</h3>
@@ -461,20 +542,9 @@
 }</pre>
         </details>
       </section>
-            <div class="action-screenshots">
-              <figure>
-                <figcaption>Before</figcaption>
-                <a href="actions/003/before.svg">
-                  <img src="actions/003/before.svg" alt="Before action 3 screenshot">
-                </a>
-              </figure>
-              <figure>
-                <figcaption>After</figcaption>
-                <a href="actions/003/after.svg">
-                  <img src="actions/003/after.svg" alt="After action 3 screenshot">
-                </a>
-              </figure>
-            </div>
+                </div>
+              </div>
+            </details>
           </div>
         </article>
       </div>
