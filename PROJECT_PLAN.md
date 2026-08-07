@@ -23,7 +23,8 @@ trace with:
 - JSON persistence and a static HTML timeline;
 - Browser Use 0.13.x and lower-level Playwright integration paths.
 - a framework-independent `observe_agent(...)` boundary for agents exposing
-  `run(task, *, tools=...)`, with sync and async recording proxies.
+  `run(task, *, tools=...)`, or an existing tool attribute bound with
+  `tools_attribute`, with sync and async recording proxies.
 - an optional provider-neutral final-state verifier for that generic boundary;
   verifier errors remain `unverified`.
 - an optional BYOK trajectory judge that can infer action and final checks from

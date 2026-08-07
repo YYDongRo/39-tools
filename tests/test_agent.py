@@ -41,6 +41,15 @@ class Agent:
         return tools.click("#target")
 
 
+class BoundAgent:
+    def __init__(self, task: str, tools: Tools) -> None:
+        self.task = task
+        self.tools = tools
+
+    def run(self, user_request: str) -> str:
+        return self.tools.click("#target")
+
+
 class AsyncAgent:
     def __init__(self, task: str) -> None:
         self.task = task
@@ -49,6 +58,15 @@ class AsyncAgent:
     async def run(self, user_request: str, *, tools: AsyncTools) -> str:
         self.received_task = user_request
         return await tools.click("#target")
+
+
+class BoundAsyncAgent:
+    def __init__(self, task: str, tools: AsyncTools) -> None:
+        self.task = task
+        self.tools = tools
+
+    async def run(self, user_request: str) -> str:
+        return await self.tools.click("#target")
 
 
 class AgentWithoutTask:
@@ -115,6 +133,24 @@ def test_observed_agent_reads_task_once_and_records_tool_actions(
     observed.assert_last_task_passed()
     assert observed.last_report_path is not None
     assert observed.last_report_path.is_file()
+
+
+def test_observed_agent_binds_and_restores_internal_tools(
+    tmp_path: Path,
+) -> None:
+    raw_tools = Tools()
+    raw_agent = BoundAgent("Click the target", raw_tools)
+    observed = observe_agent(
+        raw_agent,
+        raw_tools,
+        tmp_path / "trace",
+        tools_attribute="tools",
+    )
+
+    assert observed.run() == "clicked"
+    assert raw_agent.tools is raw_tools
+    assert observed.last_trace is not None
+    assert observed.last_trace.session.actions[0].action_type == "click"
 
 
 def test_observed_agent_records_sanitized_agent_run_failure(
@@ -184,6 +220,30 @@ def test_observed_async_agent_reads_task_and_records_async_actions(
     asyncio.run(run())
 
 
+def test_observed_async_agent_binds_and_restores_internal_tools(
+    tmp_path: Path,
+) -> None:
+    async def run() -> None:
+        raw_tools = AsyncTools()
+        raw_agent = BoundAsyncAgent(
+            "Click the target asynchronously",
+            raw_tools,
+        )
+        observed = observe_async_agent(
+            raw_agent,
+            raw_tools,
+            tmp_path / "trace",
+            tools_attribute="tools",
+        )
+
+        assert await observed.run() == "clicked"
+        assert raw_agent.tools is raw_tools
+        assert observed.last_trace is not None
+        assert observed.last_trace.session.actions[0].action_type == "click"
+
+    asyncio.run(run())
+
+
 def test_observed_async_agent_records_sanitized_agent_run_failure(
     tmp_path: Path,
 ) -> None:
@@ -215,6 +275,35 @@ def test_observed_agent_owns_tools_argument(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="owns the tools argument"):
         observed.run(tools=Tools())
+
+
+def test_observed_agent_validates_tools_attribute(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="tools_attribute"):
+        observe_agent(
+            Agent("Run once"),
+            Tools(),
+            tmp_path / "trace",
+            tools_attribute=" ",
+        )
+
+
+def test_observed_agent_reports_missing_tools_attribute(
+    tmp_path: Path,
+) -> None:
+    observed = observe_agent(
+        Agent("Run once"),
+        Tools(),
+        tmp_path / "trace",
+        tools_attribute="dispatcher",
+    )
+
+    with pytest.raises(AttributeError, match="dispatcher"):
+        observed.run()
+
+    assert observed.last_trace is not None
+    assert observed.last_trace.session.verification_note == (
+        "Agent run failed (AttributeError)."
+    )
 
 
 def test_observed_agent_passes_final_state_to_verifier(

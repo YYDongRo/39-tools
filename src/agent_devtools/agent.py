@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import webbrowser
 from collections.abc import Awaitable, Callable, Iterable
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from inspect import isawaitable
 from pathlib import Path
@@ -48,7 +49,11 @@ AsyncTrajectoryVerifier = Callable[
 
 
 class ObservedAgent(Generic[AgentT, ToolT]):
-    """Wrap an agent whose run method accepts ``task`` and ``tools``."""
+    """Wrap an agent at its tool boundary.
+
+    Agents can receive the recording proxy as ``run(..., tools=...)`` or bind
+    it temporarily to an existing tool attribute with ``tools_attribute``.
+    """
 
     def __init__(
         self,
@@ -64,9 +69,11 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         trajectory_verifier: SyncTrajectoryVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
+        tools_attribute: str | None = None,
     ) -> None:
         _validate_agent(agent)
         _validate_optional_task(task)
+        _validate_tools_attribute(tools_attribute)
         _validate_final_state_verifier(
             task_verification,
             final_state_verifier,
@@ -83,6 +90,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         self.trajectory_verifier = trajectory_verifier
         self.methods = methods
         self.event_collector = event_collector
+        self.tools_attribute = tools_attribute
         self.last_trace: RecordedTools[ToolT] | None = None
         self._active = False
 
@@ -119,12 +127,24 @@ class ObservedAgent(Generic[AgentT, ToolT]):
             self.last_trace = trace
             with trace as recorded_tools:
                 try:
-                    result = self.agent.run(  # type: ignore[attr-defined]
-                        task,
-                        *args,
-                        tools=recorded_tools,
-                        **kwargs,
-                    )
+                    with _bind_tools(
+                        self.agent,
+                        self.tools_attribute,
+                        recorded_tools,
+                    ):
+                        if self.tools_attribute is None:
+                            result = self.agent.run(  # type: ignore[attr-defined]
+                                task,
+                                *args,
+                                tools=recorded_tools,
+                                **kwargs,
+                            )
+                        else:
+                            result = self.agent.run(  # type: ignore[attr-defined]
+                                task,
+                                *args,
+                                **kwargs,
+                            )
                     if isawaitable(result):
                         close = getattr(result, "close", None)
                         if callable(close):
@@ -185,9 +205,11 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         trajectory_verifier: AsyncTrajectoryVerifier | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
+        tools_attribute: str | None = None,
     ) -> None:
         _validate_agent(agent)
         _validate_optional_task(task)
+        _validate_tools_attribute(tools_attribute)
         _validate_final_state_verifier(
             task_verification,
             final_state_verifier,
@@ -204,6 +226,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         self.trajectory_verifier = trajectory_verifier
         self.methods = methods
         self.event_collector = event_collector
+        self.tools_attribute = tools_attribute
         self.last_trace: RecordedAsyncTools[ToolT] | None = None
         self._active = False
 
@@ -240,18 +263,30 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
             self.last_trace = trace
             async with trace as recorded_tools:
                 try:
-                    result = self.agent.run(  # type: ignore[attr-defined]
-                        task,
-                        *args,
-                        tools=recorded_tools,
-                        **kwargs,
-                    )
-                    if not isawaitable(result):
-                        raise TypeError(
-                            "observe_async_agent() requires an async agent "
-                            "run method"
-                        )
-                    resolved_result = await result
+                    with _bind_tools(
+                        self.agent,
+                        self.tools_attribute,
+                        recorded_tools,
+                    ):
+                        if self.tools_attribute is None:
+                            result = self.agent.run(  # type: ignore[attr-defined]
+                                task,
+                                *args,
+                                tools=recorded_tools,
+                                **kwargs,
+                            )
+                        else:
+                            result = self.agent.run(  # type: ignore[attr-defined]
+                                task,
+                                *args,
+                                **kwargs,
+                            )
+                        if not isawaitable(result):
+                            raise TypeError(
+                                "observe_async_agent() requires an async agent "
+                                "run method"
+                            )
+                        resolved_result = await result
                     if self.final_state_verifier is not None:
                         await _apply_async_final_state_verifier(
                             trace,
@@ -300,6 +335,7 @@ def observe_agent(
     trajectory_verifier: SyncTrajectoryVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
+    tools_attribute: str | None = None,
 ) -> ObservedAgent[AgentT, ToolT]:
     return ObservedAgent(
         agent,
@@ -313,6 +349,7 @@ def observe_agent(
         trajectory_verifier=trajectory_verifier,
         methods=methods,
         event_collector=event_collector,
+        tools_attribute=tools_attribute,
     )
 
 
@@ -329,6 +366,7 @@ def observe_async_agent(
     trajectory_verifier: AsyncTrajectoryVerifier | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
+    tools_attribute: str | None = None,
 ) -> ObservedAsyncAgent[AgentT, ToolT]:
     return ObservedAsyncAgent(
         agent,
@@ -342,12 +380,42 @@ def observe_async_agent(
         trajectory_verifier=trajectory_verifier,
         methods=methods,
         event_collector=event_collector,
+        tools_attribute=tools_attribute,
     )
 
 
 def _validate_agent(agent: object) -> None:
     if not callable(getattr(agent, "run", None)):
         raise TypeError("agent must provide a callable run method")
+
+
+def _validate_tools_attribute(attribute: object) -> None:
+    if attribute is not None and (
+        not isinstance(attribute, str) or not attribute.strip()
+    ):
+        raise ValueError("tools_attribute must be a non-empty string or None")
+
+
+@contextmanager
+def _bind_tools(
+    agent: object,
+    attribute: str | None,
+    recorded_tools: object,
+):
+    if attribute is None:
+        yield
+        return
+
+    if not hasattr(agent, attribute):
+        raise AttributeError(
+            f"agent has no tools attribute {attribute!r}"
+        )
+    original_tools = getattr(agent, attribute)
+    setattr(agent, attribute, recorded_tools)
+    try:
+        yield
+    finally:
+        setattr(agent, attribute, original_tools)
 
 
 def _validate_optional_task(task: object) -> None:

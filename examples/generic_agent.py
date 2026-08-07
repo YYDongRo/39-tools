@@ -61,7 +61,7 @@ class DesktopSurface:
 
 
 class DesktopTools:
-    """The tool object that the agent receives through ``observe_agent``."""
+    """The tool dispatcher that the agent keeps and calls during a run."""
 
     def __init__(self, surface: DesktopSurface) -> None:
         self._surface = surface
@@ -74,15 +74,22 @@ class DesktopTools:
 
 
 class DemoAgent:
-    def __init__(self, task: str = TASK, *, click_target: str) -> None:
+    def __init__(
+        self,
+        tools: DesktopTools,
+        task: str = TASK,
+        *,
+        click_target: str,
+    ) -> None:
         self.task = task
+        self.tools = tools
         self.click_target = click_target
 
-    def run(self, task: str, *, tools: DesktopTools) -> str:
+    def run(self, task: str) -> str:
         if task != self.task:
             raise ValueError("the observer passed a different task")
-        tools.open_app("Settings")
-        tools.click(self.click_target)
+        self.tools.open_app("Settings")
+        self.tools.click(self.click_target)
         return "done"
 
 
@@ -187,10 +194,12 @@ def run_demo(output_root: str | Path, *, correct: bool = False) -> Path:
 
     surface = DesktopSurface()
     target = "dark-mode-toggle" if correct else "notifications-toggle"
+    tools = DesktopTools(surface)
     observed = observe_agent(
-        DemoAgent(click_target=target),
-        DesktopTools(surface),
+        DemoAgent(tools, click_target=target),
+        tools,
         output_root,
+        tools_attribute="tools",
         capture_screenshot=lambda path: path.write_bytes(
             _render_surface(surface)
         ),

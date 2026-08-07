@@ -206,6 +206,25 @@ Agent DevTools wraps public callable methods on `tools` and records their
 names, arguments, timing, status, and exceptions. A screenshot callback and a
 small state observer are optional but provide stronger visual evidence.
 
+If the agent already owns its dispatcher, it can keep a normal `run(task)`
+method. Bind the proxy to that attribute for the duration of the run:
+
+```python
+raw_agent = MyAgent(tools=MyTools())
+observed_agent = observe_agent(
+    raw_agent,
+    raw_agent.tools,
+    "trace/my-agent",
+    tools_attribute="tools",
+)
+observed_agent.run(user_request)
+```
+
+The original `raw_agent.tools` object is restored after the run. This is useful
+when the agent's central dispatcher calls `click`, `type_text`, `scroll`, or
+other tool methods internally. Calls that bypass that dispatcher and invoke an
+unwrapped API directly are still outside the recording boundary.
+
 For automatic final verification, replace `task_verification` with a
 `final_state_verifier` callback. It receives a `FinalStateObservation` with the
 task, final state, actions, and last after-screenshot path:

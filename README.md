@@ -120,6 +120,11 @@ enter it a second time. The complete integration contract, cleanup guidance,
 and optional deterministic final checks are in the
 [Browser Use guide](docs/browser-use.md).
 
+For a custom desktop agent that keeps its tools on `raw_agent.tools`, pass
+`tools_attribute="tools"` when wrapping it. Agent DevTools temporarily replaces
+that dispatcher with the recording proxy and restores it after the run; the
+agent does not need recording code in every action method.
+
 ## What the report means
 
 The report deliberately keeps three results separate:

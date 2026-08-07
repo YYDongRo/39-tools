@@ -75,19 +75,22 @@ high-risk decisions.
 ## The agent integration boundary
 
 The framework-independent entry points `observe_agent(...)` and
-`observe_async_agent(...)` accept an agent with this small contract:
+`observe_async_agent(...)` accept an agent with either of these small
+contracts:
 
 ```python
 agent.run(task, *, tools=recorded_tools)
 ```
 
-The observer reads `agent.task` when the task is not passed again, injects a
-recording proxy once, and sends every callable tool method through the existing
-action/session recorder. Screenshot and state callbacks remain optional. A
-`final_state_verifier` can consume a `FinalStateObservation` containing the
-task, final state, actions, and last after-screenshot. Agents that call browser
-or desktop APIs directly instead of using the provided tool object still
-require a framework-specific adapter.
+If an agent already keeps its dispatcher on an attribute, such as
+`agent.tools`, pass `tools_attribute="tools"`. The observer temporarily binds
+the recording proxy to that attribute while `run(task)` executes and restores
+the original object afterward. In both forms, every callable tool method goes
+through the existing action/session recorder. Screenshot and state callbacks
+remain optional. A `final_state_verifier` can consume a
+`FinalStateObservation` containing the task, final state, actions, and last
+after-screenshot. Agents that call browser or desktop APIs directly instead of
+using the provided tool boundary still require a framework-specific adapter.
 
 The final-state verifier is an alternative to the deterministic
 `task_verification` callback. Its errors are recorded as `unverified`, and it

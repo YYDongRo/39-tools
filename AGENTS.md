@@ -106,7 +106,8 @@ package.
   groups, and writes versioned aggregate JSON and static HTML.
 - Framework-independent `observe_agent(...)` and
   `observe_async_agent(...)` inject the existing sync/async recording proxies
-  into agents with `run(task, *, tools=...)`, so a caller does not instrument
+  into agents with `run(task, *, tools=...)`, or temporarily bind them to an
+  existing tool attribute via `tools_attribute`. A caller does not instrument
   each action manually. They also accept an optional provider-neutral
   `final_state_verifier` for task-level judge results.
 - The generic observers also accept an optional BYOK `trajectory_verifier`
