@@ -347,6 +347,67 @@ def _print_evaluation_summary(evaluation: AgentEvaluation) -> None:
         print(f"Comparison: {evaluation.comparison_report_path.resolve()}")
 
 
+def _compact_output(value: str, *, limit: int = 160) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "…"
+
+
+def _format_run_summary(
+    session: ActionSession | None,
+    report_path: Path,
+    *,
+    run_error: BaseException | None = None,
+) -> str:
+    actions = session.actions if session is not None else []
+    action_failures = sum(
+        action.status is ActionStatus.FAILURE for action in actions
+    )
+    action_successes = len(actions) - action_failures
+    verification = session.verification if session is not None else None
+
+    if run_error is not None:
+        result = "ERROR"
+    elif verification is None:
+        result = "UNVERIFIED"
+    elif verification.passed:
+        result = "PASS"
+    else:
+        result = "FAIL"
+
+    lines = ["Agent DevTools"]
+    if session is not None and session.goal is not None:
+        lines.append(f"Task: {_compact_output(session.goal)}")
+    lines.extend(
+        (
+            f"Result: {result}",
+            f"Actions: {action_successes} succeeded, {action_failures} failed",
+            (
+                "Final check: not run"
+                if verification is None
+                else f"Final check: {'passed' if verification.passed else 'failed'}"
+            ),
+        )
+    )
+
+    if run_error is not None:
+        lines.append(f"Reason: agent run failed ({type(run_error).__name__})")
+    elif verification is not None and not verification.passed:
+        reason = verification.failure_reason
+        if reason:
+            lines.append(f"Reason: {_compact_output(reason)}")
+    elif (
+        verification is None
+        and session is not None
+        and session.verification_note is not None
+    ):
+        lines.append(f"Reason: {_compact_output(session.verification_note)}")
+
+    lines.append(f"Report: {report_path.resolve()}")
+    return "\n".join(lines)
+
+
 async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     args = _browser_use_parser().parse_args(argv)
     task = (args.task or input("Task: ")).strip()
@@ -438,7 +499,12 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         browser=browser,
         use_judge=True,
     )
-    agent = observe_browser_use_agent(raw_agent, config=config)
+    show_summary = config is None or config.terminal_summary
+    agent = observe_browser_use_agent(
+        raw_agent,
+        config=config,
+        print_summary=False,
+    )
 
     run_error: Exception | None = None
     try:
@@ -458,9 +524,15 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    print(f"Report: {report_path.resolve()}")
     if run_error is not None:
-        print(f"Agent run failed: {type(run_error).__name__}")
+        if show_summary:
+            print(
+                _format_run_summary(
+                    agent.last_session,
+                    report_path,
+                    run_error=run_error,
+                )
+            )
         _write_errored_summary(
             args.summary_json,
             type(run_error).__name__,
@@ -471,12 +543,13 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
 
     try:
         agent.assert_last_task_passed()
-    except AssertionError as error:
-        print(f"Task result: FAIL — {error}")
+    except AssertionError:
         result_is_verified = False
     else:
-        print("Task result: PASS")
         result_is_verified = True
+
+    if show_summary:
+        print(_format_run_summary(agent.last_session, report_path))
 
     _write_summary(
         args.summary_json,

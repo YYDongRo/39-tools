@@ -123,8 +123,9 @@ Task: Open example.com and confirm the Example Domain page is open.
 ```
 
 The example creates the Browser Use Agent, wraps it once, runs the task, and
-prints the report path. A report is created even when the Agent raises or the
-final task verification fails. The command exits non-zero for a failed or
+prints one concise summary with the task result, action counts, final check,
+and report path. A report is created even when the Agent raises or the final
+task verification fails. The command exits non-zero for a failed or
 unverified task, which makes it usable in a test script or CI job.
 
 ### Check stability with repeated runs

@@ -11,6 +11,8 @@ All notable changes to Agent DevTools are recorded here.
   regression reports.
 - Add `--runs N` to the installed Browser Use CLI for fresh-agent stability
   evaluations and aggregate reports.
+- Keep the installed Browser Use CLI's final result summary concise and
+  avoid duplicate report and task-result lines.
 - Allow generic sync and async observers to bind their recording proxy to an
   agent's existing tool attribute for one-time dispatcher integration.
 - Keep `examples/browser_use_cli.py` as a compatibility wrapper.
