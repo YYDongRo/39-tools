@@ -944,7 +944,46 @@ def test_write_empty_session_report(tmp_path: Path) -> None:
     assert '<span>Actions</span><strong>0</strong>' in content
     assert '<span>Action checks</span><strong>Not configured</strong>' in content
     assert "No actions recorded." in content
+    assert "No browser actions captured" in content
+    assert "outside the supported recording boundary" in content
     assert "Failure categories" not in content
+
+
+def test_session_report_warns_when_final_check_passes_without_actions(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        goal="Open the product page",
+        verification=VerificationResult(
+            expected_state="the product page is open",
+            observed_state="the product page is open",
+            passed=True,
+        ),
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<strong class="result-title">Successful</strong>' in content
+    assert "No browser actions captured" in content
+    assert "This does not prove that the task was fully observed." in content
+    assert "Limited evidence" in content
+
+
+def test_session_report_explains_auxiliary_only_coverage(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Prepare the task",
+        auxiliary_events=[{"action_type": "write_file", "status": "done"}],
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "No browser actions captured" in content
+    assert "Only auxiliary events were recorded" in content
+    assert "Agent auxiliary events (1)" in content
 
 
 def test_report_displays_verification_failure_as_final_failure(

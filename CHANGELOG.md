@@ -15,6 +15,8 @@ All notable changes to Agent DevTools are recorded here.
   avoid duplicate report and task-result lines.
 - Put before/after visual evidence ahead of collapsed technical details in
   session reports for faster failure triage.
+- Warn clearly when a run contains no captured browser actions, including the
+  boundary where direct calls may be outside observation.
 - Allow generic sync and async observers to bind their recording proxy to an
   agent's existing tool attribute for one-time dispatcher integration.
 - Keep `examples/browser_use_cli.py` as a compatibility wrapper.

@@ -463,6 +463,47 @@ def _auxiliary_events_section(session: ActionSession) -> str:
         </details>"""
 
 
+def _coverage_warning_section(session: ActionSession) -> str:
+    if session.action_count:
+        return ""
+
+    if session.auxiliary_events:
+        detail = (
+            "Only auxiliary events were recorded; no browser action appears "
+            "in the action timeline."
+        )
+    elif session.verification_source == "agent-run":
+        detail = (
+            "The run ended before a browser action was captured. Check the "
+            "agent-run note above for the stopping point."
+        )
+    elif session.verification is not None and session.verification.passed:
+        detail = (
+            "The final check passed, but no browser action was captured. "
+            "This does not prove that the task was fully observed."
+        )
+    else:
+        detail = (
+            "The agent may have ended before acting or used a call outside "
+            "the supported recording boundary."
+        )
+
+    return f"""
+      <section class="coverage-warning" aria-labelledby="coverage-title">
+        <div class="coverage-heading">
+          <div>
+            <p class="eyebrow">Recording coverage</p>
+            <h2 id="coverage-title">No browser actions captured</h2>
+          </div>
+          <span class="coverage-badge">Limited evidence</span>
+        </div>
+        <p>{escape(detail)}</p>
+        <p class="coverage-boundary">
+          Only calls routed through a supported observer appear in this timeline.
+        </p>
+      </section>"""
+
+
 def _key_value_grid(values: dict[str, object]) -> str:
     items = "".join(
         "<div><dt>"
@@ -1356,6 +1397,7 @@ def write_session_html(
     )
     findings_section = _trajectory_findings_section(session)
     auxiliary_events_section = _auxiliary_events_section(session)
+    coverage_warning_section = _coverage_warning_section(session)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -1444,6 +1486,19 @@ def write_session_html(
                              list-style: none; margin: 0; padding: 0; }}
       .failure-summary li {{ background: white; border-radius: 999px;
                              display: flex; gap: 8px; padding: 6px 12px; }}
+      .coverage-warning {{ background: #fffbeb; border: 2px solid #f59e0b;
+                           border-radius: 12px; margin-bottom: 24px;
+                           padding: 20px 24px; }}
+      .coverage-heading {{ align-items: center; display: flex; gap: 16px;
+                           justify-content: space-between; }}
+      .coverage-heading h2 {{ margin-bottom: 0; }}
+      .coverage-badge {{ background: #fef3c7; border-radius: 999px;
+                         color: #92400e; font-size: 12px; font-weight: 800;
+                         padding: 6px 10px; white-space: nowrap; }}
+      .coverage-warning > p {{ color: #78350f; margin: 12px 0 0; }}
+      .coverage-warning .coverage-boundary {{ border-top: 1px solid #fde68a;
+                                              color: #92400e; font-size: 14px;
+                                              margin-top: 16px; padding-top: 12px; }}
       .trajectory-findings {{ background: #fffbeb; border: 2px solid #f59e0b;
                               border-radius: 12px; margin-bottom: 24px;
                               padding: 24px; }}
@@ -1593,8 +1648,8 @@ def write_session_html(
         .run-stats {{
           grid-template-columns: 1fr;
         }}
-        .title-row, .action-heading, .findings-heading {{ align-items: flex-start;
-                                                          flex-direction: column; }}
+        .title-row, .action-heading, .findings-heading, .coverage-heading {{
+          align-items: flex-start; flex-direction: column; }}
         .result-mark {{ display: none; }}
       }}
     </style>
@@ -1628,6 +1683,7 @@ def write_session_html(
 {automatic_verification_section}
 {auxiliary_events_section}
       </header>
+{coverage_warning_section}
 {findings_section}
 {task_verification_section}
       <div class="timeline">

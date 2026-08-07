@@ -185,6 +185,11 @@ observed.run(user_request)
 print(observed.last_report_path)
 ```
 
+If a report says **No browser actions captured**, the run did not exercise the
+recording boundary. Check the integration before treating the task result as
+fully observed; direct browser, desktop, or Android calls may be outside the
+observer.
+
 See the [CLI and custom-agent guide](docs/cli.md) and the
 [Playwright guide](docs/playwright.md) for the supported contracts. Optional
 BYOK trajectory judging is described in the [concepts guide](docs/concepts.md).
