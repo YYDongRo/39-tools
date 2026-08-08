@@ -27,6 +27,67 @@ class RunIssue:
     next_step: str
 
 
+_ISSUES = {
+    RunIssueCode.PROVIDER_CREDENTIALS: RunIssue(
+        code=RunIssueCode.PROVIDER_CREDENTIALS,
+        title="Provider credentials rejected",
+        detail=(
+            "The model provider rejected its credentials before final "
+            "task verification."
+        ),
+        next_step="Check the provider key and selected model, then retry.",
+    ),
+    RunIssueCode.PROVIDER_RATE_LIMITED: RunIssue(
+        code=RunIssueCode.PROVIDER_RATE_LIMITED,
+        title="Provider rate limit reached",
+        detail=(
+            "The model provider stopped the run before final task "
+            "verification."
+        ),
+        next_step="Wait for quota recovery, then retry the task.",
+    ),
+    RunIssueCode.PROVIDER_TIMEOUT: RunIssue(
+        code=RunIssueCode.PROVIDER_TIMEOUT,
+        title="Provider timed out",
+        detail=(
+            "The model provider timed out before final task "
+            "verification."
+        ),
+        next_step="Check provider latency or retry the task later.",
+    ),
+    RunIssueCode.PROVIDER_ERROR: RunIssue(
+        code=RunIssueCode.PROVIDER_ERROR,
+        title="Provider stopped the run",
+        detail=(
+            "The model provider did not return a usable final task "
+            "verification."
+        ),
+        next_step="Check the provider logs and retry the task.",
+    ),
+}
+
+
+def _issue_for_code(value: object) -> RunIssue | None:
+    try:
+        code = RunIssueCode(value)
+    except (TypeError, ValueError):
+        return None
+    return _ISSUES.get(code)
+
+
+def _issue_code_from_note(note: str) -> RunIssueCode | None:
+    normalized = note.casefold()
+    if "rejected its credentials" in normalized or "api key" in normalized:
+        return RunIssueCode.PROVIDER_CREDENTIALS
+    if "rate-limited" in normalized or "rate limit" in normalized:
+        return RunIssueCode.PROVIDER_RATE_LIMITED
+    if "provider timeout" in normalized:
+        return RunIssueCode.PROVIDER_TIMEOUT
+    if "model provider" in normalized:
+        return RunIssueCode.PROVIDER_ERROR
+    return None
+
+
 def classify_run_issue(session: ActionSession) -> RunIssue | None:
     """Classify known Browser Use provider interruptions without raw errors.
 
@@ -37,52 +98,17 @@ def classify_run_issue(session: ActionSession) -> RunIssue | None:
 
     if session.verification is not None:
         return None
-    note = session.verification_note
-    if session.verification_source != "browser-use" or note is None:
+    if session.verification_source != "browser-use":
         return None
 
-    normalized = note.casefold()
-    if "rejected its credentials" in normalized or "api key" in normalized:
-        return RunIssue(
-            code=RunIssueCode.PROVIDER_CREDENTIALS,
-            title="Provider credentials rejected",
-            detail=(
-                "The model provider rejected its credentials before final "
-                "task verification."
-            ),
-            next_step="Check the provider key and selected model, then retry.",
-        )
-    if "rate-limited" in normalized or "rate limit" in normalized:
-        return RunIssue(
-            code=RunIssueCode.PROVIDER_RATE_LIMITED,
-            title="Provider rate limit reached",
-            detail=(
-                "The model provider stopped the run before final task "
-                "verification."
-            ),
-            next_step="Wait for quota recovery, then retry the task.",
-        )
-    if "provider timeout" in normalized:
-        return RunIssue(
-            code=RunIssueCode.PROVIDER_TIMEOUT,
-            title="Provider timed out",
-            detail=(
-                "The model provider timed out before final task "
-                "verification."
-            ),
-            next_step="Check provider latency or retry the task later.",
-        )
-    if "model provider" in normalized:
-        return RunIssue(
-            code=RunIssueCode.PROVIDER_ERROR,
-            title="Provider stopped the run",
-            detail=(
-                "The model provider did not return a usable final task "
-                "verification."
-            ),
-            next_step="Check the provider logs and retry the task.",
-        )
-    return None
+    issue = _issue_for_code(session.issue_code)
+    if issue is not None:
+        return issue
+
+    note = session.verification_note
+    if note is None:
+        return None
+    return _issue_for_code(_issue_code_from_note(note))
 
 
 __all__ = ["RunIssue", "RunIssueCode", "classify_run_issue"]

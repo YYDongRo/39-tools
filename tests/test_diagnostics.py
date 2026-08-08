@@ -23,6 +23,19 @@ def test_classifies_browser_use_rate_limit_as_actionable_issue() -> None:
     assert "quota" in issue.next_step
 
 
+def test_prefers_structured_issue_code_over_note_text() -> None:
+    session = ActionSession(
+        goal="Open the requested page.",
+        verification_source="browser-use",
+        issue_code=RunIssueCode.PROVIDER_RATE_LIMITED.value,
+    )
+
+    issue = classify_run_issue(session)
+
+    assert issue is not None
+    assert issue.code is RunIssueCode.PROVIDER_RATE_LIMITED
+
+
 def test_classifies_browser_use_credentials_error_without_persisting_raw_text(
 ) -> None:
     session = ActionSession(

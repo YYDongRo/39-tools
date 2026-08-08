@@ -11,6 +11,10 @@ class ActionSession:
     inferred_goal: str | None = None
     verification_source: str | None = None
     verification_note: str | None = None
+    # Optional machine-readable explanation for an unverified run.  It is
+    # intentionally a string so the core session model does not depend on a
+    # provider-specific diagnostics module.
+    issue_code: str | None = None
     verification: VerificationResult | None = None
     auxiliary_events: list[dict[str, object]] = field(default_factory=list)
 
@@ -27,6 +31,7 @@ class ActionSession:
         _validate_optional_text(self.inferred_goal, "inferred_goal")
         _validate_optional_text(self.verification_source, "verification_source")
         _validate_optional_text(self.verification_note, "verification_note")
+        _validate_optional_text(self.issue_code, "issue_code")
         if self.verification is not None and not isinstance(
             self.verification, VerificationResult
         ):

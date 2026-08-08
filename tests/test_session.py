@@ -150,7 +150,7 @@ def test_session_rejects_task_verification_without_goal() -> None:
 
 @pytest.mark.parametrize(
     "field_name",
-    ["inferred_goal", "verification_source", "verification_note"],
+    ["inferred_goal", "verification_source", "verification_note", "issue_code"],
 )
 def test_session_rejects_empty_generation_metadata(field_name: str) -> None:
     with pytest.raises(ValueError, match=f"{field_name} cannot be empty"):
@@ -167,6 +167,7 @@ def test_session_json_round_trip(tmp_path: Path) -> None:
         inferred_goal="Reach the requested page",
         verification_source="openai:gpt-test",
         verification_note="Generated automatically.",
+        issue_code="provider_rate_limited",
     )
     output_path = tmp_path / "session.json"
 
@@ -180,6 +181,7 @@ def test_session_json_round_trip(tmp_path: Path) -> None:
     assert data["inferred_goal"] == "Reach the requested page"
     assert data["verification_source"] == "openai:gpt-test"
     assert data["verification_note"] == "Generated automatically."
+    assert data["issue_code"] == "provider_rate_limited"
     assert data["verification"] is None
     assert len(data["actions"]) == 2
 

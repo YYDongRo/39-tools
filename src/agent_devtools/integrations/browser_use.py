@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.diagnostics import RunIssueCode
 from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.report_opening import open_local_report
@@ -399,6 +400,7 @@ class _BrowserUseRecorder:
         deterministic_error_type: str | None = None,
     ) -> None:
         if run_error is not None:
+            self.session.issue_code = None
             record_agent_run_failure(
                 self.session,
                 run_error,
@@ -408,6 +410,7 @@ class _BrowserUseRecorder:
             return
 
         if deterministic_error_type is not None:
+            self.session.issue_code = None
             self.session.verification_source = "browser-use:deterministic"
             self.session.verification_note = (
                 "Deterministic final checks could not run "
@@ -440,6 +443,7 @@ class _BrowserUseRecorder:
                 }
             self.session.verification_source = "browser-use:deterministic"
             self.session.verification_note = None
+            self.session.issue_code = None
             self.session.verification = VerificationResult(
                 expected_state=deterministic_verification.expected_state,
                 observed_state=deterministic_verification.observed_state,
@@ -452,10 +456,14 @@ class _BrowserUseRecorder:
             return
 
         if judgement is None:
+            issue_code = _history_failure_issue_code(history)
             self.session.verification_source = "browser-use"
             self.session.verification_note = (
                 _history_failure_note(history)
                 or "Browser Use did not return a final task judgment."
+            )
+            self.session.issue_code = (
+                issue_code.value if issue_code is not None else None
             )
             self._persist()
             return
@@ -465,10 +473,12 @@ class _BrowserUseRecorder:
             self.session.verification_note = (
                 "Browser Use returned an invalid final task judgment."
             )
+            self.session.issue_code = None
             self._persist()
             return
         self.session.verification_source = "browser-use:judge"
         self.session.verification_note = None
+        self.session.issue_code = None
         self.session.verification = judge_verification
         self._persist()
 
@@ -974,7 +984,7 @@ def _latest_action_result(
     return errors, reported_failure
 
 
-def _history_failure_note(history: object | None) -> str | None:
+def _history_failure_issue_code(history: object | None) -> RunIssueCode | None:
     items = getattr(history, "history", None)
     if not isinstance(items, list):
         return None
@@ -992,21 +1002,34 @@ def _history_failure_note(history: object | None) -> str | None:
         marker in combined
         for marker in ("api_key_invalid", "api key not valid", "authentication")
     ):
+        return RunIssueCode.PROVIDER_CREDENTIALS
+    if "rate limit" in combined or "resource_exhausted" in combined:
+        return RunIssueCode.PROVIDER_RATE_LIMITED
+    if "timeout" in combined:
+        return RunIssueCode.PROVIDER_TIMEOUT
+    return RunIssueCode.PROVIDER_ERROR
+
+
+def _history_failure_note(history: object | None) -> str | None:
+    issue_code = _history_failure_issue_code(history)
+    if issue_code is RunIssueCode.PROVIDER_CREDENTIALS:
         return (
             "Browser Use model provider rejected its credentials. "
             "Check provider setup and API key."
         )
-    if "rate limit" in combined or "resource_exhausted" in combined:
+    if issue_code is RunIssueCode.PROVIDER_RATE_LIMITED:
         return (
             "Browser Use model provider rate-limited the run. "
             "Check provider quota and retry policy."
         )
-    if "timeout" in combined:
+    if issue_code is RunIssueCode.PROVIDER_TIMEOUT:
         return "Browser Use stopped before final judgment after a provider timeout."
-    return (
-        "Browser Use stopped before final judgment after a model or runtime "
-        "error. Check the agent logs."
-    )
+    if issue_code is RunIssueCode.PROVIDER_ERROR:
+        return (
+            "Browser Use stopped before final judgment after a model or runtime "
+            "error. Check the agent logs."
+        )
+    return None
 
 
 def _page_state(

@@ -178,7 +178,11 @@ local paths to the full HTML report and `session.json`. The detailed report is
 still generated for debugging. With `--runs N`, the same option writes the
 evaluation counts, empirical pass rate, and paths to `evaluation.json` and the
 aggregate report instead. Error summaries include only the exception type, not
-the raw message or provider credentials.
+the raw message or provider credentials. For a known Browser Use provider
+interruption, single-run summaries also include `issue_code`,
+`issue_title`, and `issue_next_step`; these fields are `null` when the run has
+no classified provider issue. The task remains `unverified`—the diagnostic
+code explains why verification was unavailable, not that the task passed.
 
 To skip the prompt, pass the task directly:
 

@@ -289,6 +289,8 @@ def session_to_dict(session: ActionSession) -> dict[str, object]:
         "verification": _verification_to_dict(session.verification),
         "actions": [action_to_dict(action) for action in session.actions],
     }
+    if session.issue_code is not None:
+        data["issue_code"] = session.issue_code
     if session.auxiliary_events:
         data["auxiliary_events"] = session.auxiliary_events
     return data
@@ -310,6 +312,9 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         )
         verification_note_value = (
             data["verification_note"] if schema_version == 3 else None
+        )
+        issue_code_value = (
+            data.get("issue_code") if schema_version == 3 else None
         )
         verification_value = (
             data["verification"]
@@ -337,6 +342,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         ("inferred_goal", inferred_goal_value),
         ("verification_source", verification_source_value),
         ("verification_note", verification_note_value),
+        ("issue_code", issue_code_value),
     ):
         if value is not None and not isinstance(value, str):
             raise ValueError(f"{field_name} must be a string or null")
@@ -358,6 +364,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         inferred_goal=inferred_goal_value,
         verification_source=verification_source_value,
         verification_note=verification_note_value,
+        issue_code=issue_code_value,
         verification=verification,
     )
 

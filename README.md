@@ -169,7 +169,9 @@ evaluation.open_report()
 See the [stability evaluation guide](docs/evaluation.md) for the factory
 contract, output layout, statistics, and limitations. A short machine-readable
 `--summary-json` file is also available for local scripts and CI; it does not
-replace the detailed HTML report.
+replace the detailed HTML report. For known Browser Use provider interruptions,
+the single-run summary also includes a stable issue code and next-step hint
+while keeping the run `unverified`.
 
 To compare future evaluations automatically, set
 `compare_previous = true` in the copied `agent_devtools.toml`. The first run

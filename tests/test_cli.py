@@ -224,8 +224,29 @@ def test_summary_json_is_short_versioned_and_uses_relative_report_paths(
         "final_check": "passed",
         "report_path": "trace/report.html",
         "session_path": "trace/session.json",
+        "issue_code": None,
+        "issue_title": None,
+        "issue_next_step": None,
         "error_type": None,
     }
+
+
+def test_summary_json_includes_structured_provider_issue(tmp_path: Path) -> None:
+    data = cli_module._build_summary(
+        status="unverified",
+        report_path=tmp_path / "report.html",
+        session=ActionSession(
+            goal="Open the requested page.",
+            verification_source="browser-use",
+            issue_code="provider_rate_limited",
+        ),
+    )
+
+    assert data["issue_code"] == "provider_rate_limited"
+    assert data["issue_title"] == "Provider rate limit reached"
+    assert data["issue_next_step"] == (
+        "Wait for quota recovery, then retry the task."
+    )
 
 
 def _evaluation_for_cli_summary() -> AgentEvaluation:

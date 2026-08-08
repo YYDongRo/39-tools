@@ -691,10 +691,12 @@ def test_provider_failure_is_clear_without_storing_secret_details(
         assert agent.last_session.outcome is ActionOutcome.UNVERIFIED
         assert agent.last_session.verification_note is not None
         assert "rejected its credentials" in agent.last_session.verification_note
+        assert agent.last_session.issue_code == "provider_credentials"
         report = agent.last_report_path
         assert report is not None
         trace_text = (report.parent / "session.json").read_text(encoding="utf-8")
         trace_text += report.read_text(encoding="utf-8")
+        assert '"issue_code": "provider_credentials"' in trace_text
         assert "secret-provider-detail" not in trace_text
 
     asyncio.run(run())

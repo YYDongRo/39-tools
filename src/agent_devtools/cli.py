@@ -229,6 +229,7 @@ def _build_summary(
 ) -> dict[str, object]:
     actions = session.actions if session is not None else []
     verification = session.verification if session is not None else None
+    run_issue = classify_run_issue(session) if session is not None else None
     return {
         "schema_version": 1,
         "status": status,
@@ -251,6 +252,11 @@ def _build_summary(
             _summary_path(report_path.parent / "session.json")
             if report_path is not None
             else None
+        ),
+        "issue_code": run_issue.code.value if run_issue is not None else None,
+        "issue_title": run_issue.title if run_issue is not None else None,
+        "issue_next_step": (
+            run_issue.next_step if run_issue is not None else None
         ),
         "error_type": error_type,
     }
