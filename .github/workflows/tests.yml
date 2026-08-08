@@ -34,6 +34,9 @@ jobs:
 
   browser-tests:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.61.0-noble
+      options: --ipc=host
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -53,14 +56,14 @@ jobs:
       - name: Install project dependencies
         run: uv sync --extra browser --extra llm-openai --extra llm-gemini --locked
 
-      - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
-
       - name: Run tests
         run: uv run pytest
 
   browser-use-tests:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.61.0-noble
+      options: --ipc=host
     timeout-minutes: 20
     env:
       TIMEOUT_BrowserStartEvent: "60"
@@ -78,9 +81,6 @@ jobs:
 
       - name: Install Browser Use integration
         run: uv sync --extra browser-use --locked
-
-      - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
 
       - name: Run Browser Use tests
         run: >-

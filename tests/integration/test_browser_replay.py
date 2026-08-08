@@ -110,7 +110,7 @@ def test_replays_saved_browser_fill(tmp_path: Path) -> None:
         browser = browser_api.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1000, "height": 650})
         page.goto(page_path.as_uri())
-        page.screenshot(path=str(before_path), full_page=True)
+        page.screenshot(path=str(before_path), full_page=False)
 
         def execute_fill(
             selector: str,
@@ -130,7 +130,7 @@ def test_replays_saved_browser_fill(tmp_path: Path) -> None:
             screenshot_after=Path("after.png"),
         )
 
-        page.screenshot(path=str(after_path), full_page=True)
+        page.screenshot(path=str(after_path), full_page=False)
         input_value = page.locator("#visible-input").input_value()
         browser.close()
 
