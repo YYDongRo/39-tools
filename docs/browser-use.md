@@ -197,6 +197,13 @@ from whether individual actions executed successfully:
 - a recovered intermediate failure can remain visible while the task passes;
 - a run without a usable judge result remains `unverified`.
 
+When the Browser Use provider stops before returning a final judgment, the
+terminal summary and report identify the safe, actionable cause when it is
+known—for example, `provider_rate_limited`, rejected credentials, or a provider
+timeout. The recorded actions remain available, but the task stays
+`unverified`; Agent DevTools does not silently retry and spend more provider
+quota.
+
 For HTTP/HTTPS `navigate` actions, Agent DevTools also performs a small local
 check without asking for another expectation: it compares the hostname in the
 action's requested URL with the hostname observed after the action. A different

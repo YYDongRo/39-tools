@@ -75,6 +75,25 @@ def test_format_failed_action_summary_is_compact(tmp_path: Path) -> None:
     assert "very detailed provider" not in summary
 
 
+def test_format_session_summary_explains_provider_rate_limit(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        goal="Open the requested page",
+        verification_source="browser-use",
+        verification_note=(
+            "Browser Use model provider rate-limited the run. "
+            "Check provider quota and retry policy."
+        ),
+    )
+
+    summary = format_session_summary(session, tmp_path / "report.html")
+
+    assert "Issue: Provider rate limit reached" in summary
+    assert "Next: Wait for quota recovery" in summary
+    assert "Reason:" not in summary
+
+
 def test_write_successful_action_report(tmp_path: Path) -> None:
     action = ActionRecord(
         action_type="<click>",
@@ -911,6 +930,35 @@ def test_session_report_displays_agent_run_failure(
     assert '<strong class="result-title">Agent run failed</strong>' in content
     assert "<strong>Agent run failure:</strong>" in content
     assert "Agent run failed (RuntimeError)." in content
+
+
+def test_session_report_highlights_provider_rate_limit(
+    tmp_path: Path,
+) -> None:
+    session = ActionSession(
+        goal="Open the requested page",
+        verification_source="browser-use",
+        verification_note=(
+            "Browser Use model provider rate-limited the run. "
+            "Check provider quota and retry policy."
+        ),
+    )
+    output_path = tmp_path / "session.html"
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert (
+        '<strong class="result-title">Provider rate limit reached</strong>'
+        in content
+    )
+    assert (
+        "The model provider stopped the run before final task verification."
+        in content
+    )
+    assert "provider_rate_limited" in content
+    assert "Wait for quota recovery, then retry the task." in content
+    assert "<summary>Provider detail</summary>" in content
 
 
 def test_session_report_displays_failed_task_verification(tmp_path: Path) -> None:

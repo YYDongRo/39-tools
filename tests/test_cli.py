@@ -159,6 +159,24 @@ def test_run_summary_is_concise_and_explains_final_failure(tmp_path: Path) -> No
     assert "Task result:" not in summary
 
 
+def test_run_summary_explains_provider_rate_limit(tmp_path: Path) -> None:
+    session = ActionSession(
+        goal="Open the requested page.",
+        verification_source="browser-use",
+        verification_note=(
+            "Browser Use model provider rate-limited the run. "
+            "Check provider quota and retry policy."
+        ),
+    )
+
+    summary = _format_run_summary(session, tmp_path / "report.html")
+
+    assert "Result: UNVERIFIED" in summary
+    assert "Issue: Provider rate limit reached" in summary
+    assert "Next: Wait for quota recovery" in summary
+    assert "Reason:" not in summary
+
+
 def test_preflight_summary_is_short_and_explicit() -> None:
     summary = _format_preflight(
         BrowserUsePreflightResult(

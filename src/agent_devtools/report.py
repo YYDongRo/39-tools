@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agent_devtools.action import ActionOutcome, ActionRecord, ActionStatus
 from agent_devtools.analysis import TrajectoryFinding, analyze_session
+from agent_devtools.diagnostics import classify_run_issue
 from agent_devtools.evaluation import DivergenceKind, TrajectoryDivergence
 from agent_devtools.failure import FailureCategory
 from agent_devtools.serialization import SESSION_SCHEMA_VERSION, action_to_dict
@@ -96,6 +97,7 @@ def format_session_summary(
         action.status is ActionStatus.FAILURE for action in session.actions
     )
     execution_successes = session.action_count - execution_failures
+    run_issue = classify_run_issue(session)
     lines = ["Agent DevTools"]
     if session.goal is not None:
         lines.append(f"Task: {_compact_console_text(session.goal)}")
@@ -131,6 +133,9 @@ def format_session_summary(
             "Reason: "
             + _compact_console_text(session.verification.failure_reason or "")
         )
+    elif run_issue is not None:
+        lines.append(f"Issue: {run_issue.title}")
+        lines.append(f"Next: {run_issue.next_step}")
     elif session.verification is None and session.verification_note is not None:
         lines.append(
             f"Reason: {_compact_console_text(session.verification_note)}"
@@ -1249,6 +1254,7 @@ def write_session_html(
         )
         for category in FailureCategory
     }
+    run_issue = classify_run_issue(session)
     if session.verification is not None:
         overall_status = session.outcome.value
     elif session.goal is not None:
@@ -1284,6 +1290,9 @@ def write_session_html(
             session.verification_note
             or "The agent stopped before final task verification."
         )
+    elif run_issue is not None:
+        result_title = run_issue.title
+        result_detail = run_issue.detail
     elif session.action_count == 0:
         result_title = "No actions"
         result_detail = "Nothing was recorded in this run."
@@ -1365,12 +1374,32 @@ def write_session_html(
         note_label = (
             "Agent run failure"
             if session.verification_source == "agent-run"
+            else "Provider detail"
+            if run_issue is not None
             else "Verification note"
         )
-        verification_note_section = (
-            f'<p class="verification-note"><strong>{note_label}:</strong> '
-            f"{escape(session.verification_note)}</p>"
-        )
+        if run_issue is not None:
+            verification_note_section = f"""
+        <details class="verification-context">
+          <summary>{note_label}</summary>
+          <p class="verification-note">{escape(session.verification_note)}</p>
+        </details>"""
+        else:
+            verification_note_section = (
+                f'<p class="verification-note"><strong>{note_label}:</strong> '
+                f"{escape(session.verification_note)}</p>"
+            )
+    run_issue_section = ""
+    if run_issue is not None:
+        run_issue_section = f"""
+        <section class="run-issue" aria-label="Run issue">
+          <div class="run-issue-heading">
+            <strong>{escape(run_issue.title)}</strong>
+            <code>{escape(run_issue.code.value)}</code>
+          </div>
+          <p>{escape(run_issue.detail)}</p>
+          <p><strong>Next:</strong> {escape(run_issue.next_step)}</p>
+        </section>"""
     task_verification_section = ""
     if session.verification is not None:
         assessment_type = session.verification.evidence.get(
@@ -1479,6 +1508,13 @@ def write_session_html(
       .verification-note {{ background: #fffbeb; border: 1px solid #fcd34d;
                             border-radius: 8px; color: #78350f;
                             margin: 16px 0 0; padding: 12px 14px; }}
+      .run-issue {{ background: #fff7ed; border: 1px solid #fdba74;
+                    border-left: 5px solid #ea580c; border-radius: 10px;
+                    color: #7c2d12; margin-top: 16px; padding: 14px 16px; }}
+      .run-issue-heading {{ align-items: center; display: flex;
+                            gap: 12px; justify-content: space-between; }}
+      .run-issue-heading code {{ color: #9a3412; font-size: 12px; }}
+      .run-issue p {{ margin: 8px 0 0; }}
       .failure-summary {{ background: #fff1f2; border: 1px solid #fecdd3;
                           border-radius: 8px; margin-top: 20px; padding: 16px; }}
       .failure-summary h2 {{ font-size: 16px; margin-bottom: 12px; }}
@@ -1677,7 +1713,7 @@ def write_session_html(
           <div class="run-stat"><span>Action failures</span><strong>{failure_count}</strong></div>
           <div class="run-stat"><span>Action checks</span><strong>{step_check_value}</strong></div>
         </section>
-{failure_summary}
+{run_issue_section}{failure_summary}
 {verification_note_section}
 {inferred_goal_section}
 {automatic_verification_section}

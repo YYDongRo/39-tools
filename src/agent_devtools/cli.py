@@ -17,6 +17,7 @@ from agent_devtools.browser_use import (
     observe_browser_use_agent,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.diagnostics import classify_run_issue
 from agent_devtools.serialization import _write_json
 from agent_devtools.session import ActionSession
 
@@ -389,6 +390,7 @@ def _format_run_summary(
     )
     action_successes = len(actions) - action_failures
     verification = session.verification if session is not None else None
+    run_issue = classify_run_issue(session) if session is not None else None
     coverage_unverified = (
         require_recorded_actions
         and not actions
@@ -432,6 +434,9 @@ def _format_run_summary(
         reason = verification.failure_reason
         if reason:
             lines.append(f"Reason: {_compact_output(reason)}")
+    elif verification is None and run_issue is not None:
+        lines.append(f"Issue: {run_issue.title}")
+        lines.append(f"Next: {run_issue.next_step}")
     elif (
         verification is None
         and session is not None
