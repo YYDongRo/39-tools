@@ -324,6 +324,7 @@ def _build_evaluation_summary(
         "failed_count": evaluation.failed_count,
         "unverified_count": evaluation.unverified_count,
         "errored_count": evaluation.errored_count,
+        "issue_code_counts": evaluation.issue_code_counts,
         "empirical_pass_rate": evaluation.empirical_pass_rate,
         "report_path": _summary_path(evaluation.report_path),
         "evaluation_path": _summary_path(

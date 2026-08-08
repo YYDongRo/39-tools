@@ -249,7 +249,10 @@ def test_summary_json_includes_structured_provider_issue(tmp_path: Path) -> None
     )
 
 
-def _evaluation_for_cli_summary() -> AgentEvaluation:
+def _evaluation_for_cli_summary(
+    *,
+    issue_code: str | None = None,
+) -> AgentEvaluation:
     started_at = datetime(2026, 1, 1, tzinfo=UTC)
     run = EvaluationRun(
         run_number=1,
@@ -260,6 +263,7 @@ def _evaluation_for_cli_summary() -> AgentEvaluation:
         action_count=2,
         trace_directory=Path("runs/001"),
         report_path=Path("runs/001/report.html"),
+        issue_code=issue_code,
     )
     return AgentEvaluation(
         evaluation_id="cli-summary",
@@ -288,6 +292,16 @@ def test_evaluation_summary_preserves_counts_and_report_paths(
     assert data["report_path"] == "evaluations/cli-summary/report.html"
     assert data["evaluation_path"] == "evaluations/cli-summary/evaluation.json"
     assert data["comparison_path"] is None
+
+
+def test_evaluation_summary_includes_issue_code_counts() -> None:
+    evaluation = _evaluation_for_cli_summary(
+        issue_code="provider_rate_limited",
+    )
+
+    summary = _build_evaluation_summary(evaluation)
+
+    assert summary["issue_code_counts"] == {"provider_rate_limited": 1}
 
 
 def test_cli_repeated_runs_use_fresh_agents_and_evaluation_summary(

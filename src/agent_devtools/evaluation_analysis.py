@@ -32,7 +32,10 @@ def analyze_evaluation_runs(
     baseline = sessions[representative] if representative is not None else None
     analyzed_runs = tuple(
         run
-        if run.status is EvaluationRunStatus.PASSED
+        if (
+            run.status is EvaluationRunStatus.PASSED
+            or run.issue_code is not None
+        )
         else replace(
             run,
             divergence=(
@@ -381,6 +384,19 @@ def _failure_signature(
     int | None,
     dict[str, object],
 ]:
+    if run.issue_code is not None:
+        evidence = {
+            "issue_code": run.issue_code,
+            "run_status": run.status.value,
+        }
+        return (
+            _canonical_json(evidence),
+            f"Provider issue: {run.issue_code}.",
+            None,
+            None,
+            evidence,
+        )
+
     if run.divergence is not None:
         divergence = run.divergence
         evidence = {

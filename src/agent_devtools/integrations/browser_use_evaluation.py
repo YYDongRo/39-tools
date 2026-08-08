@@ -30,6 +30,7 @@ from agent_devtools.evaluation_serialization import (
     write_evaluation_json,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.diagnostics import classify_run_issue
 from agent_devtools.integrations.browser_use import (
     BrowserUseFinalCheck,
     ObservedBrowserUseAgent,
@@ -243,6 +244,7 @@ async def _evaluate_attempt(
         session.verification = None
         session.verification_source = "evaluation"
         session.verification_note = _error_note(error_phase, error_type)
+        session.issue_code = None
         _write_trace(session, trace_directory)
 
     status = (
@@ -253,6 +255,7 @@ async def _evaluate_attempt(
             require_recorded_actions=config.require_recorded_actions,
         )
     )
+    run_issue = classify_run_issue(session)
     ended_at = datetime.now(UTC)
     run = EvaluationRun(
         run_number=run_number,
@@ -265,6 +268,7 @@ async def _evaluate_attempt(
         report_path=relative_trace / "report.html",
         error_phase=error_phase if status is EvaluationRunStatus.ERRORED else None,
         error_type=error_type if status is EvaluationRunStatus.ERRORED else None,
+        issue_code=run_issue.code.value if run_issue is not None else None,
     )
     return run, session
 

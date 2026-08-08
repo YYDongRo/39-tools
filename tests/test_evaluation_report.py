@@ -19,6 +19,7 @@ def _run(
     number: int,
     status: EvaluationRunStatus,
     divergence: TrajectoryDivergence | None = None,
+    issue_code: str | None = None,
 ) -> EvaluationRun:
     return EvaluationRun(
         run_number=number,
@@ -30,6 +31,7 @@ def _run(
         trace_directory=Path(f"runs/{number:03d}"),
         report_path=Path(f"runs/{number:03d}/report.html"),
         divergence=divergence,
+        issue_code=issue_code,
     )
 
 
@@ -100,3 +102,32 @@ def test_report_explains_missing_success_baseline(tmp_path: Path) -> None:
     assert "No successful baseline was available" in html
     assert "Unverified: 1" in html
     assert "Runs need attention" in html
+
+
+def test_report_separates_provider_interruptions_from_divergences(
+    tmp_path: Path,
+) -> None:
+    evaluation = AgentEvaluation(
+        evaluation_id="provider-issue",
+        task="Open the product.",
+        started_at=NOW,
+        ended_at=NOW,
+        requested_run_count=2,
+        runs=(
+            _run(1, EvaluationRunStatus.PASSED),
+            _run(
+                2,
+                EvaluationRunStatus.UNVERIFIED,
+                issue_code="provider_rate_limited",
+            ),
+        ),
+        output_dir=tmp_path,
+        representative_success_run_number=1,
+    )
+
+    html = render_evaluation_html(evaluation)
+
+    assert "Provider interruptions:" in html
+    assert "provider_rate_limited × 1" in html
+    assert "Provider issue: provider_rate_limited" in html
+    assert "Final verification was unavailable" in html

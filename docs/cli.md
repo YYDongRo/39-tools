@@ -183,6 +183,9 @@ interruption, single-run summaries also include `issue_code`,
 `issue_title`, and `issue_next_step`; these fields are `null` when the run has
 no classified provider issue. The task remains `unverified`—the diagnostic
 code explains why verification was unavailable, not that the task passed.
+For repeated evaluations, the summary also includes `issue_code_counts`, and
+each run in `evaluation.json` stores its optional `issue_code`. These fields let
+scripts separate provider interruptions from Agent trajectory failures.
 
 To skip the prompt, pass the task directly:
 

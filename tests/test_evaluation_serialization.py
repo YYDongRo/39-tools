@@ -51,6 +51,7 @@ def _evaluation(output_dir: Path) -> AgentEvaluation:
             trace_directory=Path("runs/002"),
             report_path=Path("runs/002/report.html"),
             divergence=divergence,
+            issue_code="provider_rate_limited",
         ),
     )
     return AgentEvaluation(
@@ -91,6 +92,7 @@ def test_evaluation_json_contains_schema_and_derived_summary(
     data = evaluation_to_dict(_evaluation(tmp_path))
 
     assert data["schema_version"] == 1
+    assert data["runs"][1]["issue_code"] == "provider_rate_limited"  # type: ignore[index]
     assert data["summary"] == {
         "attempted_run_count": 2,
         "completed_run_count": 2,

@@ -85,6 +85,7 @@ def test_evaluation_statistics_keep_run_statuses_distinct(tmp_path: Path) -> Non
     assert evaluation.median_duration_ms == 200
     assert evaluation.average_action_count == 4
     assert evaluation.median_action_count == 4
+    assert evaluation.issue_code_counts == {}
     assert evaluation.representative_unsuccessful_run_numbers == (2, 3, 4)
 
 
@@ -131,6 +132,21 @@ def test_run_requires_safe_relative_report_path() -> None:
             action_count=0,
             trace_directory=Path("runs/001"),
             report_path=Path("/tmp/report.html"),
+        )
+
+
+def test_run_rejects_empty_issue_code() -> None:
+    with pytest.raises(ValueError, match="issue_code cannot be empty"):
+        EvaluationRun(
+            run_number=1,
+            status=EvaluationRunStatus.UNVERIFIED,
+            started_at=START,
+            ended_at=START,
+            duration_ms=0,
+            action_count=0,
+            trace_directory=Path("runs/001"),
+            report_path=Path("runs/001/report.html"),
+            issue_code=" ",
         )
 
 

@@ -105,6 +105,9 @@ def render_evaluation_html(
     .evaluation-status.attention {{ background: #fee2e2; color: #991b1b; }}
     .pattern {{ border: 1px solid #fecaca; border-left: 4px solid #dc2626;
       border-radius: 10px; margin-top: 12px; padding: 14px 16px; }}
+    .provider-issues {{ background: #fff7ed; border: 1px solid #fed7aa;
+      border-left: 4px solid #f97316; border-radius: 10px; margin-top: 16px;
+      padding: 14px 16px; }}
     .muted {{ color: #64748b; }} a {{ color: #1459b8; font-weight: 650; }}
     .table-wrap {{ overflow-x: auto; }}
     table {{ border-collapse: collapse; width: 100%; }}
@@ -142,6 +145,7 @@ def render_evaluation_html(
       {_pill("unverified", evaluation.unverified_count)}
       {_pill("errored", evaluation.errored_count)}
     </div>
+    {_provider_issue_summary(evaluation)}
     <div class="baseline"><strong>Representative successful run:</strong>
       {baseline_html}
     </div>
@@ -158,7 +162,7 @@ def render_evaluation_html(
     <div class="table-wrap">
       <table>
         <thead><tr><th>Run</th><th>Result</th><th>Duration</th>
-          <th>Actions</th><th>First observed divergence</th><th>Trace</th></tr></thead>
+          <th>Actions</th><th>First divergence / diagnosis</th><th>Trace</th></tr></thead>
         <tbody>{''.join(_run_row(run) for run in evaluation.runs)}</tbody>
       </table>
     </div>
@@ -197,7 +201,13 @@ def _pill(status: str, count: int) -> str:
 
 
 def _run_row(run: EvaluationRun) -> str:
-    divergence = run.divergence.summary if run.divergence is not None else "—"
+    if run.issue_code is not None:
+        divergence = (
+            f"Provider issue: {run.issue_code}. "
+            "Final verification was unavailable."
+        )
+    else:
+        divergence = run.divergence.summary if run.divergence is not None else "—"
     if run.status is EvaluationRunStatus.ERRORED:
         divergence = f"Errored during {run.error_phase} ({run.error_type})."
     return f"""
@@ -210,6 +220,21 @@ def _run_row(run: EvaluationRun) -> str:
         <td><a href="{escape(run.report_path.as_posix())}">Open report</a></td>
       </tr>
     """
+
+
+def _provider_issue_summary(evaluation: AgentEvaluation) -> str:
+    counts = evaluation.issue_code_counts
+    if not counts:
+        return ""
+    details = ", ".join(
+        f"{escape(code)} × {count}"
+        for code, count in sorted(counts.items())
+    )
+    return (
+        '<div class="provider-issues"><strong>Provider interruptions:</strong> '
+        f"{details}. These runs are not treated as agent trajectory failures; "
+        "open the individual report for the suggested next step.</div>"
+    )
 
 
 def _percent(value: float) -> str:

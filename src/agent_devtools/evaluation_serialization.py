@@ -94,7 +94,7 @@ def read_evaluation_json(input_path: Path) -> AgentEvaluation:
 
 
 def _run_to_dict(run: EvaluationRun) -> dict[str, object]:
-    return {
+    data: dict[str, object] = {
         "run_number": run.run_number,
         "status": run.status.value,
         "started_at": _timestamp(run.started_at),
@@ -107,6 +107,9 @@ def _run_to_dict(run: EvaluationRun) -> dict[str, object]:
         "error_phase": run.error_phase,
         "error_type": run.error_type,
     }
+    if run.issue_code is not None:
+        data["issue_code"] = run.issue_code
+    return data
 
 
 def _run_from_dict(value: object, index: int) -> EvaluationRun:
@@ -115,6 +118,7 @@ def _run_from_dict(value: object, index: int) -> EvaluationRun:
         status = EvaluationRunStatus(_text(data, "status"))
     except ValueError as error:
         raise ValueError(f"invalid run status at index {index}") from error
+    issue_code = _optional_text_if_present(data, "issue_code")
     return EvaluationRun(
         run_number=_integer(data, "run_number"),
         status=status,
@@ -127,6 +131,7 @@ def _run_from_dict(value: object, index: int) -> EvaluationRun:
         divergence=_divergence_from_dict(data.get("divergence")),
         error_phase=_optional_text(data, "error_phase"),
         error_type=_optional_text(data, "error_type"),
+        issue_code=issue_code,
     )
 
 
@@ -262,6 +267,16 @@ def _optional_text(data: dict[str, object], field: str) -> str | None:
         value = data[field]
     except KeyError as error:
         raise ValueError(f"missing required evaluation field: {field}") from error
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{field} must be a string or null")
+    return value
+
+
+def _optional_text_if_present(
+    data: dict[str, object],
+    field: str,
+) -> str | None:
+    value = data.get(field)
     if value is not None and not isinstance(value, str):
         raise ValueError(f"{field} must be a string or null")
     return value

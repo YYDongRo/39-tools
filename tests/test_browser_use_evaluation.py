@@ -12,6 +12,7 @@ from agent_devtools.browser_use import (
     evaluate_browser_use_agent,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.diagnostics import RunIssue, RunIssueCode
 from agent_devtools.evaluation_comparison_serialization import (
     read_evaluation_comparison_json,
 )
@@ -182,6 +183,40 @@ def test_evaluator_uses_deterministic_final_check(tmp_path: Path) -> None:
     judge = session.verification.evidence["browser_use_judge"]
     assert isinstance(judge, dict)
     assert judge["passed"] is True
+
+
+def test_evaluator_persists_provider_issue_code_in_aggregate_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = RunIssue(
+        code=RunIssueCode.PROVIDER_RATE_LIMITED,
+        title="Provider rate limit reached",
+        detail="The provider stopped the run.",
+        next_step="Retry after quota recovery.",
+    )
+    monkeypatch.setattr(
+        "agent_devtools.integrations.browser_use_evaluation.classify_run_issue",
+        lambda session: issue,
+    )
+
+    evaluation = asyncio.run(
+        evaluate_browser_use_agent(
+            agent_factory=lambda task: _Agent(verdict=None),
+            task="Open the product.",
+            runs=1,
+            output_root=tmp_path,
+        )
+    )
+
+    assert evaluation.runs[0].status is EvaluationRunStatus.UNVERIFIED
+    assert evaluation.runs[0].issue_code == "provider_rate_limited"
+    data = json.loads(
+        (evaluation.output_dir / "evaluation.json").read_text(encoding="utf-8")
+    )
+    assert data["runs"][0]["issue_code"] == "provider_rate_limited"
+    report = (evaluation.output_dir / "report.html").read_text(encoding="utf-8")
+    assert "Provider interruptions:" in report
 
 
 def test_evaluator_compares_latest_same_task_when_configured(

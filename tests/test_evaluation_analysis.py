@@ -76,6 +76,7 @@ def run(
     run_number: int,
     status: EvaluationRunStatus,
     action_count: int,
+    issue_code: str | None = None,
 ) -> EvaluationRun:
     directory = Path("runs") / f"{run_number:03d}"
     return EvaluationRun(
@@ -87,6 +88,7 @@ def run(
         action_count=action_count,
         trace_directory=directory,
         report_path=directory / "report.html",
+        issue_code=issue_code,
     )
 
 
@@ -288,3 +290,27 @@ def test_no_success_baseline_groups_by_local_failure_reason() -> None:
     assert all(item.divergence is None for item in analyzed)
     assert len(patterns) == 1
     assert patterns[0].run_numbers == (1, 2)
+
+
+def test_provider_issue_is_not_compared_as_agent_trajectory() -> None:
+    runs = (
+        run(1, EvaluationRunStatus.PASSED, 1),
+        run(2, EvaluationRunStatus.UNVERIFIED, 1, "provider_rate_limited"),
+        run(3, EvaluationRunStatus.UNVERIFIED, 1, "provider_rate_limited"),
+        run(4, EvaluationRunStatus.UNVERIFIED, 1, "provider_timeout"),
+    )
+    sessions = {
+        1: verified_session([action()]),
+        2: verified_session([action("fill", {"text": "different"})]),
+        3: verified_session([action("press", {"key": "Escape"})]),
+        4: verified_session([action("click", {"selector": "#other"})]),
+    }
+
+    analyzed, representative, patterns = analyze_evaluation_runs(runs, sessions)
+
+    assert representative == 1
+    assert analyzed[1].divergence is None
+    assert analyzed[2].divergence is None
+    assert analyzed[3].divergence is None
+    assert [pattern.run_numbers for pattern in patterns] == [(2, 3), (4,)]
+    assert patterns[0].evidence["issue_code"] == "provider_rate_limited"

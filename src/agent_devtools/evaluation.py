@@ -74,6 +74,10 @@ class EvaluationRun:
     divergence: TrajectoryDivergence | None = None
     error_phase: str | None = None
     error_type: str | None = None
+    # Optional machine-readable reason for a provider-backed run that could
+    # not reach final verification.  Keep this as text so evaluation models
+    # stay independent of a specific integration's diagnostics enum.
+    issue_code: str | None = None
 
     def __post_init__(self) -> None:
         _require_positive_integer(self.run_number, "run_number")
@@ -96,6 +100,8 @@ class EvaluationRun:
             _require_text(self.error_type, "error_type")
         elif self.error_phase is not None or self.error_type is not None:
             raise ValueError("only errored runs can contain error details")
+        if self.issue_code is not None:
+            _require_text(self.issue_code, "issue_code")
         if self.status is EvaluationRunStatus.PASSED and self.divergence is not None:
             raise ValueError("passed runs cannot contain a divergence")
 
@@ -259,6 +265,16 @@ class AgentEvaluation:
     def median_action_count(self) -> float | None:
         values = [run.action_count for run in self._completed_runs]
         return float(median(values)) if values else None
+
+    @property
+    def issue_code_counts(self) -> dict[str, int]:
+        """Count structured diagnostics attached to repeated runs."""
+
+        counts: dict[str, int] = {}
+        for run in self.runs:
+            if run.issue_code is not None:
+                counts[run.issue_code] = counts.get(run.issue_code, 0) + 1
+        return dict(sorted(counts.items()))
 
     @property
     def representative_unsuccessful_run_numbers(self) -> tuple[int, ...]:

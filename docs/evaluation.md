@@ -146,6 +146,14 @@ creates a zero-action session report containing only the error phase and
 sanitized exception type. Raw factory, execution, and cleanup exception
 messages are not added to the evaluation metadata.
 
+When Browser Use stops before final verification because of a known provider
+problem, that run also stores a machine-readable `issue_code` such as
+`provider_credentials`, `provider_rate_limited`, or `provider_timeout` in
+`evaluation.json`. The aggregate report counts these interruptions separately
+from trajectory divergences, so an API outage is not presented as an Agent
+reliability failure. Open the linked individual report for the human-readable
+diagnosis and next step.
+
 The aggregate report compares unsuccessful trajectories with a representative
 successful run. It checks action type, arguments, execution and verification
 results, URL, compact state, missing or extra actions, browser/runtime findings,

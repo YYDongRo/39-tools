@@ -171,7 +171,9 @@ contract, output layout, statistics, and limitations. A short machine-readable
 `--summary-json` file is also available for local scripts and CI; it does not
 replace the detailed HTML report. For known Browser Use provider interruptions,
 the single-run summary also includes a stable issue code and next-step hint
-while keeping the run `unverified`.
+while keeping the run `unverified`. Repeated evaluations carry the same
+`issue_code` into each run in `evaluation.json` and count provider interruptions
+separately from agent trajectory failures.
 
 To compare future evaluations automatically, set
 `compare_previous = true` in the copied `agent_devtools.toml`. The first run
