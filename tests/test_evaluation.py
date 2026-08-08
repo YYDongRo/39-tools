@@ -142,8 +142,12 @@ def test_open_report_is_explicit(
     report_path.write_text("report", encoding="utf-8")
     opened: list[tuple[str, int]] = []
     monkeypatch.setattr(
-        "agent_devtools.evaluation.webbrowser.open",
+        "agent_devtools.report_opening.webbrowser.open",
         lambda url, *, new: opened.append((url, new)) or True,
+    )
+    monkeypatch.setattr(
+        "agent_devtools.report_opening._is_wsl",
+        lambda: False,
     )
     evaluation = AgentEvaluation(
         evaluation_id="evaluation-1",

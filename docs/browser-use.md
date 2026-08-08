@@ -90,7 +90,8 @@ agent.open_last_report()
 
 The method is explicit and is never called automatically in CI. It raises a
 clear error if the agent has not run, the report was removed, or the system
-cannot launch a browser.
+cannot launch a browser. In WSL it tries `explorer.exe` first so the Windows
+default browser opens the report, then falls back to the WSL browser handler.
 
 `observe_browser_use_agent(...)` returns an `ObservedBrowserUseAgent`. It reads
 the task from `agent.task`, so the developer enters the user's request only

@@ -89,6 +89,7 @@ unverified. Copy `agent_devtools.example.toml` to
 `agent_devtools.toml` only when you want persistent recording settings such as
 screenshots, report opening, output directories, or an installed Brave/Chrome/
 Edge executable. See the [CLI guide](docs/cli.md) for platform-specific paths.
+On WSL, `--open-report` tries the Windows default browser automatically.
 
 If the model provider stops early, the terminal summary and report call out the
 known cause—such as a rate limit or rejected credentials—separately from the

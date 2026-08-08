@@ -189,7 +189,8 @@ uv run --extra browser-use agent-devtools \
 
 The report is normally under `trace/browser-use/`. The exact path is printed
 after every run. The report is local and may contain URLs, typed values, and
-screenshots; review it before sharing.
+screenshots; review it before sharing. In WSL, `--open-report` tries
+`explorer.exe` first, then falls back to the WSL HTML handler.
 
 ## Custom desktop or browser agents
 

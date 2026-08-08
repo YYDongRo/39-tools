@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import webbrowser
 from collections.abc import Awaitable, Callable, Iterable
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -17,6 +16,7 @@ from agent_devtools.async_tool_recorder import (
 from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import record_agent_run_failure
 from agent_devtools.final_state import FinalStateObservation
+from agent_devtools.report_opening import open_local_report
 from agent_devtools.tool_recorder import RecordedTools, record_tools
 from agent_devtools.trajectory import TrajectoryVerificationResult
 from agent_devtools.verification import VerificationResult
@@ -182,10 +182,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
     def open_last_report(self) -> Path:
         if self.last_report_path is None:
             raise RuntimeError("the observed agent has not run yet")
-        absolute_path = self.last_report_path.resolve()
-        if not webbrowser.open(absolute_path.as_uri(), new=2):
-            raise RuntimeError(f"could not open report: {absolute_path}")
-        return absolute_path
+        return open_local_report(self.last_report_path)
 
 
 class ObservedAsyncAgent(Generic[AgentT, ToolT]):
@@ -316,10 +313,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
     def open_last_report(self) -> Path:
         if self.last_report_path is None:
             raise RuntimeError("the observed agent has not run yet")
-        absolute_path = self.last_report_path.resolve()
-        if not webbrowser.open(absolute_path.as_uri(), new=2):
-            raise RuntimeError(f"could not open report: {absolute_path}")
-        return absolute_path
+        return open_local_report(self.last_report_path)
 
 
 def observe_agent(

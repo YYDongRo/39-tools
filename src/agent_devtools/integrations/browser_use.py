@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import json
 import re
-import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,6 +17,7 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
+from agent_devtools.report_opening import open_local_report
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
@@ -788,16 +788,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         report_path = self.last_report_path
         if report_path is None:
             raise RuntimeError("the observed Browser Use agent has not run yet")
-
-        absolute_path = report_path.resolve()
-        if not absolute_path.is_file():
-            raise FileNotFoundError(f"report does not exist: {absolute_path}")
-        if not webbrowser.open(absolute_path.as_uri(), new=2):
-            raise RuntimeError(
-                "could not open the report with the default browser; "
-                f"open it manually: {absolute_path}"
-            )
-        return absolute_path
+        return open_local_report(report_path)
 
     async def _on_model_action(
         self,

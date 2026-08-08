@@ -405,8 +405,12 @@ def test_open_last_report_uses_default_browser(
         await agent.run()
 
         monkeypatch.setattr(
-            "agent_devtools.integrations.browser_use.webbrowser.open",
+            "agent_devtools.report_opening.webbrowser.open",
             open_browser,
+        )
+        monkeypatch.setattr(
+            "agent_devtools.report_opening._is_wsl",
+            lambda: False,
         )
         report_path = agent.open_last_report()
 
@@ -534,8 +538,12 @@ def test_config_can_open_the_report_automatically(
         return True
 
     monkeypatch.setattr(
-        "agent_devtools.integrations.browser_use.webbrowser.open",
+        "agent_devtools.report_opening.webbrowser.open",
         open_browser,
+    )
+    monkeypatch.setattr(
+        "agent_devtools.report_opening._is_wsl",
+        lambda: False,
     )
 
     async def run() -> None:

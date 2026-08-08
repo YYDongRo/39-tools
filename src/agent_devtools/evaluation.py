@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import re
-import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from math import isfinite
 from pathlib import Path, PurePosixPath
 from statistics import fmean, median
+
+from agent_devtools.report_opening import open_local_report
 
 
 class EvaluationRunStatus(StrEnum):
@@ -267,15 +268,7 @@ class AgentEvaluation:
         )
 
     def open_report(self) -> Path:
-        absolute_path = self.report_path.resolve()
-        if not absolute_path.is_file():
-            raise FileNotFoundError(f"report does not exist: {absolute_path}")
-        if not webbrowser.open(absolute_path.as_uri(), new=2):
-            raise RuntimeError(
-                "could not open the report with the default browser; "
-                f"open it manually: {absolute_path}"
-            )
-        return absolute_path
+        return open_local_report(self.report_path)
 
     @property
     def comparison_report_path(self) -> Path | None:
