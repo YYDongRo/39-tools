@@ -19,8 +19,8 @@ readable HTML report. It helps answer:
 The displayed project name is **Agent DevTools**. The Python distribution is
 `39-tools`, and Python imports use `agent_devtools`.
 
-The package is an alpha and is not yet published on PyPI; use a repository
-checkout or the GitHub installation documented in the detailed guides.
+The package is an alpha and is not yet published on PyPI. For a reproducible
+install, use the fixed `v0.1.0` GitHub release or a repository checkout.
 
 ## See a report first
 

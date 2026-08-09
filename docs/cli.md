@@ -44,7 +44,7 @@ failed preflight exits non-zero with the failing check and a repair hint.
 Install the optional Browser Use integration and Chromium:
 
 ```bash
-uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.1.0"
 uv run playwright install chromium
 uv run agent-devtools --help
 ```

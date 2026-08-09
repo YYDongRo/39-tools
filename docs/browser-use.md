@@ -9,7 +9,7 @@ calls then create a new trace and HTML report automatically.
 The early alpha is not yet published on PyPI. Install it directly from GitHub:
 
 ```bash
-uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.1.0"
 uv run playwright install chromium
 uv run agent-devtools --help
 ```
