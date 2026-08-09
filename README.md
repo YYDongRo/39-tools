@@ -70,6 +70,17 @@ The command runs the agent, prints the report path, and opens the HTML report.
 Remove `--headed` for a headless run. If `--task` is omitted, the CLI asks for
 the task interactively.
 
+After each completed run, Agent DevTools also updates a local index such as
+`trace/browser-use/index.html`. It is a simple table of recent reports, their
+status, and any exported bundles. Add `--open-index` if you want to open that
+table instead of finding the files manually.
+
+```bash
+uv run agent-devtools \
+  --task "Open https://example.com and confirm the Example Domain page is open." \
+  --open-index
+```
+
 To make one portable local diagnostic archive, add `--export-bundle`:
 
 ```bash

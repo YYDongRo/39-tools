@@ -45,6 +45,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
             "3",
             "--export-bundle",
             "--redact",
+            "--open-index",
             "--summary-json",
             "ci/summary.json",
         ]
@@ -56,6 +57,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
     assert args.runs == 3
     assert args.export_bundle is True
     assert args.redact is True
+    assert args.open_index is True
     assert args.summary_json.name == "summary.json"
 
 

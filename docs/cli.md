@@ -199,6 +199,18 @@ after every run. The report is local and may contain URLs, typed values, and
 screenshots; review it before sharing. In WSL, `--open-report` tries
 `explorer.exe` first, then falls back to the WSL HTML handler.
 
+After a completed run, the CLI also updates `trace/browser-use/index.html`.
+This local index lists recent task reports, statuses, and exported bundles:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --open-index
+```
+
+Use `--open-index` only when you want the index opened automatically; the index
+is still updated after normal runs without that flag.
+
 ### Export a diagnostic bundle
 
 Add `--export-bundle` when you want one offline zip containing the completed

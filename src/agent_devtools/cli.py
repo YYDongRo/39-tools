@@ -19,6 +19,8 @@ from agent_devtools.browser_use import (
 from agent_devtools.bundle import BundleExportError, export_diagnostic_bundle
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.diagnostics import classify_run_issue
+from agent_devtools.report_opening import open_local_report
+from agent_devtools.run_index import write_run_index
 from agent_devtools.serialization import _write_json
 from agent_devtools.session import ActionSession
 
@@ -96,6 +98,11 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         help="open the report after the task finishes",
     )
     parser.add_argument(
+        "--open-index",
+        action="store_true",
+        help="open the local run index after the task finishes",
+    )
+    parser.add_argument(
         "--export-bundle",
         action="store_true",
         help="export the completed trace as a dated diagnostic zip",
@@ -152,6 +159,22 @@ def _export_bundle_if_requested(
         return False
     print(f"Bundle: {bundle_path.resolve()}")
     return True
+
+
+def _update_run_index(report_path: Path, *, open_index: bool) -> Path | None:
+    try:
+        index_path = write_run_index(report_path.parent.parent)
+    except (OSError, ValueError, TypeError) as error:
+        print(f"Run index could not be created: {type(error).__name__}")
+        return None
+
+    print(f"Run index: {index_path.resolve()}")
+    if open_index:
+        try:
+            open_local_report(index_path)
+        except Exception as error:
+            print(f"Run index could not be opened: {type(error).__name__}")
+    return index_path
 
 
 def _browser_kwargs(
@@ -531,6 +554,9 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     if args.redact and not args.export_bundle:
         print("Configuration error: --redact requires --export-bundle")
         return 2
+    if args.preflight and args.open_index:
+        print("Configuration error: --open-index requires a completed task")
+        return 2
 
     try:
         browser_kwargs = _browser_kwargs(config, headed=args.headed)
@@ -579,6 +605,10 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
             evaluation.report_path,
             args.export_bundle,
             redact=args.redact,
+        )
+        _update_run_index(
+            evaluation.report_path,
+            open_index=args.open_index,
         )
         return 0 if bundle_ok and evaluation.all_runs_passed else 1
 
@@ -639,6 +669,7 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         args.export_bundle,
         redact=args.redact,
     )
+    _update_run_index(report_path, open_index=args.open_index)
 
     if run_error is not None:
         if show_summary:

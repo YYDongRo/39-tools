@@ -27,6 +27,7 @@ from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.replay import ReplayResult, replay_click, replay_fill
 from agent_devtools.runtime import RuntimeContext, collect_runtime_context
+from agent_devtools.run_index import write_run_index
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.tool_recorder import RecordedTools, record_tools
@@ -74,6 +75,7 @@ __all__ = [
     "collect_runtime_context",
     "export_diagnostic_bundle",
     "next_bundle_path",
+    "write_run_index",
     "read_action_json",
     "read_session_json",
     "observe_agent",
