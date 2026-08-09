@@ -13,6 +13,11 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.bundle import (
+    BundleExportError,
+    export_diagnostic_bundle,
+    next_bundle_path,
+)
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.failure import FailureCategory
 from agent_devtools.final_state import FinalStateObservation
@@ -133,6 +138,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
+        "BundleExportError": BundleExportError,
         "EvaluationComparison": EvaluationComparison,
         "EvaluationComparisonStatus": EvaluationComparisonStatus,
         "EvaluationStatusCounts": EvaluationStatusCounts,
@@ -157,6 +163,8 @@ def test_core_public_api_exports_supported_types() -> None:
         "analyze_session": analyze_session,
         "compare_evaluations": compare_evaluations,
         "collect_runtime_context": collect_runtime_context,
+        "export_diagnostic_bundle": export_diagnostic_bundle,
+        "next_bundle_path": next_bundle_path,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
         "observe_agent": observe_agent,

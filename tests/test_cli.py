@@ -43,6 +43,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
             "4",
             "--runs",
             "3",
+            "--export-bundle",
             "--summary-json",
             "ci/summary.json",
         ]
@@ -52,6 +53,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
     assert args.task == "Open the page."
     assert args.max_steps == 4
     assert args.runs == 3
+    assert args.export_bundle is True
     assert args.summary_json.name == "summary.json"
 
 

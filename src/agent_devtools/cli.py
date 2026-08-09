@@ -16,6 +16,7 @@ from agent_devtools.browser_use import (
     evaluate_browser_use_agent,
     observe_browser_use_agent,
 )
+from agent_devtools.bundle import BundleExportError, export_diagnostic_bundle
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.diagnostics import classify_run_issue
 from agent_devtools.serialization import _write_json
@@ -95,6 +96,11 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         help="open the report after the task finishes",
     )
     parser.add_argument(
+        "--export-bundle",
+        action="store_true",
+        help="export the completed trace as a dated diagnostic zip",
+    )
+    parser.add_argument(
         "--preflight",
         action="store_true",
         help="check recording setup and exit without running the task",
@@ -119,6 +125,18 @@ def _load_config(path: Path | None = None) -> AgentDevToolsConfig | None:
             )
         return None
     return AgentDevToolsConfig.from_file(config_path)
+
+
+def _export_bundle_if_requested(report_path: Path, requested: bool) -> bool:
+    if not requested:
+        return True
+    try:
+        bundle_path = export_diagnostic_bundle(report_path.parent)
+    except (BundleExportError, OSError, ValueError) as error:
+        print(f"Bundle export failed: {type(error).__name__}: {error}")
+        return False
+    print(f"Bundle: {bundle_path.resolve()}")
+    return True
 
 
 def _browser_kwargs(
@@ -492,6 +510,9 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     if args.preflight and args.runs != 1:
         print("Configuration error: --preflight cannot be combined with --runs")
         return 2
+    if args.preflight and args.export_bundle:
+        print("Configuration error: --export-bundle requires a completed task")
+        return 2
 
     try:
         browser_kwargs = _browser_kwargs(config, headed=args.headed)
@@ -536,7 +557,11 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
 
         _print_evaluation_summary(evaluation)
         _write_evaluation_summary(args.summary_json, evaluation)
-        return 0 if evaluation.all_runs_passed else 1
+        bundle_ok = _export_bundle_if_requested(
+            evaluation.report_path,
+            args.export_bundle,
+        )
+        return 0 if bundle_ok and evaluation.all_runs_passed else 1
 
     try:
         browser = Browser(**browser_kwargs)
@@ -590,6 +615,8 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
+    bundle_ok = _export_bundle_if_requested(report_path, args.export_bundle)
+
     if run_error is not None:
         if show_summary:
             print(
@@ -639,7 +666,7 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         except Exception as error:
             print(f"Report could not be opened: {type(error).__name__}")
 
-    return 0 if result_is_verified else 1
+    return 0 if result_is_verified and bundle_ok else 1
 
 
 def main() -> int:

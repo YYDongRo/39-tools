@@ -199,6 +199,25 @@ after every run. The report is local and may contain URLs, typed values, and
 screenshots; review it before sharing. In WSL, `--open-report` tries
 `explorer.exe` first, then falls back to the WSL HTML handler.
 
+### Export a diagnostic bundle
+
+Add `--export-bundle` when you want one offline zip containing the completed
+trace, report, screenshots, and a `manifest.json`:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --export-bundle
+```
+
+Bundles are written beside the trace root in `bundles/` and use a short,
+dated name such as `agent-devtools-20260809-test001.zip`. The UTC date is
+followed by a per-day export number; another export that day becomes
+`test002`, while the next day starts at `test001`. The archive contains only
+relative paths and never includes the source directory name in its manifest.
+It is still a copy of local evidence, not an automatic redaction tool: check
+task text, arguments, URLs, typed values, and screenshots before sharing.
+
 ## Custom desktop or browser agents
 
 For an agent that is not Browser Use, use the generic observer at the agent's

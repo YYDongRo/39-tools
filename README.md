@@ -70,6 +70,21 @@ The command runs the agent, prints the report path, and opens the HTML report.
 Remove `--headed` for a headless run. If `--task` is omitted, the CLI asks for
 the task interactively.
 
+To make one portable local diagnostic archive, add `--export-bundle`:
+
+```bash
+uv run agent-devtools \
+  --task "Open https://example.com and confirm the Example Domain page is open." \
+  --export-bundle
+```
+
+The CLI prints a path such as
+`bundles/agent-devtools-20260809-test001.zip`. The UTC date stays in the name,
+the number increments for each export on that date, and the next date starts at
+`test001`. The archive is offline and includes the trace, report, screenshots,
+and a small manifest. Review task text, typed values, URLs, and screenshots
+before sharing it.
+
 Already have a Browser Use, Playwright, or compatible custom agent? Add the
 observer once at its run boundary. See the [Browser Use guide](docs/browser-use.md),
 [CLI guide](docs/cli.md), and [Playwright guide](docs/playwright.md) for the

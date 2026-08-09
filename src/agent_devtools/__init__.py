@@ -10,6 +10,11 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.bundle import (
+    BundleExportError,
+    export_diagnostic_bundle,
+    next_bundle_path,
+)
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.evaluation import (
     EvaluationComparison,
@@ -43,6 +48,7 @@ __all__ = [
     "ActionSession",
     "ActionStatus",
     "AgentDevToolsConfig",
+    "BundleExportError",
     "EvaluationComparison",
     "EvaluationComparisonStatus",
     "EvaluationStatusCounts",
@@ -66,6 +72,8 @@ __all__ = [
     "analyze_session",
     "compare_evaluations",
     "collect_runtime_context",
+    "export_diagnostic_bundle",
+    "next_bundle_path",
     "read_action_json",
     "read_session_json",
     "observe_agent",
