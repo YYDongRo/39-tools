@@ -49,6 +49,7 @@ def test_records_session_with_screenshots_and_persists_each_action(
     assert loaded_session.actions[0].observations == {
         "target_visible_after": True
     }
+    assert loaded_session.run_context is not None
     assert captured_paths == [
         Path("actions/001/before.png"),
         Path("actions/001/after.png"),
@@ -60,6 +61,7 @@ def test_records_session_with_screenshots_and_persists_each_action(
     assert "<dt>Action check</dt><dd>passed</dd>" in report
     assert "Observations" in report
     assert "<dt>Target Visible After</dt><dd>true</dd>" in report
+    assert '<summary>Run context</summary>' in report
 
 
 def test_persists_verification_failure_before_returning(tmp_path: Path) -> None:

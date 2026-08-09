@@ -109,6 +109,7 @@ from agent_devtools.integrations.playwright_task import (
     url_matches,
 )
 from agent_devtools.replay import ReplayResult, replay_click, replay_fill
+from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
@@ -142,6 +143,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "RecordedAsyncTools": RecordedAsyncTools,
         "RecordedTools": RecordedTools,
         "ReplayResult": ReplayResult,
+        "RuntimeContext": RuntimeContext,
         "SessionRecorder": SessionRecorder,
         "TrajectoryFinding": TrajectoryFinding,
         "TrajectoryVerificationResult": TrajectoryVerificationResult,
@@ -154,6 +156,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "trajectory_judge_from_env": trajectory_judge_from_env,
         "analyze_session": analyze_session,
         "compare_evaluations": compare_evaluations,
+        "collect_runtime_context": collect_runtime_context,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
         "observe_agent": observe_agent,

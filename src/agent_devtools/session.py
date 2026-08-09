@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from agent_devtools.action import ActionOutcome, ActionRecord
+from agent_devtools.runtime import RuntimeContext
 from agent_devtools.verification import VerificationResult
 
 
@@ -17,6 +18,7 @@ class ActionSession:
     issue_code: str | None = None
     verification: VerificationResult | None = None
     auxiliary_events: list[dict[str, object]] = field(default_factory=list)
+    run_context: RuntimeContext | None = None
 
     def __post_init__(self) -> None:
         for index, event in enumerate(self.auxiliary_events):
@@ -36,6 +38,10 @@ class ActionSession:
             self.verification, VerificationResult
         ):
             raise TypeError("verification must be a VerificationResult")
+        if self.run_context is not None and not isinstance(
+            self.run_context, RuntimeContext
+        ):
+            raise TypeError("run_context must be a RuntimeContext")
         if self.verification is not None and self.goal is None:
             raise ValueError("task verification requires a goal")
 

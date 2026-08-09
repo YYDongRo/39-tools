@@ -14,6 +14,7 @@ from agent_devtools.report import (
     write_session_html,
 )
 from agent_devtools.session import ActionSession
+from agent_devtools.runtime import RuntimeContext
 from agent_devtools.verification import VerificationResult
 
 
@@ -49,6 +50,29 @@ def test_format_successful_session_summary(tmp_path: Path) -> None:
             f"Report: {report_path.resolve()}",
         )
     )
+
+
+def test_session_report_collapses_safe_runtime_context(tmp_path: Path) -> None:
+    output_path = tmp_path / "report.html"
+    session = ActionSession(
+        goal="Open the page",
+        run_context=RuntimeContext(
+            agent_devtools_version="0.1.0",
+            python_version="3.14.2",
+            os_name="Linux",
+            os_version="6.6",
+            architecture="x86_64",
+            playwright_version="1.61.0",
+        ),
+    )
+
+    write_session_html(session, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '<summary>Run context</summary>' in content
+    assert "3.14.2" in content
+    assert "1.61.0" in content
+    assert "API_KEY" not in content
 
 
 def test_format_failed_action_summary_is_compact(tmp_path: Path) -> None:

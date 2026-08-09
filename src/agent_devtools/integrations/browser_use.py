@@ -19,6 +19,7 @@ from agent_devtools.diagnostics import RunIssueCode
 from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.report_opening import open_local_report
+from agent_devtools.runtime import collect_runtime_context
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
@@ -182,7 +183,10 @@ class _BrowserUseRecorder:
     ) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=False)
-        self.session = ActionSession(goal=goal)
+        self.session = ActionSession(
+            goal=goal,
+            run_context=collect_runtime_context(),
+        )
         self.capture_screenshots = capture_screenshots
         self.redact_sensitive_data = redact_sensitive_data
         self._pending: _PendingAction | None = None

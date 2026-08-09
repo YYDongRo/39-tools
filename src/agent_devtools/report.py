@@ -1229,6 +1229,34 @@ def write_replay_stability_html(
     _write_utf8_text(output_path, document)
 
 
+def _runtime_context_section(session: ActionSession) -> str:
+    context = session.run_context
+    if context is None:
+        return ""
+
+    optional_version = lambda value: (
+        escape(value) if value is not None else "Not installed"
+    )
+    return f"""
+        <details class="runtime-context">
+          <summary>Run context</summary>
+          <p>Safe metadata captured at the start of this run.</p>
+          <dl>
+            <div><dt>Agent DevTools</dt>
+              <dd>{escape(context.agent_devtools_version)}</dd></div>
+            <div><dt>Python</dt><dd>{escape(context.python_version)}</dd></div>
+            <div><dt>Operating system</dt>
+              <dd>{escape(context.os_name)} {escape(context.os_version)}</dd></div>
+            <div><dt>Architecture</dt>
+              <dd>{escape(context.architecture)}</dd></div>
+            <div><dt>Playwright package</dt>
+              <dd>{optional_version(context.playwright_version)}</dd></div>
+            <div><dt>Browser Use package</dt>
+              <dd>{optional_version(context.browser_use_version)}</dd></div>
+          </dl>
+        </details>"""
+
+
 def write_session_html(
     session: ActionSession,
     output_path: Path,
@@ -1427,6 +1455,7 @@ def write_session_html(
     findings_section = _trajectory_findings_section(session)
     auxiliary_events_section = _auxiliary_events_section(session)
     coverage_warning_section = _coverage_warning_section(session)
+    runtime_context_section = _runtime_context_section(session)
 
     document = f"""<!doctype html>
 <html lang="en">
@@ -1505,6 +1534,11 @@ def write_session_html(
                                margin-top: 18px; padding-top: 14px; }}
       .verification-context summary {{ cursor: pointer; font-weight: 700; }}
       .verification-context p {{ margin: 10px 0 0; }}
+      .runtime-context {{ border-top: 1px solid #e2e8f0; color: #475569;
+                          margin-top: 18px; padding-top: 14px; }}
+      .runtime-context summary {{ cursor: pointer; font-weight: 700; }}
+      .runtime-context p {{ margin: 10px 0 0; }}
+      .runtime-context dl {{ margin-top: 14px; }}
       .verification-note {{ background: #fffbeb; border: 1px solid #fcd34d;
                             border-radius: 8px; color: #78350f;
                             margin: 16px 0 0; padding: 12px 14px; }}
@@ -1717,6 +1751,7 @@ def write_session_html(
 {verification_note_section}
 {inferred_goal_section}
 {automatic_verification_section}
+{runtime_context_section}
 {auxiliary_events_section}
       </header>
 {coverage_warning_section}

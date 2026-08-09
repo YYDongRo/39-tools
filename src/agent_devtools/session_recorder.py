@@ -6,6 +6,7 @@ from typing import Self
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.recorder import record_action
 from agent_devtools.report import write_session_html
+from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.serialization import read_session_json, write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
@@ -19,10 +20,18 @@ class SessionRecorder:
         *,
         goal: str | None = None,
         task_verification: Callable[[], VerificationResult] | None = None,
+        run_context: RuntimeContext | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.capture_screenshot = capture_screenshot
-        self.session = ActionSession(goal=goal)
+        self.session = ActionSession(
+            goal=goal,
+            run_context=(
+                run_context
+                if run_context is not None
+                else collect_runtime_context()
+            ),
+        )
         self.task_verification = task_verification
 
         if task_verification is not None and goal is None:

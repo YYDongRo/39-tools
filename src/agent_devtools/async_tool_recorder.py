@@ -14,6 +14,7 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import FailureCategory, classify_exception
 from agent_devtools.report import write_session_html
+from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.tool_recorder import (
@@ -57,6 +58,7 @@ class RecordedAsyncTools(Generic[ToolT]):
         ) = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
+        run_context: RuntimeContext | None = None,
     ) -> None:
         if observe_state is not None and not callable(observe_state):
             raise TypeError("observe_state must be callable or None")
@@ -77,7 +79,14 @@ class RecordedAsyncTools(Generic[ToolT]):
         self._wrappers: dict[str, Callable[..., Awaitable[object]]] = {}
         self._active_action = False
         self.output_dir = Path(output_dir)
-        self.session = ActionSession(goal=goal)
+        self.session = ActionSession(
+            goal=goal,
+            run_context=(
+                run_context
+                if run_context is not None
+                else collect_runtime_context()
+            ),
+        )
 
         if self.output_dir.exists() and any(self.output_dir.iterdir()):
             raise FileExistsError(
@@ -360,6 +369,7 @@ def record_async_tools(
     ) = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
+    run_context: RuntimeContext | None = None,
 ) -> RecordedAsyncTools[ToolT]:
     return RecordedAsyncTools(
         tools,
@@ -370,6 +380,7 @@ def record_async_tools(
         task_verification=task_verification,
         methods=methods,
         event_collector=event_collector,
+        run_context=run_context,
     )
 
 

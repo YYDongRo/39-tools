@@ -36,6 +36,7 @@ from agent_devtools.integrations.browser_use import (
     ObservedBrowserUseAgent,
 )
 from agent_devtools.report import write_session_html
+from agent_devtools.runtime import collect_runtime_context
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 
@@ -300,6 +301,7 @@ def _placeholder_session(
 ) -> ActionSession:
     return ActionSession(
         goal=task,
+        run_context=collect_runtime_context(),
         verification_source="evaluation",
         verification_note=_error_note(error_phase, error_type),
     )

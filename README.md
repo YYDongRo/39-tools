@@ -98,7 +98,10 @@ patterns. See the [stability evaluation guide](docs/evaluation.md) for details.
 
 Reports and JSON traces stay local by default. They can contain URLs, typed
 values, page text, and screenshots, so review them before sharing. Provider
-keys are read from environment variables and are not written to reports.
+keys are read from environment variables and are not written to reports. Each
+recorded session also includes a collapsed, safe run context (Python, OS, and
+installed adapter versions) to help compare local and CI failures; it does not
+scan files or save environment variables and executable paths.
 
 ## Scope and documentation
 

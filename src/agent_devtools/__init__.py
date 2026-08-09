@@ -21,6 +21,7 @@ from agent_devtools.failure import FailureCategory
 from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.replay import ReplayResult, replay_click, replay_fill
+from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
 from agent_devtools.tool_recorder import RecordedTools, record_tools
@@ -52,6 +53,7 @@ __all__ = [
     "RecordedAsyncTools",
     "RecordedTools",
     "ReplayResult",
+    "RuntimeContext",
     "SessionRecorder",
     "TrajectoryFinding",
     "TrajectoryVerificationResult",
@@ -63,6 +65,7 @@ __all__ = [
     "async_trajectory_judge_from_env",
     "analyze_session",
     "compare_evaluations",
+    "collect_runtime_context",
     "read_action_json",
     "read_session_json",
     "observe_agent",

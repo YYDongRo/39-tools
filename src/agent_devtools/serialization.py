@@ -3,9 +3,11 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import cast
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.failure import FailureCategory
+from agent_devtools.runtime import RuntimeContext
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
 
@@ -116,6 +118,60 @@ def _verification_from_dict(data: object) -> VerificationResult | None:
         evidence=dict(evidence),
         failure_reason=failure_reason,
         failure_category=failure_category,
+    )
+
+
+def _runtime_context_to_dict(
+    context: RuntimeContext | None,
+) -> dict[str, object] | None:
+    if context is None:
+        return None
+    return {
+        "agent_devtools_version": context.agent_devtools_version,
+        "python_version": context.python_version,
+        "os_name": context.os_name,
+        "os_version": context.os_version,
+        "architecture": context.architecture,
+        "playwright_version": context.playwright_version,
+        "browser_use_version": context.browser_use_version,
+    }
+
+
+def _runtime_context_from_dict(data: object) -> RuntimeContext | None:
+    if data is None:
+        return None
+    if not isinstance(data, dict) or not all(
+        isinstance(key, str) for key in data
+    ):
+        raise ValueError("run_context must be an object or null")
+
+    required_fields = (
+        "agent_devtools_version",
+        "python_version",
+        "os_name",
+        "os_version",
+        "architecture",
+    )
+    optional_fields = ("playwright_version", "browser_use_version")
+    values: dict[str, object] = {}
+    for field_name in (*required_fields, *optional_fields):
+        if field_name not in data:
+            raise ValueError(f"missing required run_context field: {field_name}")
+        value = data[field_name]
+        if value is not None and not isinstance(value, str):
+            raise ValueError(
+                f"run_context {field_name} must be a string or null"
+            )
+        values[field_name] = value
+
+    return RuntimeContext(
+        agent_devtools_version=cast(str, values["agent_devtools_version"]),
+        python_version=cast(str, values["python_version"]),
+        os_name=cast(str, values["os_name"]),
+        os_version=cast(str, values["os_version"]),
+        architecture=cast(str, values["architecture"]),
+        playwright_version=cast(str | None, values["playwright_version"]),
+        browser_use_version=cast(str | None, values["browser_use_version"]),
     )
 
 
@@ -293,6 +349,9 @@ def session_to_dict(session: ActionSession) -> dict[str, object]:
         data["issue_code"] = session.issue_code
     if session.auxiliary_events:
         data["auxiliary_events"] = session.auxiliary_events
+    runtime_context = _runtime_context_to_dict(session.run_context)
+    if runtime_context is not None:
+        data["run_context"] = runtime_context
     return data
 
 
@@ -322,6 +381,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
             else None
         )
         auxiliary_events_value = data.get("auxiliary_events", [])
+        run_context_value = data.get("run_context")
     except KeyError as error:
         raise ValueError(f"missing required field: {error.args[0]}") from error
     if not isinstance(actions_value, list):
@@ -357,6 +417,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
             raise ValueError(f"invalid action at index {index}: {error}") from error
 
     verification = _verification_from_dict(verification_value)
+    run_context = _runtime_context_from_dict(run_context_value)
     return ActionSession(
         actions=actions,
         auxiliary_events=[dict(event) for event in auxiliary_events_value],
@@ -366,6 +427,7 @@ def session_from_dict(data: dict[str, object]) -> ActionSession:
         verification_note=verification_note_value,
         issue_code=issue_code_value,
         verification=verification,
+        run_context=run_context,
     )
 
 
