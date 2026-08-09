@@ -44,6 +44,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
             "--runs",
             "3",
             "--export-bundle",
+            "--redact",
             "--summary-json",
             "ci/summary.json",
         ]
@@ -54,6 +55,7 @@ def test_installed_cli_parser_uses_stable_command_name() -> None:
     assert args.max_steps == 4
     assert args.runs == 3
     assert args.export_bundle is True
+    assert args.redact is True
     assert args.summary_json.name == "summary.json"
 
 

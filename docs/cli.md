@@ -218,6 +218,20 @@ relative paths and never includes the source directory name in its manifest.
 It is still a copy of local evidence, not an automatic redaction tool: check
 task text, arguments, URLs, typed values, and screenshots before sharing.
 
+For a shareable copy, add `--redact`:
+
+```bash
+uv run --extra browser-use agent-devtools \
+  --task "Open example.com and confirm the Example Domain page is open." \
+  --export-bundle --redact
+```
+
+The redacted bundle replaces common secret-shaped values in JSON, HTML, and
+text files, removes image files, and adds a visible note where screenshots were
+referenced. The original trace remains unchanged. This is a conservative,
+pattern-based filter; inspect the result before sharing because it cannot
+recognize every private value or sensitive detail inside arbitrary images.
+
 ## Custom desktop or browser agents
 
 For an agent that is not Browser Use, use the generic observer at the agent's

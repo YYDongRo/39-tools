@@ -92,6 +92,60 @@ def test_export_bundle_contains_relative_files_and_manifest(tmp_path: Path) -> N
     assert "Review task text" in manifest["privacy_note"]
 
 
+def test_redacted_bundle_hides_text_secrets_and_screenshots(tmp_path: Path) -> None:
+    source = tmp_path / "trace"
+    output = tmp_path / "bundles"
+    _write_trace(source)
+    (source / "report.html").write_text(
+        "<html><body><img src='screenshots/secret.png'>"
+        "<p>Bearer abc123</p></body></html>",
+        encoding="utf-8",
+    )
+    (source / "session.json").write_text(
+        json.dumps(
+            {
+                "password": "hunter2",
+                "url": "https://internal.test/reset?token=abc123",
+                "nested": {
+                    "api_key": "sk-example-secret",
+                    "access_token": "access-secret",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (source / "screenshots" / "secret.png").write_bytes(b"private image")
+    report_before_export = (source / "report.html").read_bytes()
+
+    bundle = export_diagnostic_bundle(
+        source,
+        output,
+        created_at=FIXED_TIME,
+        redact=True,
+    )
+
+    with ZipFile(bundle) as archive:
+        names = archive.namelist()
+        report = archive.read("report.html").decode("utf-8")
+        session = archive.read("session.json").decode("utf-8")
+        manifest = json.loads(archive.read("manifest.json"))
+
+    assert "screenshots/secret.png" not in names
+    assert "hunter2" not in session
+    assert "abc123" not in session
+    assert "sk-example-secret" not in session
+    assert "access-secret" not in session
+    assert "Bearer abc123" not in report
+    assert "Screenshot omitted" in report
+    assert manifest["redaction"]["enabled"] is True
+    assert manifest["redaction"]["replacement_count"] >= 4
+    assert manifest["redaction"]["omitted_files"] == [
+        "screenshots/after.svg",
+        "screenshots/secret.png",
+    ]
+    assert (source / "report.html").read_bytes() == report_before_export
+
+
 def test_export_bundle_increments_without_overwriting(tmp_path: Path) -> None:
     source = tmp_path / "trace"
     output = tmp_path / "bundles"

@@ -101,6 +101,13 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         help="export the completed trace as a dated diagnostic zip",
     )
     parser.add_argument(
+        "--redact",
+        action="store_true",
+        help=(
+            "redact common secrets and omit screenshots in the exported bundle"
+        ),
+    )
+    parser.add_argument(
         "--preflight",
         action="store_true",
         help="check recording setup and exit without running the task",
@@ -127,11 +134,19 @@ def _load_config(path: Path | None = None) -> AgentDevToolsConfig | None:
     return AgentDevToolsConfig.from_file(config_path)
 
 
-def _export_bundle_if_requested(report_path: Path, requested: bool) -> bool:
+def _export_bundle_if_requested(
+    report_path: Path,
+    requested: bool,
+    *,
+    redact: bool = False,
+) -> bool:
     if not requested:
         return True
     try:
-        bundle_path = export_diagnostic_bundle(report_path.parent)
+        bundle_path = export_diagnostic_bundle(
+            report_path.parent,
+            redact=redact,
+        )
     except (BundleExportError, OSError, ValueError) as error:
         print(f"Bundle export failed: {type(error).__name__}: {error}")
         return False
@@ -513,6 +528,9 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     if args.preflight and args.export_bundle:
         print("Configuration error: --export-bundle requires a completed task")
         return 2
+    if args.redact and not args.export_bundle:
+        print("Configuration error: --redact requires --export-bundle")
+        return 2
 
     try:
         browser_kwargs = _browser_kwargs(config, headed=args.headed)
@@ -560,6 +578,7 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         bundle_ok = _export_bundle_if_requested(
             evaluation.report_path,
             args.export_bundle,
+            redact=args.redact,
         )
         return 0 if bundle_ok and evaluation.all_runs_passed else 1
 
@@ -615,7 +634,11 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    bundle_ok = _export_bundle_if_requested(report_path, args.export_bundle)
+    bundle_ok = _export_bundle_if_requested(
+        report_path,
+        args.export_bundle,
+        redact=args.redact,
+    )
 
     if run_error is not None:
         if show_summary:

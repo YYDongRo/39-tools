@@ -85,6 +85,18 @@ the number increments for each export on that date, and the next date starts at
 and a small manifest. Review task text, typed values, URLs, and screenshots
 before sharing it.
 
+When sharing outside your machine, add `--redact`:
+
+```bash
+uv run agent-devtools \
+  --task "Open https://example.com and confirm the Example Domain page is open." \
+  --export-bundle --redact
+```
+
+This creates a separate copy with common secret-shaped text replaced and image
+files omitted. The original trace is not changed. It is a deterministic safety
+filter, not a guarantee that every private value or screenshot has been found.
+
 Already have a Browser Use, Playwright, or compatible custom agent? Add the
 observer once at its run boundary. See the [Browser Use guide](docs/browser-use.md),
 [CLI guide](docs/cli.md), and [Playwright guide](docs/playwright.md) for the
