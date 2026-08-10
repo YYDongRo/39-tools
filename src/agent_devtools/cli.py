@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal, Sequence
@@ -18,6 +19,7 @@ from agent_devtools.browser_use import (
 )
 from agent_devtools.bundle import BundleExportError, export_diagnostic_bundle
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.control_center import serve_control_center
 from agent_devtools.diagnostics import classify_run_issue
 from agent_devtools.report_opening import open_local_report
 from agent_devtools.run_index import write_run_index
@@ -36,6 +38,16 @@ def _positive_int(value: str) -> int:
         raise argparse.ArgumentTypeError("must be a positive integer") from error
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _port(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a port number") from error
+    if not 0 <= parsed <= 65535:
+        raise argparse.ArgumentTypeError("must be between 0 and 65535")
     return parsed
 
 
@@ -128,6 +140,51 @@ def _browser_use_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
+
+
+def _control_center_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agent-devtools dashboard",
+        description="Show the current local Agent DevTools run status.",
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path("trace") / "browser-use",
+        help="trace root to watch (default: trace/browser-use)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="local interface to bind (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=_port,
+        default=0,
+        help="port to bind; 0 chooses a free local port (default: 0)",
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="open the control center in the default browser",
+    )
+    return parser
+
+
+def _control_center_main(argv: Sequence[str] | None = None) -> int:
+    args = _control_center_parser().parse_args(argv)
+    try:
+        serve_control_center(
+            args.root,
+            host=args.host,
+            port=args.port,
+            open_browser=args.open,
+        )
+    except (OSError, TypeError, ValueError) as error:
+        print(f"Control center could not start: {type(error).__name__}: {error}")
+        return 2
+    return 0
 
 
 def _load_config(path: Path | None = None) -> AgentDevToolsConfig | None:
@@ -723,10 +780,13 @@ async def _browser_use_main(argv: Sequence[str] | None = None) -> int:
     return 0 if result_is_verified and bundle_ok else 1
 
 
-def main() -> int:
-    """Run the installed Browser Use command-line workflow."""
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the installed Agent DevTools command-line workflow."""
 
-    return asyncio.run(_browser_use_main())
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "dashboard":
+        return _control_center_main(arguments[1:])
+    return asyncio.run(_browser_use_main(arguments))
 
 
 __all__ = ["main"]

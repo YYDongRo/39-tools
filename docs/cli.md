@@ -211,6 +211,21 @@ uv run --extra browser-use agent-devtools \
 Use `--open-index` only when you want the index opened automatically; the index
 is still updated after normal runs without that flag.
 
+### Watch a run locally
+
+The run index is useful after a task finishes. To see whether the current
+observer is active while a task is running, start the local control center in a
+second terminal:
+
+```bash
+uv run --extra browser-use agent-devtools dashboard --open
+```
+
+It reads `trace/browser-use/run-state.json` and refreshes while the status is
+`tracking`. When the run finishes, use **Open latest report** or **All reports**.
+The server binds to `127.0.0.1` by default, serves only the selected trace root,
+and stops with `Ctrl+C`. Use `--root PATH` for a different trace directory.
+
 ### Export a diagnostic bundle
 
 Add `--export-bundle` when you want one offline zip containing the completed

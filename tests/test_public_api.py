@@ -19,6 +19,10 @@ from agent_devtools.bundle import (
     next_bundle_path,
 )
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.control_center import (
+    render_control_center,
+    serve_control_center,
+)
 from agent_devtools.failure import FailureCategory
 from agent_devtools.final_state import FinalStateObservation
 from agent_devtools.evaluation import (
@@ -146,6 +150,8 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionSession": ActionSession,
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
+        "render_control_center": render_control_center,
+        "serve_control_center": serve_control_center,
         "BundleExportError": BundleExportError,
         "EvaluationComparison": EvaluationComparison,
         "EvaluationComparisonStatus": EvaluationComparisonStatus,

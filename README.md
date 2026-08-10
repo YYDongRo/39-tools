@@ -81,6 +81,17 @@ uv run agent-devtools \
   --open-index
 ```
 
+To watch the current run in a small local control center, use a second
+terminal:
+
+```bash
+uv run agent-devtools dashboard --open
+```
+
+It reads `trace/browser-use/run-state.json`, refreshes while an agent is
+tracking, and links to the latest report. It does not run the agent or upload
+your trace; stop it with `Ctrl+C`.
+
 To make one portable local diagnostic archive, add `--export-bundle`:
 
 ```bash
