@@ -68,6 +68,31 @@ def test_control_center_links_latest_report_with_relative_path(
     assert str(tmp_path.resolve()) not in html
 
 
+def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> None:
+    older_root = tmp_path / "playwright"
+    newer_root = tmp_path / "browser-use"
+    older_root.mkdir()
+    newer_root.mkdir()
+    _write_state(older_root, RunStateStatus.PASSED, action_count=1)
+    _write_state(newer_root, RunStateStatus.TRACKING, action_count=4)
+    # Make the selection deterministic without relying on filesystem mtime.
+    state_path = newer_root / "run-state.json"
+    state_path.write_text(
+        state_path.read_text(encoding="utf-8").replace(
+            "2026-08-09T12:00:02+00:00",
+            "2026-08-09T12:00:03+00:00",
+        ),
+        encoding="utf-8",
+    )
+
+    html = render_control_center(tmp_path)
+
+    assert "Tracking" in html
+    assert "4" in html
+    assert "browser-use" in html
+    assert "playwright" not in html
+
+
 def test_control_center_handles_first_run_without_state(tmp_path: Path) -> None:
     html = render_control_center(tmp_path)
 

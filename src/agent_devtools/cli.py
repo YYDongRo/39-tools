@@ -150,8 +150,11 @@ def _control_center_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path("trace") / "browser-use",
-        help="trace root to watch (default: trace/browser-use)",
+        default=Path("trace"),
+        help=(
+            "trace root to watch; recent observer roots are discovered below "
+            "it (default: trace)"
+        ),
     )
     parser.add_argument(
         "--host",

@@ -88,9 +88,10 @@ terminal:
 uv run agent-devtools dashboard --open
 ```
 
-It reads `trace/browser-use/run-state.json`, refreshes while an agent is
-tracking, and links to the latest report. It does not run the agent or upload
-your trace; stop it with `Ctrl+C`.
+It reads the newest `run-state.json` below `trace/`, refreshes while an agent is
+tracking, and links to the latest report. Use `--root PATH` for another trace
+workspace. It does not run the agent or upload your trace; stop it with
+`Ctrl+C`.
 
 To make one portable local diagnostic archive, add `--export-bundle`:
 

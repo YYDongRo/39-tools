@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import webbrowser
+from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
 from datetime import UTC, datetime
@@ -25,14 +26,22 @@ _STATUS_LABELS = {
 }
 
 
+@dataclass(frozen=True)
+class _StateLocation:
+    root: Path
+    state: RunState
+
+
 def render_control_center(root: str | Path) -> str:
     """Render the current local run state as a dependency-free HTML page."""
 
     output_root = _ensure_root(root)
-    state, state_error = _load_state(output_root / "run-state.json")
-    report_href = _report_href(output_root, state)
+    location, state_error = _discover_state(output_root)
+    state = location.state if location is not None else None
+    state_root = location.root if location is not None else None
+    report_href = _report_href(output_root, state_root, state)
     try:
-        write_run_index(output_root)
+        _write_report_indexes(output_root, state_root)
         index_error = None
     except (OSError, TypeError, ValueError) as error:
         index_error = f"Could not update report index ({type(error).__name__})"
@@ -44,6 +53,7 @@ def render_control_center(root: str | Path) -> str:
         action_count = "—"
         updated_at = "—"
         details = state_error or "No run-state.json has been created yet."
+        trace_source = "—"
         refresh = ""
     else:
         status_value = state.status
@@ -52,11 +62,13 @@ def render_control_center(root: str | Path) -> str:
         action_count = str(state.action_count)
         updated_at = _format_timestamp(state.updated_at)
         details = _state_details(state)
+        trace_source = _relative_source(output_root, state_root)
         refresh = '<meta http-equiv="refresh" content="2">' if (
             state.status is RunStateStatus.TRACKING
         ) else ""
 
     index_note = index_error or "Reports are listed in the local index."
+    index_href = _index_href(output_root, state_root)
     report_link = (
         f'<a class="button primary" href="{escape(report_href, quote=True)}">'
         "Open latest report</a>"
@@ -100,7 +112,7 @@ def render_control_center(root: str | Path) -> str:
     .task-label, dt {{ color: #64748b; font-size: .75rem; font-weight: 800;
       letter-spacing: .05em; text-transform: uppercase; }}
     .task-text {{ margin: 7px 0 0; white-space: pre-wrap; word-break: break-word; }}
-    dl {{ display: grid; gap: 14px 28px; grid-template-columns: repeat(3, 1fr);
+    dl {{ display: grid; gap: 14px 28px; grid-template-columns: repeat(4, 1fr);
       margin: 22px 0 0; }}
     dt {{ margin-bottom: 5px; }} dd {{ margin: 0; word-break: break-word; }}
     .actions {{ align-items: center; display: flex; flex-wrap: wrap; gap: 12px;
@@ -132,10 +144,11 @@ def render_control_center(root: str | Path) -> str:
       <div><dt>Actions</dt><dd>{escape(action_count)}</dd></div>
       <div><dt>Last update (UTC)</dt><dd>{escape(updated_at)}</dd></div>
       <div><dt>Details</dt><dd>{escape(details)}</dd></div>
+      <div><dt>Trace source</dt><dd>{escape(trace_source)}</dd></div>
     </dl>
     <div class="actions">
       {report_link}
-      <a class="button secondary" href="index.html">All reports</a>
+      <a class="button secondary" href="{escape(index_href, quote=True)}">All reports</a>
     </div>
     <div class="notice">{escape(index_note)}</div>
   </section>
@@ -153,7 +166,7 @@ def render_control_center(root: str | Path) -> str:
 
 
 def serve_control_center(
-    root: str | Path = Path("trace") / "browser-use",
+    root: str | Path = Path("trace"),
     *,
     host: str = "127.0.0.1",
     port: int = 0,
@@ -239,26 +252,78 @@ def _ensure_root(root: str | Path) -> Path:
     return resolved
 
 
-def _load_state(path: Path) -> tuple[RunState | None, str | None]:
-    if not path.is_file():
-        return None, None
-    try:
-        return read_run_state(path), None
-    except (OSError, TypeError, ValueError) as error:
-        return None, f"Run state is unavailable ({type(error).__name__})."
+def _discover_state(root: Path) -> tuple[_StateLocation | None, str | None]:
+    """Find the newest valid state directly below ``root`` or one level down."""
+
+    candidates = [root / "run-state.json"]
+    candidates.extend(sorted(root.glob("*/run-state.json")))
+    locations: list[_StateLocation] = []
+    errors: list[str] = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            locations.append(_StateLocation(path.parent, read_run_state(path)))
+        except (OSError, TypeError, ValueError) as error:
+            errors.append(type(error).__name__)
+
+    if locations:
+        locations.sort(
+            key=lambda location: (
+                location.state.updated_at,
+                location.root.as_posix(),
+            ),
+            reverse=True,
+        )
+        return locations[0], None
+    if errors:
+        return None, f"Run state is unavailable ({errors[0]})."
+    return None, None
 
 
-def _report_href(root: Path, state: RunState | None) -> str | None:
-    if state is None or state.report_path is None:
+def _write_report_indexes(root: Path, state_root: Path | None) -> None:
+    roots = {root}
+    if state_root is not None:
+        roots.add(state_root)
+    for index_root in sorted(roots, key=lambda path: path.as_posix()):
+        write_run_index(index_root)
+
+
+def _report_href(
+    root: Path,
+    state_root: Path | None,
+    state: RunState | None,
+) -> str | None:
+    if state is None or state_root is None or state.report_path is None:
         return None
-    report = root / state.report_path
+    report = state_root / state.report_path
     try:
-        report.resolve().relative_to(root.resolve())
+        report.resolve().relative_to(state_root.resolve())
+        relative = report.resolve().relative_to(root.resolve())
     except ValueError:
         return None
     if not report.is_file():
         return None
-    return state.report_path.as_posix()
+    return relative.as_posix()
+
+
+def _relative_source(root: Path, state_root: Path | None) -> str:
+    if state_root is None:
+        return "—"
+    try:
+        relative = state_root.relative_to(root)
+    except ValueError:
+        return "—"
+    return relative.as_posix() or "."
+
+
+def _index_href(root: Path, state_root: Path | None) -> str:
+    if state_root is None:
+        return "index.html"
+    try:
+        return (state_root.relative_to(root) / "index.html").as_posix()
+    except ValueError:
+        return "index.html"
 
 
 def _state_details(state: RunState) -> str:

@@ -77,7 +77,7 @@ def test_installed_cli_parser_rejects_non_positive_runs() -> None:
 def test_control_center_parser_uses_local_defaults() -> None:
     args = _control_center_parser().parse_args(["--open", "--port", "8765"])
 
-    assert args.root == Path("trace") / "browser-use"
+    assert args.root == Path("trace")
     assert args.host == "127.0.0.1"
     assert args.port == 8765
     assert args.open is True
