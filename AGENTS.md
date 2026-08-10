@@ -147,8 +147,9 @@ package.
 - Human-readable config: `agent_devtools.toml`, based on
   `agent_devtools.example.toml`.
 - CLI and custom-agent setup guide: `docs/cli.md`.
-- Local control center: `agent-devtools dashboard` reads the latest
-  `run-state.json` and links to local reports.
+- Local control center: `agent-devtools dashboard --open`; its **Start a task**
+  page launches only the existing Browser Use CLI on loopback, reads the latest
+  `run-state.json`, and links to local reports.
 
 Keep these names stable unless a deliberate compatibility plan is written.
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Thread
-from urllib.request import urlopen
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -12,6 +15,7 @@ from agent_devtools.control_center import (
     _create_server,
     render_control_center,
     render_setup_page,
+    render_start_page,
 )
 from agent_devtools.run_state import (
     RunState,
@@ -129,6 +133,8 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
             report_html = response.read().decode("utf-8")
         with urlopen(f"{base_url}/setup.html") as response:
             setup_html = response.read().decode("utf-8")
+        with urlopen(f"{base_url}/start.html") as response:
+            start_html = response.read().decode("utf-8")
     finally:
         server.shutdown()
         thread.join(timeout=2)
@@ -139,6 +145,78 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert report_html == "<html>local report</html>"
     assert "Setup &amp; health" in setup_html
     assert "Local checks only" in setup_html
+    assert "Start a task" in start_html
+    assert "Start Browser Use task" in start_html
+
+
+def test_start_page_is_local_only_and_does_not_show_secrets(
+    tmp_path: Path,
+) -> None:
+    html = render_start_page(
+        tmp_path,
+        config_path=tmp_path / "private-config.toml",
+        enabled=False,
+    )
+
+    assert "Task launch is disabled" in html
+    assert "private-config.toml" in html
+    assert str(tmp_path.resolve()) not in html
+    assert "GOOGLE_API_KEY" not in html
+
+
+def test_start_route_launches_only_the_fixed_browser_use_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launched: dict[str, object] = {}
+
+    class FakeProcess:
+        def poll(self) -> None:
+            return None
+
+    def fake_popen(command: list[str], **kwargs: object) -> FakeProcess:
+        launched["command"] = command
+        launched.update(kwargs)
+        return FakeProcess()
+
+    monkeypatch.setattr(
+        "agent_devtools.control_center.subprocess.Popen",
+        fake_popen,
+    )
+    server = _create_server(tmp_path, host="127.0.0.1", port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        request = Request(
+            f"{base_url}/run",
+            data=urlencode(
+                {"task": "Open example.test", "headed": "on"}
+            ).encode("utf-8"),
+            method="POST",
+        )
+        with urlopen(request) as response:
+            dashboard = response.read().decode("utf-8")
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+
+    command = launched["command"]
+    assert isinstance(command, list)
+    assert command[0] == sys.executable
+    assert command[1:4] == [
+        "-c",
+        "from agent_devtools.cli import main; raise SystemExit(main())",
+        "--task",
+    ]
+    assert "Open example.test" in command
+    assert "--headed" in command
+    assert launched["stdin"] is subprocess.DEVNULL
+    assert launched["shell"] is False
+    assert launched["cwd"] == str(Path.cwd())
+    assert "Start a task" in dashboard
+    assert "Open example.test" not in dashboard
 
 
 def test_setup_page_reports_safe_configuration_status(

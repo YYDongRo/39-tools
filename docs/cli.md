@@ -241,6 +241,12 @@ uv run --extra browser-use agent-devtools dashboard \
   --config path/to/agent_devtools.toml --open
 ```
 
+The dashboard's **Start a task** link is a local shortcut for the same Browser
+Use CLI. Enter a task, optionally select a headed browser, and submit; the
+dashboard stays available while the normal trace and report are written. The
+form accepts only a task description, never a shell command, and is disabled
+when the server is bound to a non-loopback interface.
+
 ### Export a diagnostic bundle
 
 Add `--export-bundle` when you want one offline zip containing the completed

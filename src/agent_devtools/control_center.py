@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import webbrowser
 from datetime import UTC, datetime, timedelta
 from dataclasses import dataclass
 from html import escape
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Lock
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.run_index import _discover_entries, write_run_index
@@ -28,6 +31,8 @@ _STATUS_LABELS = {
 }
 _STALE_RUN_AFTER = timedelta(minutes=2)
 _RECENT_RUN_LIMIT = 5
+_MAX_LAUNCH_BODY_BYTES = 16 * 1024
+_MAX_TASK_LENGTH = 2_000
 _INDEX_STATUS_LABELS = {
     "passed": "Passed",
     "failed": "Failed",
@@ -53,6 +58,7 @@ def render_control_center(
     root: str | Path,
     *,
     now: datetime | None = None,
+    launch_enabled: bool = True,
 ) -> str:
     """Render the current local run state as a dependency-free HTML page."""
 
@@ -116,6 +122,11 @@ def render_control_center(
     )
     index_link = _external_link(index_href, "Open report index ↗", "secondary")
     setup_link = _external_link("setup.html", "Setup & health ↗", "secondary")
+    start_link = _external_link(
+        "start.html",
+        "Start a task ↗" if launch_enabled else "Start page (local only) ↗",
+        "primary" if launch_enabled else "secondary",
+    )
     status_class = escape(
         f"{status_value.value}{' stale' if is_stale else ''}",
         quote=True,
@@ -209,6 +220,7 @@ def render_control_center(
       <div><dt>Trace source</dt><dd>{escape(trace_source)}</dd></div>
     </dl>
     <div class="actions">
+      {start_link}
       {report_link}
       {setup_link}
     </div>
@@ -277,16 +289,25 @@ def _create_server(
     port: int,
     config_path: str | Path | None = None,
 ) -> ThreadingHTTPServer:
+    launch_enabled = host in {"127.0.0.1", "localhost", "::1"}
+
     class Handler(_ControlCenterHandler):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(
                 *args,
                 root=root,
                 config_path=config_path,
+                launch_enabled=launch_enabled,
                 **kwargs,
             )
 
-    return ThreadingHTTPServer((host, port), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
+    # The launcher is deliberately kept on the server instance so the local
+    # page can prevent two Browser Use processes from starting at once.
+    server._launcher_process = None  # type: ignore[attr-defined]
+    server._launcher_lock = Lock()  # type: ignore[attr-defined]
+    server._launch_enabled = launch_enabled  # type: ignore[attr-defined]
+    return server
 
 
 class _ControlCenterHandler(SimpleHTTPRequestHandler):
@@ -295,16 +316,32 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
         *args: Any,
         root: Path,
         config_path: str | Path | None,
+        launch_enabled: bool,
         **kwargs: Any,
     ) -> None:
         self._control_root = root
         self._config_path = config_path
+        self._launch_enabled = launch_enabled
         super().__init__(*args, directory=str(root), **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = urlsplit(self.path).path
         if path == "/":
-            self._send_html(render_control_center(self._control_root))
+            self._send_html(
+                render_control_center(
+                    self._control_root,
+                    launch_enabled=self._launch_enabled,
+                )
+            )
+            return
+        if path in {"/start", "/start.html"}:
+            self._send_html(
+                render_start_page(
+                    self._control_root,
+                    config_path=self._config_path,
+                    enabled=self._launch_enabled,
+                )
+            )
             return
         if path in {"/setup", "/setup.html"}:
             self._send_html(
@@ -321,12 +358,125 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
                 pass
         super().do_GET()
 
+    def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
+        if urlsplit(self.path).path == "/run":
+            self._handle_run()
+            return
+        self.send_error(404)
+
     def log_message(self, format: str, *args: Any) -> None:
         return None
 
-    def _send_html(self, content: str) -> None:
+    def _handle_run(self) -> None:
+        if not self._launch_enabled:
+            self._send_html(
+                render_start_page(
+                    self._control_root,
+                    config_path=self._config_path,
+                    enabled=False,
+                    error="Task launch is disabled unless the server is local-only.",
+                ),
+                status=403,
+            )
+            return
+
+        length_header = self.headers.get("Content-Length")
+        try:
+            content_length = int(length_header or "0")
+        except ValueError:
+            content_length = _MAX_LAUNCH_BODY_BYTES + 1
+        if content_length <= 0 or content_length > _MAX_LAUNCH_BODY_BYTES:
+            self._send_html(
+                render_start_page(
+                    self._control_root,
+                    config_path=self._config_path,
+                    error="The task form is empty or too large.",
+                ),
+                status=400,
+            )
+            return
+
+        try:
+            form_data = self.rfile.read(content_length).decode("utf-8")
+            values = parse_qs(form_data, keep_blank_values=True)
+        except (UnicodeDecodeError, ValueError):
+            values = {}
+        task = values.get("task", [""])[0].strip()
+        headed = values.get("headed", [""])[0] == "on"
+        if not task:
+            error = "Enter a task before starting the Browser Use agent."
+        elif len(task) > _MAX_TASK_LENGTH:
+            error = f"Keep the task under {_MAX_TASK_LENGTH} characters."
+        else:
+            error = None
+
+        server = self.server
+        launcher_lock = getattr(server, "_launcher_lock", None)
+        if error is None and launcher_lock is not None:
+            with launcher_lock:
+                current = getattr(server, "_launcher_process", None)
+                if current is not None and current.poll() is None:
+                    error = "A Browser Use task is already running."
+                else:
+                    location, _ = _discover_state(self._control_root)
+                    if (
+                        location is not None
+                        and location.state.status is RunStateStatus.TRACKING
+                    ):
+                        error = "An observed task is already tracking."
+                    else:
+                        error = None
+                if error is None:
+                    try:
+                        command = [
+                            sys.executable,
+                            "-c",
+                            (
+                                "from agent_devtools.cli import main; "
+                                "raise SystemExit(main())"
+                            ),
+                            "--task",
+                            task,
+                        ]
+                        if self._config_path is not None:
+                            command.extend(
+                                ["--config", str(self._config_path)]
+                            )
+                        if headed:
+                            command.append("--headed")
+                        process = subprocess.Popen(
+                            command,
+                            cwd=str(Path.cwd()),
+                            stdin=subprocess.DEVNULL,
+                            shell=False,
+                        )
+                    except OSError as launch_error:
+                        error = (
+                            "Could not start the Browser Use process "
+                            f"({type(launch_error).__name__})."
+                        )
+                    else:
+                        setattr(server, "_launcher_process", process)
+
+        if error is not None:
+            self._send_html(
+                render_start_page(
+                    self._control_root,
+                    config_path=self._config_path,
+                    error=error,
+                ),
+                status=409 if "already" in error else 400,
+            )
+            return
+
+        self.send_response(303)
+        self.send_header("Location", "/")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _send_html(self, content: str, *, status: int = 200) -> None:
         body = content.encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -576,6 +726,103 @@ def render_setup_page(
 """
 
 
+def render_start_page(
+    root: str | Path,
+    *,
+    config_path: str | Path | None = None,
+    enabled: bool = True,
+    error: str | None = None,
+) -> str:
+    """Render the local-only Browser Use task launcher."""
+
+    output_root = _ensure_root(root)
+    config_file = Path(config_path or "agent_devtools.toml").expanduser()
+    error_html = (
+        f'<div class="error" role="alert">{escape(error)}</div>'
+        if error
+        else ""
+    )
+    if enabled:
+        form = """
+    <form method="post" action="/run">
+      <label for="task">Task</label>
+      <textarea id="task" name="task" maxlength="2000" required
+        placeholder="Example: Open example.com and confirm the page is open."></textarea>
+      <label class="checkbox"><input type="checkbox" name="headed">
+        Show the browser window while it runs</label>
+      <button type="submit">Start Browser Use task</button>
+    </form>
+    """
+    else:
+        form = """
+    <div class="disabled">
+      Task launch is disabled because this control center was not bound to a
+      loopback address. Restart it with the default local host to enable it.
+    </div>
+    """
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent DevTools start task</title>
+  <style>
+    :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
+      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; background: #f3f6fb; color: #172033; }}
+    main {{ width: min(760px, calc(100% - 32px)); margin: 48px auto 72px; }}
+    .panel {{ background: #fff; border: 1px solid #dce5f0; border-radius: 18px;
+      box-shadow: 0 16px 38px rgba(31, 50, 81, .08); padding: 28px;
+      margin-bottom: 18px; }}
+    .eyebrow {{ color: #42658f; font-size: .75rem; font-weight: 800;
+      letter-spacing: .09em; text-transform: uppercase; }}
+    h1 {{ margin: 8px 0; font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -.04em; }}
+    p {{ line-height: 1.55; }}
+    .muted {{ color: #64748b; }}
+    label {{ display: block; font-weight: 750; margin: 22px 0 8px; }}
+    textarea {{ border: 1px solid #cbd5e1; border-radius: 10px; display: block;
+      font: inherit; min-height: 130px; padding: 12px; resize: vertical;
+      width: 100%; }}
+    textarea:focus {{ border-color: #1459b8; outline: 3px solid #dbeafe; }}
+    .checkbox {{ align-items: center; display: flex; font-weight: 500; gap: 9px; }}
+    .checkbox input {{ height: 16px; width: 16px; }}
+    button {{ background: #1459b8; border: 0; border-radius: 10px; color: #fff;
+      cursor: pointer; font: inherit; font-weight: 800; margin-top: 22px;
+      padding: 11px 16px; }}
+    .notice, .disabled, .error {{ border-radius: 10px; line-height: 1.5;
+      margin-top: 18px; padding: 12px 14px; }}
+    .notice {{ background: #f8fafc; color: #53627a; }}
+    .disabled, .error {{ background: #fee2e2; color: #991b1b; }}
+    .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
+  </style>
+</head>
+<body>
+<main>
+  <section class="panel">
+    <div class="eyebrow">Agent DevTools · local control center</div>
+    <h1>Start a task</h1>
+    <p class="muted">Run the existing Browser Use CLI once. The agent's normal
+    trace and HTML report will appear in the configured trace directory.</p>
+    {error_html}
+    {form}
+    <div class="notice">This page accepts a task description only. It never
+    executes a command supplied by the form. Provider keys stay in environment
+    variables, and the process runs locally with the config from
+    <code>{escape(_path_label(config_file))}</code>.</div>
+  </section>
+  <section class="panel">
+    <a class="back" href="/">← Back to run status</a>
+    <p class="muted">When the task finishes, use the dashboard's latest report
+    link. A task can be started only while this server is bound to localhost.</p>
+  </section>
+</main>
+</body>
+</html>
+"""
+
+
 def _state_details(state: RunState) -> str:
     if state.status is RunStateStatus.ERRORED:
         return state.error_type or state.issue_code or "Agent error"
@@ -780,4 +1027,9 @@ def _path_label(path: Path) -> str:
     return relative.as_posix() or "."
 
 
-__all__ = ["render_control_center", "render_setup_page", "serve_control_center"]
+__all__ = [
+    "render_control_center",
+    "render_setup_page",
+    "render_start_page",
+    "serve_control_center",
+]

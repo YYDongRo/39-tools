@@ -97,6 +97,12 @@ of guessing that the task failed. The page also shows the last recorded action
 type without exposing its arguments, and lists the five most recent completed
 runs so you can open an older report without leaving the app.
 
+The same page has **Start a task**. Enter the task in the form and optionally
+show the browser window; it launches the existing Browser Use CLI locally and
+returns to the status page while the normal trace and report are created. It
+does not run arbitrary shell commands, and it is enabled only when the
+dashboard is bound to `127.0.0.1` (the default).
+
 Use **Setup & health** in the control center to check the local configuration,
 recording switch, provider-key presence, browser choice, trace directory,
 screenshots, and redaction. It never shows secret values. Use
