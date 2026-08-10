@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
 
 
 RUN_STATE_SCHEMA_VERSION = 1
@@ -104,6 +105,128 @@ class RunState:
                 )
         elif self.error_type is not None:
             raise ValueError("error_type is only valid for errored state")
+
+
+class _RunStateReporter:
+    """Best-effort state updates shared by the recording integrations."""
+
+    def __init__(
+        self,
+        state_path: str | Path | None,
+        output_dir: str | Path,
+        task: str | None,
+        *,
+        started_at: datetime | None = None,
+    ) -> None:
+        self._state_path = Path(state_path) if state_path is not None else None
+        self._output_dir = Path(output_dir)
+        self._report_path = self._output_dir / "report.html"
+        self._run_id = self._output_dir.name or f"run-{uuid4().hex[:8]}"
+        self._task = task
+        self._started_at = started_at or datetime.now(UTC)
+        self._report_relative_path = self._relative_report_path()
+        self.publish(RunStateStatus.TRACKING, action_count=0)
+
+    def publish(
+        self,
+        status: RunStateStatus,
+        *,
+        action_count: int,
+        issue_code: str | None = None,
+        error_type: str | None = None,
+    ) -> None:
+        if self._state_path is None:
+            return
+        state = RunState(
+            status=status,
+            updated_at=datetime.now(UTC),
+            run_id=self._run_id,
+            task=self._task,
+            started_at=self._started_at,
+            action_count=action_count,
+            report_path=(
+                self._report_relative_path
+                if status is not RunStateStatus.TRACKING
+                else None
+            ),
+            issue_code=issue_code,
+            error_type=error_type,
+        )
+        try:
+            write_run_state(state, self._state_path)
+        except Exception:
+            # Run-state reporting is auxiliary and must not change agent
+            # behavior when its local file cannot be written.
+            return
+
+    def finish(
+        self,
+        session: object,
+        *,
+        exception: BaseException | None = None,
+        error_type: str | None = None,
+        issue_code: str | None = None,
+    ) -> None:
+        action_count = len(getattr(session, "actions", ()))
+        session_issue_code = _session_issue_code(session)
+        if exception is not None or error_type is not None:
+            self.publish(
+                RunStateStatus.ERRORED,
+                action_count=action_count,
+                issue_code=issue_code or session_issue_code,
+                error_type=error_type or type(exception).__name__,
+            )
+            return
+
+        verification = getattr(session, "verification", None)
+        if verification is None:
+            self.publish(
+                RunStateStatus.UNVERIFIED,
+                action_count=action_count,
+                issue_code=issue_code or session_issue_code,
+            )
+            return
+
+        status = (
+            RunStateStatus.PASSED
+            if verification.passed
+            else RunStateStatus.FAILED
+        )
+        self.publish(
+            status,
+            action_count=action_count,
+            issue_code=issue_code or session_issue_code,
+        )
+
+    def update_action_count(self, action_count: int) -> None:
+        self.publish(RunStateStatus.TRACKING, action_count=action_count)
+
+    def _relative_report_path(self) -> Path | None:
+        if self._state_path is None:
+            return None
+        try:
+            report = self._report_path.resolve()
+            state_root = self._state_path.parent.resolve()
+            relative = report.relative_to(state_root)
+        except (OSError, ValueError):
+            return None
+        try:
+            return _relative_path_from_value(
+                relative.as_posix(),
+                "report_path",
+            )
+        except ValueError:
+            return None
+
+
+def _session_issue_code(session: object) -> str | None:
+    value = getattr(session, "issue_code", None)
+    if isinstance(value, str) and value.strip():
+        return value
+    verification = getattr(session, "verification", None)
+    category = getattr(verification, "failure_category", None)
+    value = getattr(category, "value", None)
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def run_state_to_dict(state: RunState) -> dict[str, object]:

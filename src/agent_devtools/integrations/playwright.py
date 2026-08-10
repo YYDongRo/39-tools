@@ -142,6 +142,7 @@ def record_playwright_tools(
     capture_browser_events: bool = True,
     event_settle_ms: int = 100,
     max_browser_events: int = 20,
+    run_state_path: str | Path | None = None,
 ) -> RecordedTools[PlaywrightToolT]:
     if not isinstance(full_page_screenshots, bool):
         raise TypeError("full_page_screenshots must be a boolean")
@@ -176,6 +177,7 @@ def record_playwright_tools(
         task_verification=task_verification,
         methods=methods,
         event_collector=event_collector,
+        run_state_path=run_state_path,
     )
 
 
@@ -198,6 +200,7 @@ def record_async_playwright_tools(
     capture_browser_events: bool = True,
     event_settle_ms: int = 100,
     max_browser_events: int = 20,
+    run_state_path: str | Path | None = None,
 ) -> RecordedAsyncTools[PlaywrightToolT]:
     if not isinstance(full_page_screenshots, bool):
         raise TypeError("full_page_screenshots must be a boolean")
@@ -240,6 +243,7 @@ def record_async_playwright_tools(
         task_verification=task_verification,
         methods=methods,
         event_collector=event_collector,
+        run_state_path=run_state_path,
     )
 
 

@@ -11,8 +11,10 @@ from agent_devtools import (
     ActionStatus,
     AgentDevToolsConfig,
     read_session_json,
+    read_run_state,
 )
 from agent_devtools.browser_use import observe_browser_use_agent
+from agent_devtools.run_state import RunStateStatus
 
 
 PNG = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"test-image").decode()
@@ -197,6 +199,11 @@ def test_observer_records_navigation_with_one_setup_call(
             "hostname"
         )
         assert session.outcome is ActionOutcome.SUCCESS
+        state = read_run_state(tmp_path / "run-state.json")
+        assert state.status is RunStateStatus.PASSED
+        assert state.action_count == 1
+        assert state.report_path is not None
+        assert state.report_path.name == "report.html"
 
     asyncio.run(run())
 

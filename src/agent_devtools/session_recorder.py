@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -8,6 +9,7 @@ from agent_devtools.recorder import record_action
 from agent_devtools.report import write_session_html
 from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.serialization import read_session_json, write_session_json
+from agent_devtools.run_state import _RunStateReporter
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
 
@@ -21,6 +23,7 @@ class SessionRecorder:
         goal: str | None = None,
         task_verification: Callable[[], VerificationResult] | None = None,
         run_context: RuntimeContext | None = None,
+        run_state_path: str | Path | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.capture_screenshot = capture_screenshot
@@ -33,6 +36,7 @@ class SessionRecorder:
             ),
         )
         self.task_verification = task_verification
+        self._run_state = None
 
         if task_verification is not None and goal is None:
             raise ValueError("automatic task verification requires a goal")
@@ -42,6 +46,13 @@ class SessionRecorder:
                 f"session output directory is not empty: {self.output_dir}"
             )
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        if run_state_path is not None:
+            self._run_state = _RunStateReporter(
+                run_state_path,
+                self.output_dir,
+                goal,
+                started_at=datetime.now(UTC),
+            )
 
     @classmethod
     def resume(
@@ -50,6 +61,7 @@ class SessionRecorder:
         capture_screenshot: Callable[[Path], None] | None = None,
         *,
         task_verification: Callable[[], VerificationResult] | None = None,
+        run_state_path: str | Path | None = None,
     ) -> Self:
         session = read_session_json(output_dir / "session.json")
         if task_verification is not None and session.goal is None:
@@ -59,6 +71,20 @@ class SessionRecorder:
         recorder.capture_screenshot = capture_screenshot
         recorder.session = session
         recorder.task_verification = task_verification
+        recorder._run_state = (
+            _RunStateReporter(
+                run_state_path,
+                output_dir,
+                session.goal,
+                started_at=(
+                    session.actions[0].start_time
+                    if session.actions
+                    else datetime.now(UTC)
+                ),
+            )
+            if run_state_path is not None
+            else None
+        )
         return recorder
 
     def __enter__(self) -> Self:
@@ -70,13 +96,27 @@ class SessionRecorder:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self._persist()
-        if (
-            exception_type is None
-            and self.task_verification is not None
-            and self.session.verification is None
-        ):
-            self.verify_task(self.task_verification)
+        try:
+            self._persist()
+            if (
+                exception_type is None
+                and self.task_verification is not None
+                and self.session.verification is None
+            ):
+                self.verify_task(self.task_verification)
+        except BaseException as error:
+            if self._run_state is not None:
+                self._run_state.finish(self.session, exception=error)
+            raise
+        else:
+            if self._run_state is not None:
+                if exception_type is None:
+                    self._run_state.finish(self.session)
+                else:
+                    self._run_state.finish(
+                        self.session,
+                        error_type=exception_type.__name__,
+                    )
 
     def record(
         self,
@@ -153,3 +193,5 @@ class SessionRecorder:
     def _persist(self) -> None:
         write_session_json(self.session, self.output_dir / "session.json")
         write_session_html(self.session, self.output_dir / "report.html")
+        if self._run_state is not None:
+            self._run_state.update_action_count(self.session.action_count)

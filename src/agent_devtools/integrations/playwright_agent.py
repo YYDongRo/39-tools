@@ -135,6 +135,7 @@ class ObservedPlaywrightAgent(Generic[AgentT, ToolT]):
                 capture_browser_events=self.capture_browser_events,
                 event_settle_ms=self.event_settle_ms,
                 max_browser_events=self.max_browser_events,
+                run_state_path=self.output_root / "run-state.json",
             )
             _store_generation_metadata(trace.session, generated_expectation)
             self.last_trace = trace
@@ -265,6 +266,7 @@ class ObservedAsyncPlaywrightAgent(Generic[AgentT, ToolT]):
                 capture_browser_events=self.capture_browser_events,
                 event_settle_ms=self.event_settle_ms,
                 max_browser_events=self.max_browser_events,
+                run_state_path=self.output_root / "run-state.json",
             )
             _store_generation_metadata(trace.session, generated_expectation)
             self.last_trace = trace

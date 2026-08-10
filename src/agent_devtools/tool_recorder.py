@@ -30,6 +30,7 @@ class RecordedTools(Generic[ToolT]):
         task_verification: Callable[[], VerificationResult] | None = None,
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
+        run_state_path: str | Path | None = None,
     ) -> None:
         if observe_state is not None and not callable(observe_state):
             raise TypeError("observe_state must be callable or None")
@@ -44,6 +45,7 @@ class RecordedTools(Generic[ToolT]):
             capture_screenshot,
             goal=goal,
             task_verification=task_verification,
+            run_state_path=run_state_path,
         )
 
     @property
@@ -206,6 +208,7 @@ def record_tools(
     task_verification: Callable[[], VerificationResult] | None = None,
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
+    run_state_path: str | Path | None = None,
 ) -> RecordedTools[ToolT]:
     return RecordedTools(
         tools,
@@ -216,6 +219,7 @@ def record_tools(
         task_verification=task_verification,
         methods=methods,
         event_collector=event_collector,
+        run_state_path=run_state_path,
     )
 
 

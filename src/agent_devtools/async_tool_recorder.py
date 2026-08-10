@@ -15,6 +15,7 @@ from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import FailureCategory, classify_exception
 from agent_devtools.report import write_session_html
 from agent_devtools.runtime import RuntimeContext, collect_runtime_context
+from agent_devtools.run_state import _RunStateReporter
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.tool_recorder import (
@@ -59,6 +60,7 @@ class RecordedAsyncTools(Generic[ToolT]):
         methods: Iterable[str] | None = None,
         event_collector: ActionEventCollector | None = None,
         run_context: RuntimeContext | None = None,
+        run_state_path: str | Path | None = None,
     ) -> None:
         if observe_state is not None and not callable(observe_state):
             raise TypeError("observe_state must be callable or None")
@@ -93,6 +95,16 @@ class RecordedAsyncTools(Generic[ToolT]):
                 f"session output directory is not empty: {self.output_dir}"
             )
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._run_state = (
+            _RunStateReporter(
+                run_state_path,
+                self.output_dir,
+                goal,
+                started_at=datetime.now(UTC),
+            )
+            if run_state_path is not None
+            else None
+        )
 
     @property
     def report_path(self) -> Path:
@@ -125,13 +137,27 @@ class RecordedAsyncTools(Generic[ToolT]):
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self._persist()
-        if (
-            exception_type is None
-            and self._task_verification is not None
-            and self.session.verification is None
-        ):
-            await self.verify_task(self._task_verification)
+        try:
+            self._persist()
+            if (
+                exception_type is None
+                and self._task_verification is not None
+                and self.session.verification is None
+            ):
+                await self.verify_task(self._task_verification)
+        except BaseException as error:
+            if self._run_state is not None:
+                self._run_state.finish(self.session, exception=error)
+            raise
+        else:
+            if self._run_state is not None:
+                if exception_type is None:
+                    self._run_state.finish(self.session)
+                else:
+                    self._run_state.finish(
+                        self.session,
+                        error_type=exception_type.__name__,
+                    )
 
     async def verify_task(
         self,
@@ -335,6 +361,8 @@ class RecordedAsyncTools(Generic[ToolT]):
     def _persist(self) -> None:
         write_session_json(self.session, self.output_dir / "session.json")
         write_session_html(self.session, self.output_dir / "report.html")
+        if self._run_state is not None:
+            self._run_state.update_action_count(self.session.action_count)
 
 
 class _AsyncToolProxy:
@@ -370,6 +398,7 @@ def record_async_tools(
     methods: Iterable[str] | None = None,
     event_collector: ActionEventCollector | None = None,
     run_context: RuntimeContext | None = None,
+    run_state_path: str | Path | None = None,
 ) -> RecordedAsyncTools[ToolT]:
     return RecordedAsyncTools(
         tools,
@@ -381,6 +410,7 @@ def record_async_tools(
         methods=methods,
         event_collector=event_collector,
         run_context=run_context,
+        run_state_path=run_state_path,
     )
 
 

@@ -123,6 +123,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
                 task_verification=self.task_verification,
                 methods=self.methods,
                 event_collector=self.event_collector,
+                run_state_path=self.output_root / "run-state.json",
             )
             self.last_trace = trace
             with trace as recorded_tools:
@@ -256,6 +257,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
                 task_verification=self.task_verification,
                 methods=self.methods,
                 event_collector=self.event_collector,
+                run_state_path=self.output_root / "run-state.json",
             )
             self.last_trace = trace
             async with trace as recorded_tools:

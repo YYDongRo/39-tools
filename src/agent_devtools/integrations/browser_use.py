@@ -20,6 +20,7 @@ from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
 from agent_devtools.report_opening import open_local_report
 from agent_devtools.runtime import collect_runtime_context
+from agent_devtools.run_state import _RunStateReporter
 from agent_devtools.serialization import write_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.verification import VerificationResult
@@ -180,6 +181,7 @@ class _BrowserUseRecorder:
         *,
         capture_screenshots: bool = True,
         redact_sensitive_data: bool = True,
+        run_state_path: str | Path | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=False)
@@ -193,6 +195,12 @@ class _BrowserUseRecorder:
         self._pending_auxiliary_index: int | None = None
         self._browser_session: object | None = None
         self._last_state: dict[str, object] | None = None
+        self._run_state = _RunStateReporter(
+            run_state_path,
+            self.output_dir,
+            goal,
+            started_at=datetime.now(UTC),
+        )
         self._persist()
 
     @property
@@ -411,6 +419,7 @@ class _BrowserUseRecorder:
                 runtime_name="Browser Use agent",
             )
             self._persist()
+            self._run_state.finish(self.session, exception=run_error)
             return
 
         if deterministic_error_type is not None:
@@ -422,6 +431,11 @@ class _BrowserUseRecorder:
             )
             self.session.verification = None
             self._persist()
+            self._run_state.finish(
+                self.session,
+                error_type=deterministic_error_type,
+                issue_code="final_check_error",
+            )
             return
 
         judgement = _judgement(
@@ -457,6 +471,7 @@ class _BrowserUseRecorder:
                 failure_category=deterministic_verification.failure_category,
             )
             self._persist()
+            self._run_state.finish(self.session)
             return
 
         if judgement is None:
@@ -470,6 +485,7 @@ class _BrowserUseRecorder:
                 issue_code.value if issue_code is not None else None
             )
             self._persist()
+            self._run_state.finish(self.session)
             return
 
         if judge_verification is None:
@@ -479,12 +495,14 @@ class _BrowserUseRecorder:
             )
             self.session.issue_code = None
             self._persist()
+            self._run_state.finish(self.session)
             return
         self.session.verification_source = "browser-use:judge"
         self.session.verification_note = None
         self.session.issue_code = None
         self.session.verification = judge_verification
         self._persist()
+        self._run_state.finish(self.session)
 
     async def _capture_screenshot(self, browser_state: object) -> object:
         encoded = getattr(browser_state, "screenshot", None)
@@ -511,6 +529,7 @@ class _BrowserUseRecorder:
     def _persist(self) -> None:
         write_session_json(self.session, self.output_dir / "session.json")
         write_session_html(self.session, self.report_path)
+        self._run_state.update_action_count(self.session.action_count)
 
 
 class ObservedBrowserUseAgent(Generic[AgentT]):
@@ -707,6 +726,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
             self.goal,
             capture_screenshots=self.config.screenshots,
             redact_sensitive_data=self.config.redact_sensitive_data,
+            run_state_path=self.output_root / "run-state.json",
         )
         trace.attach_browser_session(self.agent.browser_session)  # type: ignore[attr-defined]
         self.last_trace = trace

@@ -7,9 +7,11 @@ from agent_devtools import (
     FinalStateObservation,
     TrajectoryVerificationResult,
     VerificationResult,
+    read_run_state,
     observe_agent,
     observe_async_agent,
 )
+from agent_devtools.run_state import RunStateStatus
 
 
 class Tools:
@@ -135,6 +137,41 @@ def test_observed_agent_reads_task_once_and_records_tool_actions(
     assert observed.last_report_path.is_file()
 
 
+def test_observed_agent_publishes_tracking_and_final_state(
+    tmp_path: Path,
+) -> None:
+    trace_root = tmp_path / "trace"
+    state_path = trace_root / "run-state.json"
+
+    class StatusReadingAgent:
+        task = "Click the target"
+
+        def run(self, user_request: str, *, tools: Tools) -> str:
+            tracking = read_run_state(state_path)
+            assert tracking.status is RunStateStatus.TRACKING
+            assert tracking.action_count == 0
+            return tools.click("#target")
+
+    observed = observe_agent(
+        StatusReadingAgent(),
+        Tools(),
+        trace_root,
+        task_verification=lambda: VerificationResult(
+            expected_state="target clicked",
+            observed_state="target clicked",
+            passed=True,
+        ),
+    )
+
+    assert observed.run() == "clicked"
+
+    final_state = read_run_state(state_path)
+    assert final_state.status is RunStateStatus.PASSED
+    assert final_state.action_count == 1
+    assert final_state.report_path is not None
+    assert final_state.report_path.name == "report.html"
+
+
 def test_observed_agent_binds_and_restores_internal_tools(
     tmp_path: Path,
 ) -> None:
@@ -172,6 +209,10 @@ def test_observed_agent_records_sanitized_agent_run_failure(
     assert "Agent run failed" in report_text
     assert "Agent run failure" in report_text
     assert "secret-agent-detail" not in report_text
+    state = read_run_state(tmp_path / "trace" / "run-state.json")
+    assert state.status is RunStateStatus.ERRORED
+    assert state.error_type == "RuntimeError"
+    assert state.action_count == 1
 
 
 def test_observed_agent_accepts_explicit_task_for_agent_without_task(
@@ -216,6 +257,9 @@ def test_observed_async_agent_reads_task_and_records_async_actions(
         assert observed.last_trace.session.actions[0].action_type == "click"
         assert observed.last_report_path is not None
         assert observed.last_report_path.is_file()
+        state = read_run_state(tmp_path / "trace" / "run-state.json")
+        assert state.status is RunStateStatus.UNVERIFIED
+        assert state.action_count == 1
 
     asyncio.run(run())
 
@@ -266,6 +310,9 @@ def test_observed_async_agent_records_sanitized_agent_run_failure(
         report_text = report.read_text(encoding="utf-8")
         assert "Agent run failed" in report_text
         assert "secret-async-agent-detail" not in report_text
+        state = read_run_state(tmp_path / "trace" / "run-state.json")
+        assert state.status is RunStateStatus.ERRORED
+        assert state.error_type == "RuntimeError"
 
     asyncio.run(run())
 
