@@ -94,7 +94,8 @@ browser tab. Use `--root PATH` for another trace workspace. It does not run the
 agent or upload your trace; stop it with `Ctrl+C`. If a tracking run has no
 update for two minutes, the page shows a possible interruption warning instead
 of guessing that the task failed. The page also shows the last recorded action
-type without exposing its arguments.
+type without exposing its arguments, and lists the five most recent completed
+runs so you can open an older report without leaving the app.
 
 To make one portable local diagnostic archive, add `--export-bundle`:
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from agent_devtools.run_index import write_run_index
+from agent_devtools.run_index import _discover_entries, write_run_index
 from agent_devtools.run_state import RunState, RunStateStatus, read_run_state
 
 
@@ -25,6 +25,13 @@ _STATUS_LABELS = {
     RunStateStatus.ERRORED: "Errored",
 }
 _STALE_RUN_AFTER = timedelta(minutes=2)
+_RECENT_RUN_LIMIT = 5
+_INDEX_STATUS_LABELS = {
+    "passed": "Passed",
+    "failed": "Failed",
+    "unverified": "Unverified",
+    "attention": "Needs attention",
+}
 
 
 @dataclass(frozen=True)
@@ -94,11 +101,11 @@ def render_control_center(
         if report_href is not None
         else '<span class="muted">No completed report yet</span>'
     )
-    index_link = (
-        f'<a class="button secondary" href="{escape(index_href, quote=True)}" '
-        'target="_blank" rel="noopener noreferrer">'
-        "Open report index ↗</a>"
+    recent_runs = _render_recent_runs(
+        output_root,
+        state_root if state_root is not None else output_root,
     )
+    index_link = _external_link(index_href, "Open report index ↗", "secondary")
     status_class = escape(
         f"{status_value.value}{' stale' if is_stale else ''}",
         quote=True,
@@ -151,7 +158,23 @@ def render_control_center(
     .secondary {{ border: 1px solid #cbd5e1; color: #1459b8; }}
     .notice {{ background: #f8fafc; border-radius: 10px; color: #53627a;
       font-size: .9rem; margin-top: 18px; padding: 11px 13px; }}
+    .section-heading {{ align-items: center; display: flex; flex-wrap: wrap;
+      gap: 12px; justify-content: space-between; }}
+    .section-heading h2 {{ margin-bottom: 0; }}
+    .history {{ display: grid; gap: 10px; }}
+    .history-row {{ align-items: center; border: 1px solid #e2e8f0;
+      border-radius: 12px; display: grid; gap: 12px;
+      grid-template-columns: minmax(0, 1fr) auto auto; padding: 13px 14px; }}
+    .history-task {{ font-weight: 750; overflow-wrap: anywhere; }}
+    .history-meta, .history-detail {{ color: #64748b; font-size: .82rem;
+      line-height: 1.4; margin-top: 4px; }}
+    .history-detail {{ color: #53627a; }}
+    .history-link {{ color: #1459b8; font-size: .88rem; font-weight: 750;
+      white-space: nowrap; }}
+    .attention {{ background: #fee2e2; color: #991b1b; }}
     @media (max-width: 650px) {{ dl {{ grid-template-columns: 1fr 1fr; }} }}
+    @media (max-width: 650px) {{ .history-row {{ grid-template-columns: 1fr auto; }}
+      .history-link {{ grid-column: 1 / -1; }} }}
     @media (max-width: 430px) {{ dl {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -177,10 +200,16 @@ def render_control_center(
     </dl>
     <div class="actions">
       {report_link}
-      {index_link}
     </div>
     <div class="notice">{escape(index_note)} Full reports open in a separate
     browser tab; this status page stays available for monitoring.</div>
+  </section>
+  <section class="panel">
+    <div class="section-heading">
+      <h2>Recent runs</h2>
+      {index_link}
+    </div>
+    {recent_runs}
   </section>
   <section class="panel">
     <h2>What this means</h2>
@@ -355,6 +384,81 @@ def _index_href(root: Path, state_root: Path | None) -> str:
         return (state_root.relative_to(root) / "index.html").as_posix()
     except ValueError:
         return "index.html"
+
+
+def _external_link(href: str, label: str, style: str) -> str:
+    return (
+        f'<a class="button {escape(style, quote=True)}" '
+        f'href="{escape(href, quote=True)}" target="_blank" '
+        f'rel="noopener noreferrer">{escape(label)}</a>'
+    )
+
+
+def _render_recent_runs(root: Path, entries_root: Path) -> str:
+    try:
+        entries = _discover_entries(entries_root)[:_RECENT_RUN_LIMIT]
+    except (OSError, TypeError, ValueError):
+        return '<p class="muted">Run history is unavailable.</p>'
+    if not entries:
+        return '<p class="muted">No completed runs yet.</p>'
+
+    rows: list[str] = []
+    for entry in entries:
+        report_href = _history_report_href(root, entries_root, entry.report_href)
+        if report_href is None:
+            continue
+        status = entry.status
+        status_label = _INDEX_STATUS_LABELS.get(status, "Unverified")
+        status_class = escape(status, quote=True)
+        when = entry.timestamp.astimezone(UTC).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
+        action_label = (
+            f"{entry.actions} actions"
+            if entry.actions.isdigit()
+            else entry.actions
+        )
+        rows.append(
+            """
+      <div class="history-row">
+        <div>
+          <div class="history-task">{task}</div>
+          <div class="history-meta">{kind} · {when} · {actions}</div>
+          <div class="history-detail">{detail}</div>
+        </div>
+        <span class="pill {status_class}">{status_label}</span>
+        <a class="history-link" href="{href}" target="_blank"
+          rel="noopener noreferrer">Open report ↗</a>
+      </div>
+    """.format(
+                task=escape(entry.task),
+                kind=escape(entry.kind),
+                when=escape(when),
+                actions=escape(action_label),
+                detail=escape(entry.detail),
+                status_class=status_class,
+                status_label=escape(status_label),
+                href=escape(report_href, quote=True),
+            )
+        )
+    if not rows:
+        return '<p class="muted">No completed runs yet.</p>'
+    return '<div class="history">' + "".join(rows) + "</div>"
+
+
+def _history_report_href(
+    root: Path,
+    state_root: Path,
+    report_href: str,
+) -> str | None:
+    report = Path(report_href)
+    if report.is_absolute() or ".." in report.parts:
+        return None
+    try:
+        prefix = state_root.relative_to(root).as_posix()
+    except ValueError:
+        return None
+    return report.as_posix() if prefix == "." else f"{prefix}/{report.as_posix()}"
 
 
 def _state_details(state: RunState) -> str:

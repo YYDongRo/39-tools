@@ -7,12 +7,16 @@ from urllib.request import urlopen
 
 import pytest
 
+from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.control_center import _create_server, render_control_center
 from agent_devtools.run_state import (
     RunState,
     RunStateStatus,
     write_run_state,
 )
+from agent_devtools.serialization import write_session_json
+from agent_devtools.session import ActionSession
+from agent_devtools.verification import VerificationResult
 
 
 def _write_state(
@@ -127,6 +131,49 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert 'href="demo/report.html"' in control_center
     assert 'target="_blank" rel="noopener noreferrer"' in control_center
     assert report_html == "<html>local report</html>"
+
+
+def test_control_center_lists_recent_runs(tmp_path: Path) -> None:
+    run_dir = tmp_path / "20260809T120000Z-history"
+    run_dir.mkdir()
+    session = ActionSession(
+        goal="Find the requested item",
+        actions=[
+            ActionRecord(
+                action_type="click",
+                arguments={"selector": "#item"},
+                start_time=datetime(2026, 8, 9, 12, tzinfo=UTC),
+                duration_ms=42,
+                status=ActionStatus.SUCCESS,
+            )
+        ],
+        verification=VerificationResult(
+            expected_state="the requested item is open",
+            observed_state="the requested item is open",
+            passed=True,
+        ),
+    )
+    write_session_json(session, run_dir / "session.json")
+    (run_dir / "report.html").write_text(
+        "<html>history report</html>",
+        encoding="utf-8",
+    )
+    _write_state(
+        tmp_path,
+        RunStateStatus.PASSED,
+        action_count=1,
+        last_action_type="click",
+        report_path=Path("20260809T120000Z-history") / "report.html",
+    )
+
+    html = render_control_center(tmp_path)
+
+    assert "Recent runs" in html
+    assert "Find the requested item" in html
+    assert "Task run" in html
+    assert "Passed" in html
+    assert 'href="20260809T120000Z-history/report.html"' in html
+    assert "Open report ↗" in html
 
 
 def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> None:

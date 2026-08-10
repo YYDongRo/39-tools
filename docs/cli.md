@@ -229,7 +229,8 @@ binds to `127.0.0.1` by default, serves only the selected trace workspace, and
 stops with `Ctrl+C`. Use `--root PATH` for a different workspace. A tracking
 state with no update for two minutes is shown as a possible interruption; it is
 not silently converted into a failure. The last action type is shown without
-action arguments or typed values.
+action arguments or typed values. The control center also lists the five most
+recent completed runs so you can open an older report without leaving the app.
 
 ### Export a diagnostic bundle
 
