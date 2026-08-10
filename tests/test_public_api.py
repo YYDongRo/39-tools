@@ -116,6 +116,13 @@ from agent_devtools.integrations.playwright_task import (
 from agent_devtools.replay import ReplayResult, replay_click, replay_fill
 from agent_devtools.runtime import RuntimeContext, collect_runtime_context
 from agent_devtools.run_index import write_run_index
+from agent_devtools.run_state import (
+    RUN_STATE_SCHEMA_VERSION,
+    RunState,
+    RunStateStatus,
+    read_run_state,
+    write_run_state,
+)
 from agent_devtools.serialization import read_action_json, read_session_json
 from agent_devtools.session import ActionSession
 from agent_devtools.session_recorder import SessionRecorder
@@ -151,6 +158,9 @@ def test_core_public_api_exports_supported_types() -> None:
         "RecordedTools": RecordedTools,
         "ReplayResult": ReplayResult,
         "RuntimeContext": RuntimeContext,
+        "RunState": RunState,
+        "RunStateStatus": RunStateStatus,
+        "RUN_STATE_SCHEMA_VERSION": RUN_STATE_SCHEMA_VERSION,
         "SessionRecorder": SessionRecorder,
         "TrajectoryFinding": TrajectoryFinding,
         "TrajectoryVerificationResult": TrajectoryVerificationResult,
@@ -167,6 +177,8 @@ def test_core_public_api_exports_supported_types() -> None:
         "export_diagnostic_bundle": export_diagnostic_bundle,
         "next_bundle_path": next_bundle_path,
         "write_run_index": write_run_index,
+        "read_run_state": read_run_state,
+        "write_run_state": write_run_state,
         "read_action_json": read_action_json,
         "read_session_json": read_session_json,
         "observe_agent": observe_agent,
