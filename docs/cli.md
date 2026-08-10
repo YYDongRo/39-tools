@@ -225,7 +225,8 @@ It reads the newest `run-state.json` below `trace/` and refreshes while the
 status is `tracking`. When the run finishes, use **Open latest report** or
 **All reports**. The server binds to `127.0.0.1` by default, serves only the
 selected trace workspace, and stops with `Ctrl+C`. Use `--root PATH` for a
-different workspace.
+different workspace. A tracking state with no update for two minutes is shown
+as a possible interruption; it is not silently converted into a failure.
 
 ### Export a diagnostic bundle
 

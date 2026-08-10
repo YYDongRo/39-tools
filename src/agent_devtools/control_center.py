@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import webbrowser
+from datetime import UTC, datetime, timedelta
 from dataclasses import dataclass
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
-from datetime import UTC, datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -24,6 +24,7 @@ _STATUS_LABELS = {
     RunStateStatus.UNVERIFIED: "Unverified",
     RunStateStatus.ERRORED: "Errored",
 }
+_STALE_RUN_AFTER = timedelta(minutes=2)
 
 
 @dataclass(frozen=True)
@@ -32,10 +33,17 @@ class _StateLocation:
     state: RunState
 
 
-def render_control_center(root: str | Path) -> str:
+def render_control_center(
+    root: str | Path,
+    *,
+    now: datetime | None = None,
+) -> str:
     """Render the current local run state as a dependency-free HTML page."""
 
     output_root = _ensure_root(root)
+    current_time = now or datetime.now(UTC)
+    if current_time.tzinfo is None or current_time.utcoffset() is None:
+        raise ValueError("now must be timezone-aware")
     location, state_error = _discover_state(output_root)
     state = location.state if location is not None else None
     state_root = location.root if location is not None else None
@@ -54,6 +62,7 @@ def render_control_center(root: str | Path) -> str:
         updated_at = "—"
         details = state_error or "No run-state.json has been created yet."
         trace_source = "—"
+        is_stale = False
         refresh = ""
     else:
         status_value = state.status
@@ -63,6 +72,13 @@ def render_control_center(root: str | Path) -> str:
         updated_at = _format_timestamp(state.updated_at)
         details = _state_details(state)
         trace_source = _relative_source(output_root, state_root)
+        is_stale = _is_stale(state, current_time)
+        if is_stale:
+            status_label = "Tracking · possibly interrupted"
+            details = (
+                f"No update for {_format_age(current_time - state.updated_at)}; "
+                "the process may have stopped"
+            )
         refresh = '<meta http-equiv="refresh" content="2">' if (
             state.status is RunStateStatus.TRACKING
         ) else ""
@@ -75,7 +91,10 @@ def render_control_center(root: str | Path) -> str:
         if report_href is not None
         else '<span class="muted">No completed report yet</span>'
     )
-    status_class = escape(status_value.value, quote=True)
+    status_class = escape(
+        f"{status_value.value}{' stale' if is_stale else ''}",
+        quote=True,
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -104,6 +123,7 @@ def render_control_center(root: str | Path) -> str:
     .pill {{ border-radius: 999px; display: inline-block; font-size: .85rem;
       font-weight: 800; padding: 7px 11px; }}
     .tracking {{ background: #dbeafe; color: #1d4ed8; }}
+    .stale {{ background: #fef3c7; color: #92400e; }}
     .passed {{ background: #dcfce7; color: #166534; }}
     .failed, .errored {{ background: #fee2e2; color: #991b1b; }}
     .unverified, .not_configured, .ready {{ background: #fef3c7; color: #92400e; }}
@@ -157,7 +177,8 @@ def render_control_center(root: str | Path) -> str:
     <p class="muted">Tracking means the observer is active. Passed or failed is
     the final task result, not merely whether an individual action ran.</p>
     <p class="muted">The page refreshes every two seconds while a run is
-    tracking. Stop the server with Ctrl+C.</p>
+    tracking. If no update arrives for two minutes, it shows a warning instead
+    of guessing that the task failed. Stop the server with Ctrl+C.</p>
   </section>
 </main>
 </body>
@@ -340,6 +361,22 @@ def _format_timestamp(value: object) -> str:
     if not isinstance(value, datetime):
         return "—"
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _is_stale(state: RunState, now: datetime) -> bool:
+    return (
+        state.status is RunStateStatus.TRACKING
+        and now.astimezone(UTC) - state.updated_at.astimezone(UTC)
+        >= _STALE_RUN_AFTER
+    )
+
+
+def _format_age(age: timedelta) -> str:
+    seconds = max(0, int(age.total_seconds()))
+    minutes, remaining_seconds = divmod(seconds, 60)
+    if minutes:
+        return f"{minutes}m {remaining_seconds}s"
+    return f"{remaining_seconds}s"
 
 
 __all__ = ["render_control_center", "serve_control_center"]

@@ -40,14 +40,31 @@ def _write_state(
 def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) -> None:
     _write_state(tmp_path, RunStateStatus.TRACKING, action_count=3)
 
-    html = render_control_center(tmp_path)
+    html = render_control_center(
+        tmp_path,
+        now=datetime(2026, 8, 9, 12, 0, 10, tzinfo=UTC),
+    )
 
     assert "Tracking" in html
     assert "Open the requested page" in html
     assert "3" in html
     assert 'http-equiv="refresh" content="2"' in html
     assert "No completed report yet" in html
+    assert "possibly interrupted" not in html
     assert str(tmp_path.resolve()) not in html
+
+
+def test_control_center_warns_when_tracking_state_is_stale(tmp_path: Path) -> None:
+    _write_state(tmp_path, RunStateStatus.TRACKING, action_count=3)
+
+    html = render_control_center(
+        tmp_path,
+        now=datetime(2026, 8, 9, 12, 2, 5, tzinfo=UTC),
+    )
+
+    assert "Tracking · possibly interrupted" in html
+    assert "No update for 2m 3s" in html
+    assert "the process may have stopped" in html
 
 
 def test_control_center_links_latest_report_with_relative_path(
