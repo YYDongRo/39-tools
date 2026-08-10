@@ -168,6 +168,7 @@ def test_observed_agent_publishes_tracking_and_final_state(
     final_state = read_run_state(state_path)
     assert final_state.status is RunStateStatus.PASSED
     assert final_state.action_count == 1
+    assert final_state.last_action_type == "click"
     assert final_state.report_path is not None
     assert final_state.report_path.name == "report.html"
 

@@ -202,6 +202,7 @@ def test_observer_records_navigation_with_one_setup_call(
         state = read_run_state(tmp_path / "run-state.json")
         assert state.status is RunStateStatus.PASSED
         assert state.action_count == 1
+        assert state.last_action_type == "navigate"
         assert state.report_path is not None
         assert state.report_path.name == "report.html"
 

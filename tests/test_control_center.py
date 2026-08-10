@@ -18,6 +18,7 @@ def _write_state(
     status: RunStateStatus,
     *,
     action_count: int = 2,
+    last_action_type: str | None = None,
     report_path: Path | None = None,
 ) -> None:
     started_at = datetime(2026, 8, 9, 12, tzinfo=UTC)
@@ -29,6 +30,7 @@ def _write_state(
             task="Open the requested page",
             started_at=started_at,
             action_count=action_count,
+            last_action_type=last_action_type,
             report_path=report_path,
             issue_code="target_not_found" if status is RunStateStatus.FAILED else None,
             error_type="RuntimeError" if status is RunStateStatus.ERRORED else None,
@@ -38,7 +40,12 @@ def _write_state(
 
 
 def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) -> None:
-    _write_state(tmp_path, RunStateStatus.TRACKING, action_count=3)
+    _write_state(
+        tmp_path,
+        RunStateStatus.TRACKING,
+        action_count=3,
+        last_action_type="click",
+    )
 
     html = render_control_center(
         tmp_path,
@@ -48,6 +55,7 @@ def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) ->
     assert "Tracking" in html
     assert "Open the requested page" in html
     assert "3" in html
+    assert "click" in html
     assert 'http-equiv="refresh" content="2"' in html
     assert "No completed report yet" in html
     assert "possibly interrupted" not in html
@@ -55,7 +63,12 @@ def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) ->
 
 
 def test_control_center_warns_when_tracking_state_is_stale(tmp_path: Path) -> None:
-    _write_state(tmp_path, RunStateStatus.TRACKING, action_count=3)
+    _write_state(
+        tmp_path,
+        RunStateStatus.TRACKING,
+        action_count=3,
+        last_action_type="fill",
+    )
 
     html = render_control_center(
         tmp_path,

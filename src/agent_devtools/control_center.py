@@ -59,6 +59,7 @@ def render_control_center(
         status_label = "Waiting for a run"
         task = "Start an observed agent run to see its live status here."
         action_count = "—"
+        last_action_type = "—"
         updated_at = "—"
         details = state_error or "No run-state.json has been created yet."
         trace_source = "—"
@@ -69,6 +70,7 @@ def render_control_center(
         status_label = _STATUS_LABELS[state.status]
         task = state.task or "Task not provided"
         action_count = str(state.action_count)
+        last_action_type = state.last_action_type or "—"
         updated_at = _format_timestamp(state.updated_at)
         details = _state_details(state)
         trace_source = _relative_source(output_root, state_root)
@@ -162,6 +164,7 @@ def render_control_center(
     </div>
     <dl>
       <div><dt>Actions</dt><dd>{escape(action_count)}</dd></div>
+      <div><dt>Last action</dt><dd>{escape(last_action_type)}</dd></div>
       <div><dt>Last update (UTC)</dt><dd>{escape(updated_at)}</dd></div>
       <div><dt>Details</dt><dd>{escape(details)}</dd></div>
       <div><dt>Trace source</dt><dd>{escape(trace_source)}</dd></div>

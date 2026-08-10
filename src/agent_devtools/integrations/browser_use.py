@@ -529,7 +529,12 @@ class _BrowserUseRecorder:
     def _persist(self) -> None:
         write_session_json(self.session, self.output_dir / "session.json")
         write_session_html(self.session, self.report_path)
-        self._run_state.update_action_count(self.session.action_count)
+        self._run_state.update_action_count(
+            self.session.action_count,
+            self.session.actions[-1].action_type
+            if self.session.actions
+            else None,
+        )
 
 
 class ObservedBrowserUseAgent(Generic[AgentT]):

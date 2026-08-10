@@ -43,6 +43,7 @@ class RunState:
     task: str | None = None
     started_at: datetime | None = None
     action_count: int = 0
+    last_action_type: str | None = None
     report_path: Path | None = None
     issue_code: str | None = None
     error_type: str | None = None
@@ -64,6 +65,7 @@ class RunState:
 
         _validate_optional_text(self.run_id, "run_id")
         _validate_optional_text(self.task, "task")
+        _validate_optional_text(self.last_action_type, "last_action_type")
         _validate_optional_text(self.issue_code, "issue_code")
         _validate_optional_text(self.error_type, "error_type")
         if self.report_path is not None:
@@ -78,6 +80,10 @@ class RunState:
                     f"{self.status.value} state cannot describe an active run"
                 )
             if self.action_count != 0 or self.report_path is not None:
+                raise ValueError(
+                    f"{self.status.value} state cannot contain run data"
+                )
+            if self.last_action_type is not None:
                 raise ValueError(
                     f"{self.status.value} state cannot contain run data"
                 )
@@ -124,6 +130,7 @@ class _RunStateReporter:
         self._run_id = self._output_dir.name or f"run-{uuid4().hex[:8]}"
         self._task = task
         self._started_at = started_at or datetime.now(UTC)
+        self._last_action_type: str | None = None
         self._report_relative_path = self._relative_report_path()
         self.publish(RunStateStatus.TRACKING, action_count=0)
 
@@ -132,11 +139,17 @@ class _RunStateReporter:
         status: RunStateStatus,
         *,
         action_count: int,
+        last_action_type: str | None = None,
         issue_code: str | None = None,
         error_type: str | None = None,
     ) -> None:
         if self._state_path is None:
             return
+        effective_last_action_type = (
+            self._last_action_type
+            if last_action_type is None
+            else last_action_type
+        )
         state = RunState(
             status=status,
             updated_at=datetime.now(UTC),
@@ -144,6 +157,7 @@ class _RunStateReporter:
             task=self._task,
             started_at=self._started_at,
             action_count=action_count,
+            last_action_type=effective_last_action_type,
             report_path=(
                 self._report_relative_path
                 if status is not RunStateStatus.TRACKING
@@ -154,6 +168,7 @@ class _RunStateReporter:
         )
         try:
             write_run_state(state, self._state_path)
+            self._last_action_type = effective_last_action_type
         except Exception:
             # Run-state reporting is auxiliary and must not change agent
             # behavior when its local file cannot be written.
@@ -168,11 +183,13 @@ class _RunStateReporter:
         issue_code: str | None = None,
     ) -> None:
         action_count = len(getattr(session, "actions", ()))
+        last_action_type = _session_last_action_type(session)
         session_issue_code = _session_issue_code(session)
         if exception is not None or error_type is not None:
             self.publish(
                 RunStateStatus.ERRORED,
                 action_count=action_count,
+                last_action_type=last_action_type,
                 issue_code=issue_code or session_issue_code,
                 error_type=error_type or type(exception).__name__,
             )
@@ -183,6 +200,7 @@ class _RunStateReporter:
             self.publish(
                 RunStateStatus.UNVERIFIED,
                 action_count=action_count,
+                last_action_type=last_action_type,
                 issue_code=issue_code or session_issue_code,
             )
             return
@@ -195,11 +213,20 @@ class _RunStateReporter:
         self.publish(
             status,
             action_count=action_count,
+            last_action_type=last_action_type,
             issue_code=issue_code or session_issue_code,
         )
 
-    def update_action_count(self, action_count: int) -> None:
-        self.publish(RunStateStatus.TRACKING, action_count=action_count)
+    def update_action_count(
+        self,
+        action_count: int,
+        last_action_type: str | None = None,
+    ) -> None:
+        self.publish(
+            RunStateStatus.TRACKING,
+            action_count=action_count,
+            last_action_type=last_action_type,
+        )
 
     def _relative_report_path(self) -> Path | None:
         if self._state_path is None:
@@ -229,6 +256,14 @@ def _session_issue_code(session: object) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
 
 
+def _session_last_action_type(session: object) -> str | None:
+    actions = getattr(session, "actions", ())
+    if not actions:
+        return None
+    action_type = getattr(actions[-1], "action_type", None)
+    return action_type if isinstance(action_type, str) else None
+
+
 def run_state_to_dict(state: RunState) -> dict[str, object]:
     """Return the versioned, JSON-safe representation of ``state``."""
 
@@ -244,6 +279,7 @@ def run_state_to_dict(state: RunState) -> dict[str, object]:
             else None
         ),
         "action_count": state.action_count,
+        "last_action_type": state.last_action_type,
         "report_path": (
             state.report_path.as_posix()
             if state.report_path is not None
@@ -313,6 +349,10 @@ def run_state_from_dict(data: object) -> RunState:
         task=_optional_text_from_value(data["task"], "task"),
         started_at=started_at,
         action_count=action_count,
+        last_action_type=_optional_text_from_value(
+            data.get("last_action_type"),
+            "last_action_type",
+        ),
         report_path=report_path,
         issue_code=_optional_text_from_value(data["issue_code"], "issue_code"),
         error_type=_optional_text_from_value(data["error_type"], "error_type"),

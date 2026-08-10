@@ -24,6 +24,7 @@ def _tracking_state() -> RunState:
         started_at=STARTED_AT,
         updated_at=STARTED_AT + timedelta(seconds=2),
         action_count=1,
+        last_action_type="click",
     )
 
 
@@ -46,6 +47,22 @@ def test_run_state_round_trip_uses_versioned_safe_json(tmp_path: Path) -> None:
     assert "runs/run-001/report.html" in output_path.read_text(
         encoding="utf-8"
     )
+    assert read_run_state(output_path).last_action_type is None
+
+
+def test_run_state_round_trip_preserves_last_action_type() -> None:
+    state = _tracking_state()
+
+    assert run_state_from_dict(run_state_to_dict(state)) == state
+
+
+def test_run_state_reads_older_json_without_last_action_type() -> None:
+    data = run_state_to_dict(_tracking_state())
+    data.pop("last_action_type")
+
+    loaded = run_state_from_dict(data)
+
+    assert loaded.last_action_type is None
 
 
 def test_run_state_tracking_requires_active_run_data() -> None:
