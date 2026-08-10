@@ -101,7 +101,9 @@ The same page has **Start a task**. Enter the task in the form and optionally
 show the browser window; it launches the existing Browser Use CLI locally and
 returns to the status page while the normal trace and report are created. It
 does not run arbitrary shell commands, and it is enabled only when the
-dashboard is bound to `127.0.0.1` (the default).
+dashboard is bound to `127.0.0.1` (the default). The form also exposes the
+existing `--runs` and `--max-steps` options, so you can choose one normal run
+or a small sequential stability evaluation without using a terminal.
 
 Use **Setup & health** in the control center to check the local configuration,
 recording switch, provider-key presence, browser choice, trace directory,

@@ -149,7 +149,8 @@ package.
 - CLI and custom-agent setup guide: `docs/cli.md`.
 - Local control center: `agent-devtools dashboard --open`; its **Start a task**
   page launches only the existing Browser Use CLI on loopback, reads the latest
-  `run-state.json`, and links to local reports.
+  `run-state.json`, links to local reports, and exposes bounded `runs` and
+  `max_steps` settings.
 
 Keep these names stable unless a deliberate compatibility plan is written.
 

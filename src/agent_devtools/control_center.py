@@ -33,6 +33,8 @@ _STALE_RUN_AFTER = timedelta(minutes=2)
 _RECENT_RUN_LIMIT = 5
 _MAX_LAUNCH_BODY_BYTES = 16 * 1024
 _MAX_TASK_LENGTH = 2_000
+_MAX_LAUNCH_RUNS = 20
+_MAX_LAUNCH_STEPS = 100
 _INDEX_STATUS_LABELS = {
     "passed": "Passed",
     "failed": "Failed",
@@ -402,13 +404,29 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
         except (UnicodeDecodeError, ValueError):
             values = {}
         task = values.get("task", [""])[0].strip()
+        runs_text = values.get("runs", ["1"])[0].strip()
+        max_steps_text = values.get("max_steps", ["10"])[0].strip()
         headed = values.get("headed", [""])[0] == "on"
         if not task:
             error = "Enter a task before starting the Browser Use agent."
         elif len(task) > _MAX_TASK_LENGTH:
             error = f"Keep the task under {_MAX_TASK_LENGTH} characters."
+        elif not runs_text.isdigit() or not 1 <= int(runs_text) <= _MAX_LAUNCH_RUNS:
+            error = f"Runs must be a whole number from 1 to {_MAX_LAUNCH_RUNS}."
+        elif (
+            not max_steps_text.isdigit()
+            or not 1 <= int(max_steps_text) <= _MAX_LAUNCH_STEPS
+        ):
+            error = (
+                "Maximum steps must be a whole number from 1 to "
+                f"{_MAX_LAUNCH_STEPS}."
+            )
         else:
             error = None
+        runs = int(runs_text) if runs_text.isdigit() else 1
+        max_steps = (
+            int(max_steps_text) if max_steps_text.isdigit() else 10
+        )
 
         server = self.server
         launcher_lock = getattr(server, "_launcher_lock", None)
@@ -437,6 +455,10 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
                             ),
                             "--task",
                             task,
+                            "--runs",
+                            str(runs),
+                            "--max-steps",
+                            str(max_steps),
                         ]
                         if self._config_path is not None:
                             command.extend(
@@ -464,6 +486,10 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
                     self._control_root,
                     config_path=self._config_path,
                     error=error,
+                    task_value=task,
+                    runs_value=runs_text,
+                    max_steps_value=max_steps_text,
+                    headed=headed,
                 ),
                 status=409 if "already" in error else 400,
             )
@@ -696,6 +722,7 @@ def render_setup_page(
     .check-name {{ font-weight: 750; }}
     .check-detail {{ color: #64748b; font-size: .88rem; line-height: 1.4;
       margin-top: 4px; overflow-wrap: anywhere; }}
+    .nav {{ display: flex; flex-wrap: wrap; gap: 18px; }}
     .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
   </style>
 </head>
@@ -716,9 +743,17 @@ def render_setup_page(
     <div class="checks">{rows}</div>
   </section>
   <section class="panel">
-    <a class="back" href="/">← Back to run status</a>
+    <div class="nav">
+      <a class="back" href="/">Run status</a>
+      <a class="back" href="start.html">Start a task</a>
+      <a class="back" href="index.html">Reports</a>
+    </div>
     <p class="muted">This page never displays secret values. Provider keys are
     read from environment variables by the agent process, not from this UI.</p>
+    <p class="muted">If the provider check says “Not set”, configure
+    <code>GEMINI_API_KEY</code>, <code>GOOGLE_API_KEY</code>, or
+    <code>OPENAI_API_KEY</code> in the same terminal that starts the dashboard,
+    then restart it.</p>
   </section>
 </main>
 </body>
@@ -732,6 +767,10 @@ def render_start_page(
     config_path: str | Path | None = None,
     enabled: bool = True,
     error: str | None = None,
+    task_value: str = "",
+    runs_value: str = "1",
+    max_steps_value: str = "10",
+    headed: bool = False,
 ) -> str:
     """Render the local-only Browser Use task launcher."""
 
@@ -743,12 +782,26 @@ def render_start_page(
         else ""
     )
     if enabled:
-        form = """
+        form = f"""
     <form method="post" action="/run">
       <label for="task">Task</label>
       <textarea id="task" name="task" maxlength="2000" required
-        placeholder="Example: Open example.com and confirm the page is open."></textarea>
-      <label class="checkbox"><input type="checkbox" name="headed">
+        placeholder="Example: Open example.com and confirm the page is open.">{escape(task_value)}</textarea>
+      <div class="field-grid">
+        <div>
+          <label for="runs">Runs</label>
+          <input id="runs" name="runs" type="number" min="1" max="20"
+            value="{escape(runs_value, quote=True)}" required>
+          <div class="field-help">1 = one normal run; more runs evaluate stability.</div>
+        </div>
+        <div>
+          <label for="max_steps">Maximum steps</label>
+          <input id="max_steps" name="max_steps" type="number" min="1" max="100"
+            value="{escape(max_steps_value, quote=True)}" required>
+          <div class="field-help">Limit for each Browser Use attempt.</div>
+        </div>
+      </div>
+      <label class="checkbox"><input type="checkbox" name="headed"{' checked' if headed else ''}>
         Show the browser window while it runs</label>
       <button type="submit">Start Browser Use task</button>
     </form>
@@ -786,6 +839,12 @@ def render_start_page(
       font: inherit; min-height: 130px; padding: 12px; resize: vertical;
       width: 100%; }}
     textarea:focus {{ border-color: #1459b8; outline: 3px solid #dbeafe; }}
+    .field-grid {{ display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }}
+    input[type="number"] {{ border: 1px solid #cbd5e1; border-radius: 10px;
+      font: inherit; padding: 10px; width: 100%; }}
+    input[type="number"]:focus {{ border-color: #1459b8; outline: 3px solid #dbeafe; }}
+    .field-help {{ color: #64748b; font-size: .82rem; line-height: 1.4;
+      margin-top: 6px; }}
     .checkbox {{ align-items: center; display: flex; font-weight: 500; gap: 9px; }}
     .checkbox input {{ height: 16px; width: 16px; }}
     button {{ background: #1459b8; border: 0; border-radius: 10px; color: #fff;
@@ -795,7 +854,9 @@ def render_start_page(
       margin-top: 18px; padding: 12px 14px; }}
     .notice {{ background: #f8fafc; color: #53627a; }}
     .disabled, .error {{ background: #fee2e2; color: #991b1b; }}
+    .nav {{ display: flex; flex-wrap: wrap; gap: 18px; }}
     .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
+    @media (max-width: 560px) {{ .field-grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
@@ -803,17 +864,22 @@ def render_start_page(
   <section class="panel">
     <div class="eyebrow">Agent DevTools · local control center</div>
     <h1>Start a task</h1>
-    <p class="muted">Run the existing Browser Use CLI once. The agent's normal
-    trace and HTML report will appear in the configured trace directory.</p>
+    <p class="muted">Run the existing Browser Use CLI with the settings below.
+    The normal trace and HTML report will appear in the configured trace
+    directory.</p>
     {error_html}
     {form}
-    <div class="notice">This page accepts a task description only. It never
-    executes a command supplied by the form. Provider keys stay in environment
-    variables, and the process runs locally with the config from
+    <div class="notice">This page accepts a task description and run settings;
+    it never executes a command supplied by the form. Provider keys stay in
+    environment variables, and the process runs locally with the config from
     <code>{escape(_path_label(config_file))}</code>.</div>
   </section>
   <section class="panel">
-    <a class="back" href="/">← Back to run status</a>
+    <div class="nav">
+      <a class="back" href="/">Run status</a>
+      <a class="back" href="setup.html">Setup &amp; health</a>
+      <a class="back" href="index.html">Reports</a>
+    </div>
     <p class="muted">When the task finishes, use the dashboard's latest report
     link. A task can be started only while this server is bound to localhost.</p>
   </section>

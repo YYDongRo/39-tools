@@ -145,8 +145,12 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert report_html == "<html>local report</html>"
     assert "Setup &amp; health" in setup_html
     assert "Local checks only" in setup_html
+    assert "Start a task" in setup_html
+    assert "GEMINI_API_KEY" in setup_html
     assert "Start a task" in start_html
     assert "Start Browser Use task" in start_html
+    assert 'name="runs"' in start_html
+    assert 'name="max_steps"' in start_html
 
 
 def test_start_page_is_local_only_and_does_not_show_secrets(
@@ -191,7 +195,12 @@ def test_start_route_launches_only_the_fixed_browser_use_cli(
         request = Request(
             f"{base_url}/run",
             data=urlencode(
-                {"task": "Open example.test", "headed": "on"}
+                {
+                    "task": "Open example.test",
+                    "runs": "3",
+                    "max_steps": "7",
+                    "headed": "on",
+                }
             ).encode("utf-8"),
             method="POST",
         )
@@ -211,6 +220,10 @@ def test_start_route_launches_only_the_fixed_browser_use_cli(
         "--task",
     ]
     assert "Open example.test" in command
+    assert "--runs" in command
+    assert command[command.index("--runs") + 1] == "3"
+    assert "--max-steps" in command
+    assert command[command.index("--max-steps") + 1] == "7"
     assert "--headed" in command
     assert launched["stdin"] is subprocess.DEVNULL
     assert launched["shell"] is False

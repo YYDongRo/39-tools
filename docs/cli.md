@@ -245,7 +245,9 @@ The dashboard's **Start a task** link is a local shortcut for the same Browser
 Use CLI. Enter a task, optionally select a headed browser, and submit; the
 dashboard stays available while the normal trace and report are written. The
 form accepts only a task description, never a shell command, and is disabled
-when the server is bound to a non-loopback interface.
+when the server is bound to a non-loopback interface. Its **Runs** and
+**Maximum steps** fields map directly to the CLI's `--runs` and `--max-steps`
+options.
 
 ### Export a diagnostic bundle
 
