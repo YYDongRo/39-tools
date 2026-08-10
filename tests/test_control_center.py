@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Thread
+from urllib.request import urlopen
 
 import pytest
 
-from agent_devtools.control_center import render_control_center
+from agent_devtools.control_center import _create_server, render_control_center
 from agent_devtools.run_state import (
     RunState,
     RunStateStatus,
@@ -99,6 +101,32 @@ def test_control_center_links_latest_report_with_relative_path(
     assert "separate" in html
     assert "http-equiv=\"refresh\"" not in html
     assert str(tmp_path.resolve()) not in html
+
+
+def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> None:
+    report_path = Path("demo") / "report.html"
+    report = tmp_path / report_path
+    report.parent.mkdir(parents=True)
+    report.write_text("<html>local report</html>", encoding="utf-8")
+    _write_state(tmp_path, RunStateStatus.PASSED, report_path=report_path)
+
+    server = _create_server(tmp_path, host="127.0.0.1", port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        with urlopen(f"{base_url}/") as response:
+            control_center = response.read().decode("utf-8")
+        with urlopen(f"{base_url}/demo/report.html") as response:
+            report_html = response.read().decode("utf-8")
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+
+    assert 'href="demo/report.html"' in control_center
+    assert 'target="_blank" rel="noopener noreferrer"' in control_center
+    assert report_html == "<html>local report</html>"
 
 
 def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> None:
