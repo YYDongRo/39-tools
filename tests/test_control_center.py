@@ -34,6 +34,7 @@ def _write_state(
     action_count: int = 2,
     last_action_type: str | None = None,
     report_path: Path | None = None,
+    task: str = "Open the requested page",
 ) -> None:
     started_at = datetime(2026, 8, 9, 12, tzinfo=UTC)
     write_run_state(
@@ -41,7 +42,7 @@ def _write_state(
             status=status,
             updated_at=datetime(2026, 8, 9, 12, 0, 2, tzinfo=UTC),
             run_id="20260809T120000Z-demo",
-            task="Open the requested page",
+            task=task,
             started_at=started_at,
             action_count=action_count,
             last_action_type=last_action_type,
@@ -67,11 +68,13 @@ def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) ->
     )
 
     assert "Tracking" in html
+    assert "Latest run" in html
     assert "Open the requested page" in html
-    assert "3" in html
-    assert "click" in html
+    assert "Report pending" in html
     assert 'http-equiv="refresh" content="2"' in html
-    assert "No completed report yet" in html
+    assert "What this means" not in html
+    assert "Last action" not in html
+    assert "Actions" not in html
     assert "possibly interrupted" not in html
     assert str(tmp_path.resolve()) not in html
 
@@ -90,8 +93,8 @@ def test_control_center_warns_when_tracking_state_is_stale(tmp_path: Path) -> No
     )
 
     assert "Tracking · possibly interrupted" in html
-    assert "No update for 2m 3s" in html
-    assert "the process may have stopped" in html
+    assert "No update for" not in html
+    assert "the process may have stopped" not in html
 
 
 def test_control_center_links_latest_report_with_relative_path(
@@ -106,11 +109,13 @@ def test_control_center_links_latest_report_with_relative_path(
     html = render_control_center(tmp_path)
 
     assert "Failed" in html
-    assert "target_not_found" in html
     assert 'href="20260809T120000Z-demo/report.html"' in html
     assert 'target="_blank" rel="noopener noreferrer"' in html
-    assert "Open full report" in html
-    assert "separate" in html
+    assert "Open report ↗" in html
+    assert "Open full report" not in html
+    assert "target_not_found" not in html
+    assert "Details" not in html
+    assert "What this means" not in html
     assert "http-equiv=\"refresh\"" not in html
     assert str(tmp_path.resolve()) not in html
 
@@ -145,12 +150,20 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert report_html == "<html>local report</html>"
     assert "Setup &amp; health" in setup_html
     assert "Local checks only" in setup_html
-    assert "Start a task" in setup_html
+    assert "← Back to home" in setup_html
+    assert 'href="/"' in setup_html
+    assert 'href="start.html"' not in setup_html
+    assert 'href="index.html"' not in setup_html
     assert "GEMINI_API_KEY" in setup_html
     assert "Start a task" in start_html
     assert "Start Browser Use task" in start_html
     assert 'name="runs"' in start_html
     assert 'name="max_steps"' in start_html
+    assert '<details class="advanced">' in start_html
+    assert "Open a visible browser window" in start_html
+    assert start_html.count('href="/"') == 1
+    assert 'href="setup.html"' not in start_html
+    assert 'href="index.html"' not in start_html
 
 
 def test_start_page_is_local_only_and_does_not_show_secrets(
@@ -163,9 +176,9 @@ def test_start_page_is_local_only_and_does_not_show_secrets(
     )
 
     assert "Task launch is disabled" in html
-    assert "private-config.toml" in html
     assert str(tmp_path.resolve()) not in html
     assert "GOOGLE_API_KEY" not in html
+    assert "← Back to home" in html
 
 
 def test_start_route_launches_only_the_fixed_browser_use_cli(
@@ -302,10 +315,13 @@ def test_control_center_lists_recent_runs(tmp_path: Path) -> None:
 
     assert "Recent runs" in html
     assert "Find the requested item" in html
-    assert "Task run" in html
     assert "Passed" in html
     assert 'href="20260809T120000Z-history/report.html"' in html
     assert "Open report ↗" in html
+    assert "Task run" not in html
+    assert "2026-08-09" not in html
+    assert "1 actions" not in html
+    assert "Final task check passed" not in html
 
 
 def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> None:
@@ -313,8 +329,18 @@ def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> No
     newer_root = tmp_path / "browser-use"
     older_root.mkdir()
     newer_root.mkdir()
-    _write_state(older_root, RunStateStatus.PASSED, action_count=1)
-    _write_state(newer_root, RunStateStatus.TRACKING, action_count=4)
+    _write_state(
+        older_root,
+        RunStateStatus.PASSED,
+        action_count=1,
+        task="Older task",
+    )
+    _write_state(
+        newer_root,
+        RunStateStatus.TRACKING,
+        action_count=4,
+        task="Newer task",
+    )
     # Make the selection deterministic without relying on filesystem mtime.
     state_path = newer_root / "run-state.json"
     state_path.write_text(
@@ -328,16 +354,16 @@ def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> No
     html = render_control_center(tmp_path)
 
     assert "Tracking" in html
-    assert "4" in html
-    assert "browser-use" in html
-    assert "playwright" not in html
+    assert "Newer task" in html
+    assert "Older task" not in html
 
 
 def test_control_center_handles_first_run_without_state(tmp_path: Path) -> None:
     html = render_control_center(tmp_path)
 
-    assert "Waiting for a run" in html
-    assert "No run-state.json has been created yet." in html
+    assert "Agent DevTools" in html
+    assert "What would you like to do?" in html
+    assert "Latest run" not in html
     assert 'href="index.html"' in html
 
 
@@ -351,7 +377,8 @@ def test_control_center_handles_invalid_state_without_exposing_details(
 
     html = render_control_center(tmp_path)
 
-    assert "Run state is unavailable (ValueError)." in html
+    assert "Unavailable" in html
+    assert "Could not read the latest run." in html
     assert "do-not-show" not in html
 
 

@@ -74,72 +74,75 @@ def render_control_center(
     report_href = _report_href(output_root, state_root, state)
     try:
         _write_report_indexes(output_root, state_root)
-        index_error = None
-    except (OSError, TypeError, ValueError) as error:
-        index_error = f"Could not update report index ({type(error).__name__})"
+    except (OSError, TypeError, ValueError):
+        pass
 
     if state is None:
-        status_value = RunStateStatus.NOT_CONFIGURED
-        status_label = "Waiting for a run"
-        task = "Start an observed agent run to see its live status here."
-        action_count = "—"
-        last_action_type = "—"
-        updated_at = "—"
-        details = state_error or "No run-state.json has been created yet."
-        trace_source = "—"
         is_stale = False
         refresh = ""
     else:
-        status_value = state.status
-        status_label = _STATUS_LABELS[state.status]
-        task = state.task or "Task not provided"
-        action_count = str(state.action_count)
-        last_action_type = state.last_action_type or "—"
-        updated_at = _format_timestamp(state.updated_at)
-        details = _state_details(state)
-        trace_source = _relative_source(output_root, state_root)
         is_stale = _is_stale(state, current_time)
-        if is_stale:
-            status_label = "Tracking · possibly interrupted"
-            details = (
-                f"No update for {_format_age(current_time - state.updated_at)}; "
-                "the process may have stopped"
-            )
         refresh = '<meta http-equiv="refresh" content="2">' if (
             state.status is RunStateStatus.TRACKING
         ) else ""
 
-    index_note = index_error or "Reports are listed in the local index."
     index_href = _index_href(output_root, state_root)
-    report_link = (
-        f'<a class="button primary" href="{escape(report_href, quote=True)}" '
-        'target="_blank" rel="noopener noreferrer">'
-        "Open full report ↗</a>"
-        if report_href is not None
-        else '<span class="muted">No completed report yet</span>'
-    )
     recent_runs = _render_recent_runs(
         output_root,
         state_root if state_root is not None else output_root,
     )
-    index_link = _external_link(index_href, "Open report index ↗", "secondary")
-    setup_link = _external_link("setup.html", "Setup & health ↗", "secondary")
-    start_link = _external_link(
+    index_link = _external_link(index_href, "Report index ↗", "compact-link")
+    setup_link = _internal_link("setup.html", "Setup & health")
+    start_link = _internal_link(
         "start.html",
-        "Start a task ↗" if launch_enabled else "Start page (local only) ↗",
+        "Start a task",
         "primary" if launch_enabled else "secondary",
     )
-    status_class = escape(
-        f"{status_value.value}{' stale' if is_stale else ''}",
-        quote=True,
-    )
+    if state is None:
+        latest_html = ""
+        if state_error:
+            latest_html = """\
+  <section class="panel latest-panel">
+    <div class="latest-label">Latest run</div>
+    <div class="latest-row">
+      <span class="pill attention">Unavailable</span>
+      <span class="muted">Could not read the latest run.</span>
+    </div>
+  </section>
+"""
+    else:
+        latest_status = (
+            "Tracking · possibly interrupted"
+            if is_stale
+            else _STATUS_LABELS[state.status]
+        )
+        latest_class = escape(
+            f"{state.status.value}{' stale' if is_stale else ''}",
+            quote=True,
+        )
+        latest_report = (
+            f'<a class="history-link" href="{escape(report_href, quote=True)}" '
+            'target="_blank" rel="noopener noreferrer">Open report ↗</a>'
+            if report_href is not None
+            else '<span class="muted">Report pending</span>'
+        )
+        latest_html = f"""\
+  <section class="panel latest-panel">
+    <div class="latest-label">Latest run</div>
+    <div class="latest-row">
+      <span class="pill {latest_class}">{escape(latest_status)}</span>
+      <div class="latest-task">{escape(state.task or "Task not provided")}</div>
+      {latest_report}
+    </div>
+  </section>
+"""
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {refresh}
-  <title>Agent DevTools control center</title>
+  <title>Agent DevTools</title>
   <style>
     :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
       -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
@@ -156,8 +159,6 @@ def render_control_center(
     h2 {{ margin: 0 0 18px; font-size: 1.15rem; }}
     p {{ line-height: 1.55; }}
     .muted {{ color: #64748b; }}
-    .status-row {{ align-items: center; display: flex; flex-wrap: wrap; gap: 14px;
-      margin: 22px 0 18px; }}
     .pill {{ border-radius: 999px; display: inline-block; font-size: .85rem;
       font-weight: 800; padding: 7px 11px; }}
     .tracking {{ background: #dbeafe; color: #1d4ed8; }}
@@ -165,22 +166,18 @@ def render_control_center(
     .passed {{ background: #dcfce7; color: #166534; }}
     .failed, .errored {{ background: #fee2e2; color: #991b1b; }}
     .unverified, .not_configured, .ready {{ background: #fef3c7; color: #92400e; }}
-    .task {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
-      padding: 14px; }}
-    .task-label, dt {{ color: #64748b; font-size: .75rem; font-weight: 800;
+    .latest-label {{ color: #64748b; font-size: .75rem; font-weight: 800;
       letter-spacing: .05em; text-transform: uppercase; }}
-    .task-text {{ margin: 7px 0 0; white-space: pre-wrap; word-break: break-word; }}
-    dl {{ display: grid; gap: 14px 28px; grid-template-columns: repeat(4, 1fr);
-      margin: 22px 0 0; }}
-    dt {{ margin-bottom: 5px; }} dd {{ margin: 0; word-break: break-word; }}
-    .actions {{ align-items: center; display: flex; flex-wrap: wrap; gap: 12px;
-      margin-top: 24px; }}
+    .latest-row {{ align-items: center; display: grid; gap: 14px;
+      grid-template-columns: auto minmax(0, 1fr) auto; margin-top: 10px; }}
+    .latest-task {{ font-weight: 700; overflow-wrap: anywhere; }}
+    .home-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }}
     .button {{ border-radius: 10px; display: inline-block; font-weight: 750;
       padding: 10px 14px; text-decoration: none; }}
     .primary {{ background: #1459b8; color: #fff; }}
     .secondary {{ border: 1px solid #cbd5e1; color: #1459b8; }}
-    .notice {{ background: #f8fafc; border-radius: 10px; color: #53627a;
-      font-size: .9rem; margin-top: 18px; padding: 11px 13px; }}
+    .compact-link {{ color: #1459b8; font-size: .9rem; padding: 5px 0;
+      text-decoration: none; white-space: nowrap; }}
     .section-heading {{ align-items: center; display: flex; flex-wrap: wrap;
       gap: 12px; justify-content: space-between; }}
     .section-heading h2 {{ margin-bottom: 0; }}
@@ -189,60 +186,34 @@ def render_control_center(
       border-radius: 12px; display: grid; gap: 12px;
       grid-template-columns: minmax(0, 1fr) auto auto; padding: 13px 14px; }}
     .history-task {{ font-weight: 750; overflow-wrap: anywhere; }}
-    .history-meta, .history-detail {{ color: #64748b; font-size: .82rem;
-      line-height: 1.4; margin-top: 4px; }}
-    .history-detail {{ color: #53627a; }}
     .history-link {{ color: #1459b8; font-size: .88rem; font-weight: 750;
       white-space: nowrap; }}
     .attention {{ background: #fee2e2; color: #991b1b; }}
-    @media (max-width: 650px) {{ dl {{ grid-template-columns: 1fr 1fr; }} }}
+    @media (max-width: 650px) {{ .latest-row {{ grid-template-columns: 1fr auto; }}
+      .latest-task {{ grid-column: 1 / -1; grid-row: 1; }}
+      .latest-row .pill {{ grid-row: 2; }}
+      .latest-row .history-link, .latest-row .muted {{ grid-row: 2; }} }}
     @media (max-width: 650px) {{ .history-row {{ grid-template-columns: 1fr auto; }}
       .history-link {{ grid-column: 1 / -1; }} }}
-    @media (max-width: 430px) {{ dl {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
 <main>
   <section class="panel">
     <div class="eyebrow">Agent DevTools · local control center</div>
-    <h1>Run status</h1>
-    <div class="status-row">
-      <span class="pill {status_class}">{escape(status_label)}</span>
-      <span class="muted">This page reads local trace files only.</span>
-    </div>
-    <div class="task">
-      <div class="task-label">Current task</div>
-      <div class="task-text">{escape(task)}</div>
-    </div>
-    <dl>
-      <div><dt>Actions</dt><dd>{escape(action_count)}</dd></div>
-      <div><dt>Last action</dt><dd>{escape(last_action_type)}</dd></div>
-      <div><dt>Last update (UTC)</dt><dd>{escape(updated_at)}</dd></div>
-      <div><dt>Details</dt><dd>{escape(details)}</dd></div>
-      <div><dt>Trace source</dt><dd>{escape(trace_source)}</dd></div>
-    </dl>
-    <div class="actions">
+    <h1>What would you like to do?</h1>
+    <div class="home-actions">
       {start_link}
-      {report_link}
       {setup_link}
+      {index_link}
     </div>
-    <div class="notice">{escape(index_note)} Full reports open in a separate
-    browser tab; this status page stays available for monitoring.</div>
   </section>
+  {latest_html}
   <section class="panel">
     <div class="section-heading">
       <h2>Recent runs</h2>
-      {index_link}
     </div>
     {recent_runs}
-  </section>
-  <section class="panel">
-    <h2>What this means</h2>
-    <p class="muted">Tracking means the observer is active. Passed or failed is
-    the final task result, not merely whether an individual action ran.</p>
-    <p class="muted">The page refreshes every two seconds while a run is
-    tracking. If no update arrives for two minutes, it shows a warning instead
-    of guessing that the task failed. Stop the server with Ctrl+C.</p>
   </section>
 </main>
 </body>
@@ -576,16 +547,6 @@ def _report_href(
     return relative.as_posix()
 
 
-def _relative_source(root: Path, state_root: Path | None) -> str:
-    if state_root is None:
-        return "—"
-    try:
-        relative = state_root.relative_to(root)
-    except ValueError:
-        return "—"
-    return relative.as_posix() or "."
-
-
 def _index_href(root: Path, state_root: Path | None) -> str:
     if state_root is None:
         return "index.html"
@@ -600,6 +561,13 @@ def _external_link(href: str, label: str, style: str) -> str:
         f'<a class="button {escape(style, quote=True)}" '
         f'href="{escape(href, quote=True)}" target="_blank" '
         f'rel="noopener noreferrer">{escape(label)}</a>'
+    )
+
+
+def _internal_link(href: str, label: str, style: str = "secondary") -> str:
+    return (
+        f'<a class="button {escape(style, quote=True)}" '
+        f'href="{escape(href, quote=True)}">{escape(label)}</a>'
     )
 
 
@@ -619,32 +587,16 @@ def _render_recent_runs(root: Path, entries_root: Path) -> str:
         status = entry.status
         status_label = _INDEX_STATUS_LABELS.get(status, "Unverified")
         status_class = escape(status, quote=True)
-        when = entry.timestamp.astimezone(UTC).strftime(
-            "%Y-%m-%d %H:%M:%S UTC"
-        )
-        action_label = (
-            f"{entry.actions} actions"
-            if entry.actions.isdigit()
-            else entry.actions
-        )
         rows.append(
             """
       <div class="history-row">
-        <div>
-          <div class="history-task">{task}</div>
-          <div class="history-meta">{kind} · {when} · {actions}</div>
-          <div class="history-detail">{detail}</div>
-        </div>
+        <div class="history-task">{task}</div>
         <span class="pill {status_class}">{status_label}</span>
         <a class="history-link" href="{href}" target="_blank"
           rel="noopener noreferrer">Open report ↗</a>
       </div>
     """.format(
                 task=escape(entry.task),
-                kind=escape(entry.kind),
-                when=escape(when),
-                actions=escape(action_label),
-                detail=escape(entry.detail),
                 status_class=status_class,
                 status_label=escape(status_label),
                 href=escape(report_href, quote=True),
@@ -743,17 +695,11 @@ def render_setup_page(
     <div class="checks">{rows}</div>
   </section>
   <section class="panel">
-    <div class="nav">
-      <a class="back" href="/">Run status</a>
-      <a class="back" href="start.html">Start a task</a>
-      <a class="back" href="index.html">Reports</a>
-    </div>
-    <p class="muted">This page never displays secret values. Provider keys are
-    read from environment variables by the agent process, not from this UI.</p>
-    <p class="muted">If the provider check says “Not set”, configure
+    <a class="back" href="/">← Back to home</a>
+    <p class="muted">Provider keys are never shown or saved here. If the
+    provider check says “Not set”, configure
     <code>GEMINI_API_KEY</code>, <code>GOOGLE_API_KEY</code>, or
-    <code>OPENAI_API_KEY</code> in the same terminal that starts the dashboard,
-    then restart it.</p>
+    <code>OPENAI_API_KEY</code> in the terminal that starts the dashboard.</p>
   </section>
 </main>
 </body>
@@ -775,7 +721,6 @@ def render_start_page(
     """Render the local-only Browser Use task launcher."""
 
     output_root = _ensure_root(root)
-    config_file = Path(config_path or "agent_devtools.toml").expanduser()
     error_html = (
         f'<div class="error" role="alert">{escape(error)}</div>'
         if error
@@ -787,22 +732,25 @@ def render_start_page(
       <label for="task">Task</label>
       <textarea id="task" name="task" maxlength="2000" required
         placeholder="Example: Open example.com and confirm the page is open.">{escape(task_value)}</textarea>
-      <div class="field-grid">
-        <div>
-          <label for="runs">Runs</label>
-          <input id="runs" name="runs" type="number" min="1" max="20"
-            value="{escape(runs_value, quote=True)}" required>
-          <div class="field-help">1 = one normal run; more runs evaluate stability.</div>
+      <details class="advanced">
+        <summary>Advanced settings</summary>
+        <div class="advanced-content">
+          <div class="field-grid">
+            <div>
+              <label for="runs">Runs</label>
+              <input id="runs" name="runs" type="number" min="1" max="20"
+                value="{escape(runs_value, quote=True)}" required>
+            </div>
+            <div>
+              <label for="max_steps">Maximum steps</label>
+              <input id="max_steps" name="max_steps" type="number" min="1" max="100"
+                value="{escape(max_steps_value, quote=True)}" required>
+            </div>
+          </div>
+          <label class="checkbox"><input type="checkbox" name="headed"{' checked' if headed else ''}>
+            Open a visible browser window</label>
         </div>
-        <div>
-          <label for="max_steps">Maximum steps</label>
-          <input id="max_steps" name="max_steps" type="number" min="1" max="100"
-            value="{escape(max_steps_value, quote=True)}" required>
-          <div class="field-help">Limit for each Browser Use attempt.</div>
-        </div>
-      </div>
-      <label class="checkbox"><input type="checkbox" name="headed"{' checked' if headed else ''}>
-        Show the browser window while it runs</label>
+      </details>
       <button type="submit">Start Browser Use task</button>
     </form>
     """
@@ -843,18 +791,18 @@ def render_start_page(
     input[type="number"] {{ border: 1px solid #cbd5e1; border-radius: 10px;
       font: inherit; padding: 10px; width: 100%; }}
     input[type="number"]:focus {{ border-color: #1459b8; outline: 3px solid #dbeafe; }}
-    .field-help {{ color: #64748b; font-size: .82rem; line-height: 1.4;
-      margin-top: 6px; }}
+    .advanced {{ border-top: 1px solid #e2e8f0; margin-top: 22px;
+      padding-top: 16px; }}
+    summary {{ cursor: pointer; font-weight: 750; }}
+    .advanced-content {{ margin-top: 2px; }}
     .checkbox {{ align-items: center; display: flex; font-weight: 500; gap: 9px; }}
     .checkbox input {{ height: 16px; width: 16px; }}
     button {{ background: #1459b8; border: 0; border-radius: 10px; color: #fff;
       cursor: pointer; font: inherit; font-weight: 800; margin-top: 22px;
       padding: 11px 16px; }}
-    .notice, .disabled, .error {{ border-radius: 10px; line-height: 1.5;
+    .disabled, .error {{ border-radius: 10px; line-height: 1.5;
       margin-top: 18px; padding: 12px 14px; }}
-    .notice {{ background: #f8fafc; color: #53627a; }}
     .disabled, .error {{ background: #fee2e2; color: #991b1b; }}
-    .nav {{ display: flex; flex-wrap: wrap; gap: 18px; }}
     .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
     @media (max-width: 560px) {{ .field-grid {{ grid-template-columns: 1fr; }} }}
   </style>
@@ -864,45 +812,16 @@ def render_start_page(
   <section class="panel">
     <div class="eyebrow">Agent DevTools · local control center</div>
     <h1>Start a task</h1>
-    <p class="muted">Run the existing Browser Use CLI with the settings below.
-    The normal trace and HTML report will appear in the configured trace
-    directory.</p>
     {error_html}
     {form}
-    <div class="notice">This page accepts a task description and run settings;
-    it never executes a command supplied by the form. Provider keys stay in
-    environment variables, and the process runs locally with the config from
-    <code>{escape(_path_label(config_file))}</code>.</div>
   </section>
   <section class="panel">
-    <div class="nav">
-      <a class="back" href="/">Run status</a>
-      <a class="back" href="setup.html">Setup &amp; health</a>
-      <a class="back" href="index.html">Reports</a>
-    </div>
-    <p class="muted">When the task finishes, use the dashboard's latest report
-    link. A task can be started only while this server is bound to localhost.</p>
+    <a class="back" href="/">← Back to home</a>
   </section>
 </main>
 </body>
 </html>
 """
-
-
-def _state_details(state: RunState) -> str:
-    if state.status is RunStateStatus.ERRORED:
-        return state.error_type or state.issue_code or "Agent error"
-    if state.issue_code:
-        return state.issue_code
-    if state.status is RunStateStatus.TRACKING:
-        return "Observer is active"
-    return "Final task result recorded"
-
-
-def _format_timestamp(value: object) -> str:
-    if not isinstance(value, datetime):
-        return "—"
-    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def _is_stale(state: RunState, now: datetime) -> bool:
@@ -911,14 +830,6 @@ def _is_stale(state: RunState, now: datetime) -> bool:
         and now.astimezone(UTC) - state.updated_at.astimezone(UTC)
         >= _STALE_RUN_AFTER
     )
-
-
-def _format_age(age: timedelta) -> str:
-    seconds = max(0, int(age.total_seconds()))
-    minutes, remaining_seconds = divmod(seconds, 60)
-    if minutes:
-        return f"{minutes}m {remaining_seconds}s"
-    return f"{remaining_seconds}s"
 
 
 def _load_setup_config(

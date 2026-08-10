@@ -88,28 +88,22 @@ terminal:
 uv run agent-devtools dashboard --open
 ```
 
-It reads the newest `run-state.json` below `trace/`, refreshes while an agent is
-tracking, and provides a button to open the complete report in a separate
-browser tab. Use `--root PATH` for another trace workspace. It does not run the
-agent or upload your trace; stop it with `Ctrl+C`. If a tracking run has no
-update for two minutes, the page shows a possible interruption warning instead
-of guessing that the task failed. The page also shows the last recorded action
-type without exposing its arguments, and lists the five most recent completed
-runs so you can open an older report without leaving the app.
+The control center is a small local home page with three paths:
 
-The same page has **Start a task**. Enter the task in the form and optionally
-show the browser window; it launches the existing Browser Use CLI locally and
-returns to the status page while the normal trace and report are created. It
-does not run arbitrary shell commands, and it is enabled only when the
-dashboard is bound to `127.0.0.1` (the default). The form also exposes the
-existing `--runs` and `--max-steps` options, so you can choose one normal run
-or a small sequential stability evaluation without using a terminal.
+- **Start a task** launches the existing Browser Use CLI on localhost.
+- **Setup & health** shows whether recording, the provider environment, browser,
+  screenshots, and redaction are ready; it never shows secret values.
+- **Report index** opens the local list of completed reports.
 
-Use **Setup & health** in the control center to check the local configuration,
-recording switch, provider-key presence, browser choice, trace directory,
-screenshots, and redaction. It never shows secret values. Use
-`--config PATH` with `dashboard` when the TOML file is not
-`agent_devtools.toml` in the current directory.
+After a run, **Latest run** shows only its status, task, and report link.
+**Recent runs** keeps the five newest report links. The home page refreshes while
+an agent is tracking; reports open in a separate browser tab. Use `--root PATH`
+for another trace workspace and `--config PATH` for a different TOML file. The
+dashboard does not upload traces and stops with `Ctrl+C`.
+
+The Start page accepts a task and keeps `runs`, `max_steps`, and the visible
+browser option under **Advanced settings**. It is enabled only when the
+dashboard is bound to `127.0.0.1` (the default).
 
 To make one portable local diagnostic archive, add `--export-bundle`:
 

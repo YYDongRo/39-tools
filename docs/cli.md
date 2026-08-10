@@ -221,20 +221,16 @@ second terminal:
 uv run --extra browser-use agent-devtools dashboard --open
 ```
 
-It reads the newest `run-state.json` below `trace/` and refreshes while the
-status is `tracking`. When the run finishes, use **Open full report** to open
-the complete HTML report in a separate browser tab, or **Open report index** to
-see earlier reports. The control center remains open for monitoring. The server
-binds to `127.0.0.1` by default, serves only the selected trace workspace, and
-stops with `Ctrl+C`. Use `--root PATH` for a different workspace. A tracking
-state with no update for two minutes is shown as a possible interruption; it is
-not silently converted into a failure. The last action type is shown without
-action arguments or typed values. The control center also lists the five most
-recent completed runs so you can open an older report without leaving the app.
-Select **Setup & health** to see whether recording, the provider environment,
-the configured browser, the trace directory, screenshots, and redaction are
-ready. Secret values are never displayed. If the configuration file has a
-different name or location, pass it when starting the dashboard:
+The home page has three paths: **Start a task**, **Setup & health**, and
+**Report index**. After a run, **Latest run** shows the status, task, and report
+link; **Recent runs** keeps the five newest report links. The page refreshes
+while an agent is tracking, reports open in a separate browser tab, and no
+trace is uploaded. The server binds to `127.0.0.1` by default, serves only the
+selected trace workspace, and stops with `Ctrl+C`. Use `--root PATH` for a
+different workspace. Setup & health checks recording, provider environment,
+browser, trace directory, screenshots, and redaction without displaying secret
+values. If the configuration file has a different name or location, pass it
+when starting the dashboard:
 
 ```bash
 uv run --extra browser-use agent-devtools dashboard \
@@ -242,12 +238,12 @@ uv run --extra browser-use agent-devtools dashboard \
 ```
 
 The dashboard's **Start a task** link is a local shortcut for the same Browser
-Use CLI. Enter a task, optionally select a headed browser, and submit; the
-dashboard stays available while the normal trace and report are written. The
-form accepts only a task description, never a shell command, and is disabled
-when the server is bound to a non-loopback interface. Its **Runs** and
-**Maximum steps** fields map directly to the CLI's `--runs` and `--max-steps`
-options.
+Use CLI. Enter a task and submit; the dashboard stays available while the
+normal trace and report are written. **Runs**, **Maximum steps**, and
+**Open a visible browser window** are available under the collapsed
+**Advanced settings** section. The form accepts only a task description, never
+a shell command, and is disabled when the server is bound to a non-loopback
+interface.
 
 ### Export a diagnostic bundle
 
