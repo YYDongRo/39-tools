@@ -168,6 +168,14 @@ def _control_center_parser() -> argparse.ArgumentParser:
         help="port to bind; 0 chooses a free local port (default: 0)",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        help=(
+            "configuration file to inspect on the setup page "
+            "(default: agent_devtools.toml)"
+        ),
+    )
+    parser.add_argument(
         "--open",
         action="store_true",
         help="open the control center in the default browser",
@@ -183,6 +191,7 @@ def _control_center_main(argv: Sequence[str] | None = None) -> int:
             host=args.host,
             port=args.port,
             open_browser=args.open,
+            config_path=args.config,
         )
     except (OSError, TypeError, ValueError) as error:
         print(f"Control center could not start: {type(error).__name__}: {error}")

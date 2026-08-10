@@ -21,6 +21,7 @@ from agent_devtools.bundle import (
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.control_center import (
     render_control_center,
+    render_setup_page,
     serve_control_center,
 )
 from agent_devtools.failure import FailureCategory
@@ -151,6 +152,7 @@ def test_core_public_api_exports_supported_types() -> None:
         "ActionStatus": ActionStatus,
         "AgentDevToolsConfig": AgentDevToolsConfig,
         "render_control_center": render_control_center,
+        "render_setup_page": render_setup_page,
         "serve_control_center": serve_control_center,
         "BundleExportError": BundleExportError,
         "EvaluationComparison": EvaluationComparison,

@@ -97,6 +97,12 @@ of guessing that the task failed. The page also shows the last recorded action
 type without exposing its arguments, and lists the five most recent completed
 runs so you can open an older report without leaving the app.
 
+Use **Setup & health** in the control center to check the local configuration,
+recording switch, provider-key presence, browser choice, trace directory,
+screenshots, and redaction. It never shows secret values. Use
+`--config PATH` with `dashboard` when the TOML file is not
+`agent_devtools.toml` in the current directory.
+
 To make one portable local diagnostic archive, add `--export-bundle`:
 
 ```bash

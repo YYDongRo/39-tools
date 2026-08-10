@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import webbrowser
 from datetime import UTC, datetime, timedelta
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.run_index import _discover_entries, write_run_index
 from agent_devtools.run_state import RunState, RunStateStatus, read_run_state
 
@@ -38,6 +40,13 @@ _INDEX_STATUS_LABELS = {
 class _StateLocation:
     root: Path
     state: RunState
+
+
+@dataclass(frozen=True)
+class _SetupCheck:
+    name: str
+    status: str
+    detail: str
 
 
 def render_control_center(
@@ -106,6 +115,7 @@ def render_control_center(
         state_root if state_root is not None else output_root,
     )
     index_link = _external_link(index_href, "Open report index ↗", "secondary")
+    setup_link = _external_link("setup.html", "Setup & health ↗", "secondary")
     status_class = escape(
         f"{status_value.value}{' stale' if is_stale else ''}",
         quote=True,
@@ -200,6 +210,7 @@ def render_control_center(
     </dl>
     <div class="actions">
       {report_link}
+      {setup_link}
     </div>
     <div class="notice">{escape(index_note)} Full reports open in a separate
     browser tab; this status page stays available for monitoring.</div>
@@ -231,11 +242,17 @@ def serve_control_center(
     host: str = "127.0.0.1",
     port: int = 0,
     open_browser: bool = False,
+    config_path: str | Path | None = None,
 ) -> None:
     """Serve the local control center until interrupted."""
 
     output_root = _ensure_root(root)
-    server = _create_server(output_root, host=host, port=port)
+    server = _create_server(
+        output_root,
+        host=host,
+        port=port,
+        config_path=config_path,
+    )
     url = f"http://{host}:{server.server_port}/"
     print(f"Agent DevTools control center: {url}")
     print(f"Trace root: {output_root.resolve()}")
@@ -258,10 +275,16 @@ def _create_server(
     *,
     host: str,
     port: int,
+    config_path: str | Path | None = None,
 ) -> ThreadingHTTPServer:
     class Handler(_ControlCenterHandler):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, root=root, **kwargs)
+            super().__init__(
+                *args,
+                root=root,
+                config_path=config_path,
+                **kwargs,
+            )
 
     return ThreadingHTTPServer((host, port), Handler)
 
@@ -271,15 +294,25 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
         self,
         *args: Any,
         root: Path,
+        config_path: str | Path | None,
         **kwargs: Any,
     ) -> None:
         self._control_root = root
+        self._config_path = config_path
         super().__init__(*args, directory=str(root), **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = urlsplit(self.path).path
         if path == "/":
             self._send_html(render_control_center(self._control_root))
+            return
+        if path in {"/setup", "/setup.html"}:
+            self._send_html(
+                render_setup_page(
+                    self._control_root,
+                    config_path=self._config_path,
+                )
+            )
             return
         if path == "/index.html":
             try:
@@ -461,6 +494,88 @@ def _history_report_href(
     return report.as_posix() if prefix == "." else f"{prefix}/{report.as_posix()}"
 
 
+def render_setup_page(
+    root: str | Path,
+    *,
+    config_path: str | Path | None = None,
+) -> str:
+    """Render a local, secret-free setup and environment status page."""
+
+    output_root = _ensure_root(root)
+    config_file = Path(config_path or "agent_devtools.toml").expanduser()
+    config, config_check = _load_setup_config(config_file)
+    checks = [config_check, *_setup_checks(config)]
+    overall = "attention" if any(
+        check.status == "attention" for check in checks
+    ) else "ready"
+    overall_label = "Needs attention" if overall == "attention" else "Ready"
+    rows = "".join(_setup_check_row(check) for check in checks)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent DevTools setup and health</title>
+  <style>
+    :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
+      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; background: #f3f6fb; color: #172033; }}
+    main {{ width: min(820px, calc(100% - 32px)); margin: 48px auto 72px; }}
+    .panel {{ background: #fff; border: 1px solid #dce5f0; border-radius: 18px;
+      box-shadow: 0 16px 38px rgba(31, 50, 81, .08); padding: 28px;
+      margin-bottom: 18px; }}
+    .eyebrow {{ color: #42658f; font-size: .75rem; font-weight: 800;
+      letter-spacing: .09em; text-transform: uppercase; }}
+    h1 {{ margin: 8px 0; font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -.04em; }}
+    h2 {{ margin: 0 0 18px; font-size: 1.15rem; }}
+    p {{ line-height: 1.55; }}
+    .muted {{ color: #64748b; }}
+    .topline {{ align-items: center; display: flex; flex-wrap: wrap; gap: 14px;
+      margin: 22px 0 12px; }}
+    .pill {{ border-radius: 999px; display: inline-block; font-size: .85rem;
+      font-weight: 800; padding: 7px 11px; }}
+    .ready {{ background: #dcfce7; color: #166534; }}
+    .attention {{ background: #fee2e2; color: #991b1b; }}
+    .info {{ background: #e0f2fe; color: #075985; }}
+    .checks {{ display: grid; gap: 10px; }}
+    .check {{ align-items: center; border: 1px solid #e2e8f0; border-radius: 12px;
+      display: grid; gap: 14px; grid-template-columns: auto minmax(0, 1fr);
+      padding: 13px 14px; }}
+    .check-name {{ font-weight: 750; }}
+    .check-detail {{ color: #64748b; font-size: .88rem; line-height: 1.4;
+      margin-top: 4px; overflow-wrap: anywhere; }}
+    .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
+  </style>
+</head>
+<body>
+<main>
+  <section class="panel">
+    <div class="eyebrow">Agent DevTools · local setup</div>
+    <h1>Setup &amp; health</h1>
+    <div class="topline">
+      <span class="pill {overall}">{overall_label}</span>
+      <span class="muted">Local checks only; no agent run or model call.</span>
+    </div>
+    <p class="muted">Config source: {_path_label(config_file)} · Trace root:
+    {_path_label(output_root)}</p>
+  </section>
+  <section class="panel">
+    <h2>Ready to run</h2>
+    <div class="checks">{rows}</div>
+  </section>
+  <section class="panel">
+    <a class="back" href="/">← Back to run status</a>
+    <p class="muted">This page never displays secret values. Provider keys are
+    read from environment variables by the agent process, not from this UI.</p>
+  </section>
+</main>
+</body>
+</html>
+"""
+
+
 def _state_details(state: RunState) -> str:
     if state.status is RunStateStatus.ERRORED:
         return state.error_type or state.issue_code or "Agent error"
@@ -493,4 +608,176 @@ def _format_age(age: timedelta) -> str:
     return f"{remaining_seconds}s"
 
 
-__all__ = ["render_control_center", "serve_control_center"]
+def _load_setup_config(
+    config_path: Path,
+) -> tuple[AgentDevToolsConfig, _SetupCheck]:
+    try:
+        config = AgentDevToolsConfig.from_file(config_path)
+    except FileNotFoundError:
+        return (
+            AgentDevToolsConfig(),
+            _SetupCheck(
+                "Configuration",
+                "info",
+                "No config file; using built-in defaults",
+            ),
+        )
+    except (OSError, TypeError, ValueError) as error:
+        return (
+            AgentDevToolsConfig(),
+            _SetupCheck(
+                "Configuration",
+                "attention",
+                f"Could not load config ({type(error).__name__})",
+            ),
+        )
+    return (
+        config,
+        _SetupCheck("Configuration", "ready", "Config file loaded"),
+    )
+
+
+def _setup_checks(config: AgentDevToolsConfig) -> tuple[_SetupCheck, ...]:
+    checks: list[_SetupCheck] = []
+    if config.enabled:
+        checks.append(
+            _SetupCheck("Recording", "ready", "Action recording is enabled")
+        )
+    else:
+        checks.append(
+            _SetupCheck(
+                "Recording",
+                "attention",
+                "Recording is disabled; no trace or report will be created",
+            )
+        )
+
+    checks.append(_provider_key_check())
+    checks.append(_browser_check(config))
+    checks.append(_trace_directory_check(config.trace_directory))
+    checks.append(
+        _SetupCheck(
+            "Screenshots",
+            "ready" if config.screenshots else "info",
+            (
+                "Before/after screenshots are enabled"
+                if config.screenshots
+                else "Disabled; actions and state are still recorded"
+            ),
+        )
+    )
+    checks.append(
+        _SetupCheck(
+            "Redaction",
+            "ready" if config.redact_sensitive_data else "attention",
+            (
+                "Sensitive metadata redaction is enabled"
+                if config.redact_sensitive_data
+                else "Disabled; review traces before sharing"
+            ),
+        )
+    )
+    return tuple(checks)
+
+
+def _provider_key_check() -> _SetupCheck:
+    provider = os.getenv("AGENT_DEVTOOLS_LLM_PROVIDER", "auto").strip().lower()
+    if provider not in {"auto", "gemini", "openai"}:
+        return _SetupCheck(
+            "Provider key",
+            "attention",
+            "Unknown provider selection",
+        )
+    gemini = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"))
+    openai = bool(os.getenv("OPENAI_API_KEY"))
+    if provider == "gemini" and gemini:
+        return _SetupCheck("Provider key", "ready", "Gemini key is available")
+    if provider == "openai" and openai:
+        return _SetupCheck("Provider key", "ready", "OpenAI key is available")
+    if provider == "auto" and gemini and openai:
+        return _SetupCheck(
+            "Provider key",
+            "attention",
+            "Multiple provider keys; choose Gemini or OpenAI explicitly",
+        )
+    if provider == "auto" and (gemini or openai):
+        return _SetupCheck(
+            "Provider key",
+            "ready",
+            "A provider key is available",
+        )
+    return _SetupCheck(
+        "Provider key",
+        "info",
+        "Not set; required when the Browser Use CLI creates the agent",
+    )
+
+
+def _browser_check(config: AgentDevToolsConfig) -> _SetupCheck:
+    path = config.browser_executable_path
+    if path is None:
+        return _SetupCheck(
+            "Browser",
+            "ready",
+            "Using Browser Use's managed browser",
+        )
+    if path.is_file():
+        return _SetupCheck(
+            "Browser",
+            "ready",
+            "Configured browser executable found",
+        )
+    return _SetupCheck(
+        "Browser",
+        "attention",
+        "Configured browser executable not found",
+    )
+
+
+def _trace_directory_check(configured: Path) -> _SetupCheck:
+    path = configured.expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if path.exists() and not path.is_dir():
+        return _SetupCheck(
+            "Trace directory",
+            "attention",
+            "Configured path is not a directory",
+        )
+    if not path.exists():
+        return _SetupCheck(
+            "Trace directory",
+            "info",
+            "Directory will be created on first run",
+        )
+    if os.access(path, os.W_OK):
+        return _SetupCheck(
+            "Trace directory",
+            "ready",
+            "Trace directory is writable",
+        )
+    return _SetupCheck(
+        "Trace directory",
+        "attention",
+        "Trace directory is not writable",
+    )
+
+
+def _setup_check_row(check: _SetupCheck) -> str:
+    return (
+        f'<div class="check"><span class="pill {escape(check.status)}">'
+        f'{escape(check.status.title())}</span><div><div class="check-name">'
+        f'{escape(check.name)}</div><div class="check-detail">'
+        f'{escape(check.detail)}</div></div></div>'
+    )
+
+
+def _path_label(path: Path) -> str:
+    try:
+        relative = path.resolve().relative_to(Path.cwd().resolve())
+    except (OSError, ValueError):
+        return path.name or path.as_posix()
+    return relative.as_posix() or "."
+
+
+__all__ = ["render_control_center", "render_setup_page", "serve_control_center"]

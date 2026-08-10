@@ -18,6 +18,7 @@ from agent_devtools.bundle import (
 from agent_devtools.config import AgentDevToolsConfig
 from agent_devtools.control_center import (
     render_control_center,
+    render_setup_page,
     serve_control_center,
 )
 from agent_devtools.evaluation import (
@@ -61,6 +62,7 @@ __all__ = [
     "ActionStatus",
     "AgentDevToolsConfig",
     "render_control_center",
+    "render_setup_page",
     "serve_control_center",
     "BundleExportError",
     "EvaluationComparison",

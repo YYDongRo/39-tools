@@ -231,6 +231,15 @@ state with no update for two minutes is shown as a possible interruption; it is
 not silently converted into a failure. The last action type is shown without
 action arguments or typed values. The control center also lists the five most
 recent completed runs so you can open an older report without leaving the app.
+Select **Setup & health** to see whether recording, the provider environment,
+the configured browser, the trace directory, screenshots, and redaction are
+ready. Secret values are never displayed. If the configuration file has a
+different name or location, pass it when starting the dashboard:
+
+```bash
+uv run --extra browser-use agent-devtools dashboard \
+  --config path/to/agent_devtools.toml --open
+```
 
 ### Export a diagnostic bundle
 

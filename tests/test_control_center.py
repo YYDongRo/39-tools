@@ -8,7 +8,11 @@ from urllib.request import urlopen
 import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
-from agent_devtools.control_center import _create_server, render_control_center
+from agent_devtools.control_center import (
+    _create_server,
+    render_control_center,
+    render_setup_page,
+)
 from agent_devtools.run_state import (
     RunState,
     RunStateStatus,
@@ -123,6 +127,8 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
             control_center = response.read().decode("utf-8")
         with urlopen(f"{base_url}/demo/report.html") as response:
             report_html = response.read().decode("utf-8")
+        with urlopen(f"{base_url}/setup.html") as response:
+            setup_html = response.read().decode("utf-8")
     finally:
         server.shutdown()
         thread.join(timeout=2)
@@ -131,6 +137,41 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert 'href="demo/report.html"' in control_center
     assert 'target="_blank" rel="noopener noreferrer"' in control_center
     assert report_html == "<html>local report</html>"
+    assert "Setup &amp; health" in setup_html
+    assert "Local checks only" in setup_html
+
+
+def test_setup_page_reports_safe_configuration_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "agent_devtools.toml"
+    config_path.write_text(
+        """[agent_devtools]
+screenshots = false
+redact_sensitive_data = true
+trace_directory = "trace-output"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("AGENT_DEVTOOLS_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "secret-key-value")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    html = render_setup_page(tmp_path, config_path=config_path)
+
+    assert "Setup &amp; health" in html
+    assert "Config file loaded" in html
+    assert "A provider key is available" in html
+    assert "Disabled; actions and state are still recorded" in html
+    assert "secret-key-value" not in html
+    assert str(tmp_path.resolve()) not in html
+
+    monkeypatch.setenv("OPENAI_API_KEY", "another-secret")
+    conflict_html = render_setup_page(tmp_path, config_path=config_path)
+    assert "Needs attention" in conflict_html
+    assert "Multiple provider keys" in conflict_html
 
 
 def test_control_center_lists_recent_runs(tmp_path: Path) -> None:
