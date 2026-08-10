@@ -94,6 +94,9 @@ def test_control_center_links_latest_report_with_relative_path(
     assert "Failed" in html
     assert "target_not_found" in html
     assert 'href="20260809T120000Z-demo/report.html"' in html
+    assert 'target="_blank" rel="noopener noreferrer"' in html
+    assert "Open full report" in html
+    assert "separate" in html
     assert "http-equiv=\"refresh\"" not in html
     assert str(tmp_path.resolve()) not in html
 

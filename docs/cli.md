@@ -222,12 +222,14 @@ uv run --extra browser-use agent-devtools dashboard --open
 ```
 
 It reads the newest `run-state.json` below `trace/` and refreshes while the
-status is `tracking`. When the run finishes, use **Open latest report** or
-**All reports**. The server binds to `127.0.0.1` by default, serves only the
-selected trace workspace, and stops with `Ctrl+C`. Use `--root PATH` for a
-different workspace. A tracking state with no update for two minutes is shown
-as a possible interruption; it is not silently converted into a failure. The
-last action type is shown without action arguments or typed values.
+status is `tracking`. When the run finishes, use **Open full report** to open
+the complete HTML report in a separate browser tab, or **Open report index** to
+see earlier reports. The control center remains open for monitoring. The server
+binds to `127.0.0.1` by default, serves only the selected trace workspace, and
+stops with `Ctrl+C`. Use `--root PATH` for a different workspace. A tracking
+state with no update for two minutes is shown as a possible interruption; it is
+not silently converted into a failure. The last action type is shown without
+action arguments or typed values.
 
 ### Export a diagnostic bundle
 

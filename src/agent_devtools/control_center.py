@@ -88,10 +88,16 @@ def render_control_center(
     index_note = index_error or "Reports are listed in the local index."
     index_href = _index_href(output_root, state_root)
     report_link = (
-        f'<a class="button primary" href="{escape(report_href, quote=True)}">'
-        "Open latest report</a>"
+        f'<a class="button primary" href="{escape(report_href, quote=True)}" '
+        'target="_blank" rel="noopener noreferrer">'
+        "Open full report ↗</a>"
         if report_href is not None
         else '<span class="muted">No completed report yet</span>'
+    )
+    index_link = (
+        f'<a class="button secondary" href="{escape(index_href, quote=True)}" '
+        'target="_blank" rel="noopener noreferrer">'
+        "Open report index ↗</a>"
     )
     status_class = escape(
         f"{status_value.value}{' stale' if is_stale else ''}",
@@ -171,9 +177,10 @@ def render_control_center(
     </dl>
     <div class="actions">
       {report_link}
-      <a class="button secondary" href="{escape(index_href, quote=True)}">All reports</a>
+      {index_link}
     </div>
-    <div class="notice">{escape(index_note)}</div>
+    <div class="notice">{escape(index_note)} Full reports open in a separate
+    browser tab; this status page stays available for monitoring.</div>
   </section>
   <section class="panel">
     <h2>What this means</h2>
