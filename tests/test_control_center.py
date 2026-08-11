@@ -361,8 +361,10 @@ def test_control_center_discovers_newest_nested_trace_root(tmp_path: Path) -> No
 def test_control_center_handles_first_run_without_state(tmp_path: Path) -> None:
     html = render_control_center(tmp_path)
 
-    assert "Agent DevTools" in html
-    assert "What would you like to do?" in html
+    assert "<title>39 tools</title>" in html
+    assert "<h1>39 tools</h1>" in html
+    assert "class=\"button primary\"" in html
+    assert html.count('class="button secondary"') >= 2
     assert "Latest run" not in html
     assert 'href="index.html"' in html
 

@@ -91,7 +91,7 @@ def render_control_center(
         output_root,
         state_root if state_root is not None else output_root,
     )
-    index_link = _external_link(index_href, "Report index ↗", "compact-link")
+    index_link = _external_link(index_href, "Report index ↗", "secondary")
     setup_link = _internal_link("setup.html", "Setup & health")
     start_link = _internal_link(
         "start.html",
@@ -142,7 +142,7 @@ def render_control_center(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {refresh}
-  <title>Agent DevTools</title>
+  <title>39 tools</title>
   <style>
     :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
       -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
@@ -174,10 +174,9 @@ def render_control_center(
     .home-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }}
     .button {{ border-radius: 10px; display: inline-block; font-weight: 750;
       padding: 10px 14px; text-decoration: none; }}
-    .primary {{ background: #1459b8; color: #fff; }}
-    .secondary {{ border: 1px solid #cbd5e1; color: #1459b8; }}
-    .compact-link {{ color: #1459b8; font-size: .9rem; padding: 5px 0;
-      text-decoration: none; white-space: nowrap; }}
+    .primary, .secondary {{ background: #fff; border: 1px solid #1459b8;
+      color: #1459b8; }}
+    .primary:hover, .secondary:hover {{ background: #eff6ff; }}
     .section-heading {{ align-items: center; display: flex; flex-wrap: wrap;
       gap: 12px; justify-content: space-between; }}
     .section-heading h2 {{ margin-bottom: 0; }}
@@ -200,8 +199,8 @@ def render_control_center(
 <body>
 <main>
   <section class="panel">
-    <div class="eyebrow">Agent DevTools · local control center</div>
-    <h1>What would you like to do?</h1>
+    <div class="eyebrow">39 tools · local control center</div>
+    <h1>39 tools</h1>
     <div class="home-actions">
       {start_link}
       {setup_link}
