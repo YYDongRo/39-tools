@@ -16,8 +16,9 @@ whole task actually finished:
 - action verification separated from final task verification;
 - repeated runs with fresh agents and an aggregate stability report.
 
-The displayed name is **Agent DevTools**. The distribution is `39-tools`, the
-Python import name is `agent_devtools`, and the command is `agent-devtools`.
+The product name is **Agent DevTools**. The local control center may display
+**39 tools**; the distribution is `39-tools`, the Python import name is
+`agent_devtools`, and the command is `agent-devtools`.
 
 ## See a report first
 
@@ -35,7 +36,7 @@ No installation, API key, or agent is needed to inspect these committed examples
 Install the fixed alpha release in a new project:
 
 ```bash
-uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.1.0"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.2.0a1"
 uv run playwright install chromium
 ```
 
@@ -57,6 +58,10 @@ PowerShell:
 ```powershell
 $env:GOOGLE_API_KEY = "your-key"
 ```
+
+The dashboard does not accept or store provider keys. **Setup & health** only
+reports whether the process can see a key. For a custom-agent BYOK judge, use
+the separate environment variables documented in the [CLI guide](docs/cli.md).
 
 ### Run a task
 
@@ -88,7 +93,7 @@ terminal:
 uv run agent-devtools dashboard --open
 ```
 
-The control center is a small local home page with four paths:
+The control center is a small local home page with four entry points:
 
 - **Run Browser Use task** launches the existing Browser Use CLI on localhost.
 - **Connect your agent** shows the one-time wrapper for your own compatible
@@ -106,6 +111,15 @@ dashboard does not upload traces and stops with `Ctrl+C`.
 The Start page accepts a task and keeps `runs`, `max_steps`, and the visible
 browser option under **Advanced settings**. It is enabled only when the
 dashboard is bound to `127.0.0.1` (the default).
+
+### Choose your workflow
+
+- **Run Browser Use task**: enter the task in the local page; the supported
+  Browser Use CLI creates and runs the Agent.
+- **Connect your agent**: keep entering tasks in your own CLI, script, or app,
+  and wrap your compatible agent once with `observe_agent(...)`. The dashboard
+  then shows the local trace and report; it does not start or control that
+  agent.
 
 To make one portable local diagnostic archive, add `--export-bundle`:
 
@@ -135,9 +149,10 @@ files omitted. The original trace is not changed. It is a deterministic safety
 filter, not a guarantee that every private value or screenshot has been found.
 
 Already have a Browser Use, Playwright, or compatible custom agent? Add the
-observer once at its run boundary. See the [Browser Use guide](docs/browser-use.md),
-[CLI guide](docs/cli.md), and [Playwright guide](docs/playwright.md) for the
-short integration examples.
+observer once at its run boundary. Direct calls such as `pyautogui.click()` or
+an unwrapped native API remain outside the recording boundary. See the
+[Browser Use guide](docs/browser-use.md), [CLI guide](docs/cli.md), and
+[Playwright guide](docs/playwright.md) for the short integration examples.
 
 ## Check stability
 
@@ -170,9 +185,10 @@ scan files or save environment variables and executable paths.
 ## Scope and documentation
 
 Agent DevTools observes supported Browser Use, Playwright, and tool-bound custom
-agents. It does not automatically intercept arbitrary direct `page.click()`,
-`pyautogui`, desktop, or Android calls. It is not an agent runtime, hosted
-dashboard, full replay system, or automatic recovery service.
+agents. It does not include a desktop agent or automatically intercept arbitrary
+direct `page.click()`, `pyautogui`, desktop, or Android calls. It is not an
+agent runtime, hosted dashboard, full replay system, or automatic recovery
+service.
 
 - [Browser Use guide](docs/browser-use.md)
 - [CLI and custom-agent guide](docs/cli.md)

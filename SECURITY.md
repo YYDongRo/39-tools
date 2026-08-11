@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-Agent DevTools is currently an early-stage project without a stable release.
-Security fixes are applied to the latest code on the `main` branch.
+Agent DevTools is currently an alpha project without a stable release.
+The `0.2.0a1` build is a pre-release; security fixes are applied to the latest
+code on the `main` branch.
 
 ## Reporting a vulnerability
 
@@ -34,3 +35,8 @@ text is identified.
 Keep model-provider keys in environment variables. Agent DevTools should not
 write provider keys to traces or reports. Revoke any credential that may have
 been committed, logged, or shared accidentally.
+
+The local control center does not provide a provider-key input or upload traces.
+It serves the selected trace workspace on loopback by default. A custom browser
+or desktop-style agent is recorded only when its actions pass through the
+documented observer/tool boundary; direct native calls are outside that scope.

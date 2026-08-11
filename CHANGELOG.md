@@ -4,6 +4,21 @@ All notable changes to Agent DevTools are recorded here.
 
 ## Unreleased
 
+## 0.2.0a1 - 2026-08-11
+
+- Add a local control center with focused entry points for running Browser Use
+  tasks, connecting a compatible custom agent, checking setup health, and
+  opening all local reports.
+- Add a one-time custom-agent connection guide that keeps task input in the
+  developer's existing CLI or application and explains the recording boundary.
+- Keep the latest run and recent reports compact so the control center is useful
+  during a task without replacing the agent or uploading trace data.
+- Clarify provider-key setup, local-only report handling, and the difference
+  between the `39-tools` distribution, `agent_devtools` import, and
+  `agent-devtools` command.
+- Keep this release alpha: direct unwrapped desktop or native calls are not
+  automatically captured, and the package is not published on PyPI.
+
 ## 0.1.0 - 2026-08-08
 
 - Add the installable `agent-devtools` command for the Browser Use workflow.

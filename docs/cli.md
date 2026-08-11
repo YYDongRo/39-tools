@@ -1,9 +1,12 @@
 # CLI workflow
 
-Agent DevTools is a library that attaches to an existing agent. It is not a
-global background process that can discover every program on the computer.
-After the one-time integration, however, the user's workflow can be as simple
-as entering a task in a terminal and opening the generated report.
+Agent DevTools is a local library and report viewer that attaches to an existing
+agent. It is not a global background process, and it does not include a desktop
+agent that can discover every program on the computer. Use **Run Browser Use
+task** when Agent DevTools should launch the supported Browser Use workflow; use
+**Connect your agent** when your own CLI or application already owns the agent.
+After the one-time integration, the latter workflow remains as simple as
+entering a task in your existing app and opening the generated report.
 
 ## First run: real Chromium without an API key
 
@@ -44,7 +47,7 @@ failed preflight exits non-zero with the failing check and a repair hint.
 Install the optional Browser Use integration and Chromium:
 
 ```bash
-uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.1.0"
+uv add "39-tools[browser-use] @ git+https://github.com/YYDongRo/39-tools.git@v0.2.0a1"
 uv run playwright install chromium
 uv run agent-devtools --help
 ```
@@ -57,7 +60,15 @@ export GOOGLE_API_KEY="..."       # Gemini
 # export OPENAI_API_KEY="..."     # OpenAI instead
 ```
 
-Do not put the key in `agent_devtools.toml` or in Python source code.
+PowerShell:
+
+```powershell
+$env:GOOGLE_API_KEY = "..."
+```
+
+Do not put the key in `agent_devtools.toml` or in Python source code. The local
+dashboard never accepts or stores a provider key; **Setup & health** only
+reports whether the process can see one.
 
 Copy the optional recording configuration once:
 
@@ -279,7 +290,7 @@ referenced. The original trace remains unchanged. This is a conservative,
 pattern-based filter; inspect the result before sharing because it cannot
 recognize every private value or sensitive detail inside arbitrary images.
 
-## Custom desktop or browser agents
+## Custom tool-bound browser or desktop-style agents
 
 For an agent that is not Browser Use, use the generic observer at the agent's
 run boundary:
@@ -299,7 +310,8 @@ observed_agent.run(user_request)
 print(observed_agent.last_report_path)
 ```
 
-The agent must accept the recording proxy through this contract:
+The agent must accept the recording proxy through this contract. This is an
+integration boundary, not automatic interception of a whole desktop:
 
 ```python
 def run(self, task: str, *, tools: MyTools):
@@ -353,7 +365,9 @@ verification note. Configure either `task_verification` or
 `final_state_verifier`, not both.
 
 For a provider-backed check that infers the expected result from the task and
-reviews every recorded action in one request, configure a BYOK provider once:
+reviews every recorded action in one request, configure a BYOK provider once.
+This is separate from the Browser Use CLI key above: the generic judge uses
+`AGENT_DEVTOOLS_LLM_PROVIDER` plus the matching provider key:
 
 ```bash
 export AGENT_DEVTOOLS_LLM_PROVIDER=openai
@@ -384,9 +398,10 @@ screenshots stay local in this version. Missing credentials, provider errors,
 or uncertain evidence remain `unverified`.
 
 This is an explicit integration boundary. Direct calls such as
-`pyautogui.click(...)` made outside `tools` are not automatically visible.
-The application can still keep its existing CLI: it only needs to pass the
-user's input to `observed_agent.run(user_request)` after the one-time setup.
+`pyautogui.click(...)` made outside `tools` are not automatically visible, and
+Agent DevTools does not ship a desktop agent of its own. The application can
+still keep its existing CLI: it only needs to pass the user's input to
+`observed_agent.run(user_request)` after the one-time setup.
 
 To understand this contract without installing a browser or connecting a real
 desktop, run the deterministic in-memory example:
