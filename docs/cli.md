@@ -221,29 +221,30 @@ second terminal:
 uv run --extra browser-use agent-devtools dashboard --open
 ```
 
-The home page has three paths: **Start a task**, **Setup & health**, and
-**Report index**. After a run, **Latest run** shows the status, task, and report
-link; **Recent runs** keeps the five newest report links. The page refreshes
-while an agent is tracking, reports open in a separate browser tab, and no
-trace is uploaded. The server binds to `127.0.0.1` by default, serves only the
-selected trace workspace, and stops with `Ctrl+C`. Use `--root PATH` for a
-different workspace. Setup & health checks recording, provider environment,
-browser, trace directory, screenshots, and redaction without displaying secret
-values. If the configuration file has a different name or location, pass it
-when starting the dashboard:
+The home page has four paths: **Run Browser Use task**, **Connect your agent**,
+**Setup & health**, and **All reports**. After a run, **Latest run** shows the
+status, task, and report link; **Recent runs** keeps the five newest report
+links. The page refreshes while an agent is tracking, reports open in a
+separate browser tab, and no trace is uploaded. The server binds to
+`127.0.0.1` by default, serves only the selected trace workspace, and stops
+with `Ctrl+C`. Use `--root PATH` for a different workspace. Setup & health
+checks recording, provider environment, browser, trace directory, screenshots,
+and redaction without displaying secret values. If the configuration file has a
+different name or location, pass it when starting the dashboard:
 
 ```bash
 uv run --extra browser-use agent-devtools dashboard \
   --config path/to/agent_devtools.toml --open
 ```
 
-The dashboard's **Start a task** link is a local shortcut for the same Browser
-Use CLI. Enter a task and submit; the dashboard stays available while the
-normal trace and report are written. **Runs**, **Maximum steps**, and
+The dashboard's **Run Browser Use task** link is a local shortcut for the same
+Browser Use CLI. Enter a task and submit; the dashboard stays available while
+the normal trace and report are written. **Runs**, **Maximum steps**, and
 **Open a visible browser window** are available under the collapsed
 **Advanced settings** section. The form accepts only a task description, never
 a shell command, and is disabled when the server is bound to a non-loopback
-interface.
+interface. For your own compatible Agent, use **Connect your agent**; the
+Agent continues to receive tasks from your own CLI or app.
 
 ### Export a diagnostic bundle
 

@@ -148,9 +148,9 @@ package.
   `agent_devtools.example.toml`.
 - CLI and custom-agent setup guide: `docs/cli.md`.
 - Local control center: `agent-devtools dashboard --open`; its home page offers
-  **Start a task**, **Setup & health**, and **Report index**, then shows a
-  compact latest result and five recent report links. Advanced Browser Use
-  settings stay collapsed on the start page.
+  **Run Browser Use task**, **Connect your agent**, **Setup & health**, and
+  **All reports**, then shows a compact latest result and five recent report
+  links. Advanced Browser Use settings stay collapsed on the start page.
 
 Keep these names stable unless a deliberate compatibility plan is written.
 

@@ -88,12 +88,14 @@ terminal:
 uv run agent-devtools dashboard --open
 ```
 
-The control center is a small local home page with three paths:
+The control center is a small local home page with four paths:
 
-- **Start a task** launches the existing Browser Use CLI on localhost.
+- **Run Browser Use task** launches the existing Browser Use CLI on localhost.
+- **Connect your agent** shows the one-time wrapper for your own compatible
+  browser or desktop Agent; the task stays in your CLI or app.
 - **Setup & health** shows whether recording, the provider environment, browser,
   screenshots, and redaction are ready; it never shows secret values.
-- **Report index** opens the local list of completed reports.
+- **All reports** opens the local list of completed reports.
 
 After a run, **Latest run** shows only its status, task, and report link.
 **Recent runs** keeps the five newest report links. The home page refreshes while

@@ -91,11 +91,12 @@ def render_control_center(
         output_root,
         state_root if state_root is not None else output_root,
     )
-    index_link = _external_link(index_href, "Report index ↗", "secondary")
+    index_link = _external_link(index_href, "All reports ↗", "secondary")
+    connect_link = _internal_link("connect.html", "Connect your agent")
     setup_link = _internal_link("setup.html", "Setup & health")
     start_link = _internal_link(
         "start.html",
-        "Start a task",
+        "Run Browser Use task",
         "primary" if launch_enabled else "secondary",
     )
     if state is None:
@@ -203,6 +204,7 @@ def render_control_center(
     <h1>39 tools</h1>
     <div class="home-actions">
       {start_link}
+      {connect_link}
       {setup_link}
       {index_link}
     </div>
@@ -322,6 +324,9 @@ class _ControlCenterHandler(SimpleHTTPRequestHandler):
                     config_path=self._config_path,
                 )
             )
+            return
+        if path in {"/connect", "/connect.html"}:
+            self._send_html(render_connect_page(self._control_root))
             return
         if path == "/index.html":
             try:
@@ -619,6 +624,121 @@ def _history_report_href(
     except ValueError:
         return None
     return report.as_posix() if prefix == "." else f"{prefix}/{report.as_posix()}"
+
+
+def render_connect_page(root: str | Path) -> str:
+    """Render the local guide for connecting a compatible custom agent."""
+
+    _ensure_root(root)
+    wrapper_code = escape(
+        """from agent_devtools import observe_agent
+
+raw_agent = MyDesktopAgent()
+observed_agent = observe_agent(
+    raw_agent,
+    raw_agent.tools,
+    "trace/my-agent",
+    tools_attribute="tools",
+)
+
+user_request = input("Task: ")
+observed_agent.run(user_request)
+print(observed_agent.last_report_path)""",
+        quote=False,
+    )
+    task_contract = escape(
+        """def run(self, task: str, *, tools):
+    tools.click(...)
+    tools.type_text(...)
+    tools.scroll(...)""",
+        quote=False,
+    )
+    dashboard_command = escape(
+        "uv run agent-devtools dashboard --root trace --open",
+        quote=False,
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>39 tools · connect your agent</title>
+  <style>
+    :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui,
+      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; background: #f3f6fb; color: #172033; }}
+    main {{ width: min(820px, calc(100% - 32px)); margin: 48px auto 72px; }}
+    .panel {{ background: #fff; border: 1px solid #dce5f0; border-radius: 18px;
+      box-shadow: 0 16px 38px rgba(31, 50, 81, .08); padding: 28px;
+      margin-bottom: 18px; }}
+    .eyebrow {{ color: #42658f; font-size: .75rem; font-weight: 800;
+      letter-spacing: .09em; text-transform: uppercase; }}
+    h1 {{ margin: 8px 0 10px; font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -.04em; }}
+    h2 {{ margin: 0 0 9px; font-size: 1.1rem; }}
+    p, li {{ line-height: 1.55; }}
+    .muted {{ color: #64748b; }}
+    .step {{ border-top: 1px solid #e2e8f0; padding: 22px 0 2px; }}
+    .step:first-child {{ border-top: 0; padding-top: 0; }}
+    .code {{ background: #111827; border-radius: 10px; color: #e2e8f0;
+      font: .86rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+      margin: 12px 0 0; overflow-x: auto; padding: 15px; white-space: pre; }}
+    .note {{ background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
+      color: #1e40af; margin-top: 16px; padding: 12px 14px; }}
+    .warning {{ background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px;
+      color: #9a3412; margin-top: 14px; padding: 12px 14px; }}
+    .back {{ color: #1459b8; font-weight: 750; text-decoration: none; }}
+  </style>
+</head>
+<body>
+<main>
+  <section class="panel">
+    <div class="eyebrow">39 tools · custom agent</div>
+    <h1>Connect your agent</h1>
+    <p class="muted">Your Agent still runs in its own CLI, app, or chat
+    interface. Add the observer once at the run boundary; this page does not
+    start or take control of your Agent.</p>
+    <div class="note">The task is entered on your side. 39 tools records the
+    wrapped tool calls and shows the resulting report here.</div>
+  </section>
+  <section class="panel">
+    <div class="step">
+      <h2>1. Wrap the Agent once</h2>
+      <p class="muted">Use the tools object your Agent already owns. The trace
+      root below matches this control center's default <code>trace</code>
+      directory.</p>
+      <pre class="code"><code>{wrapper_code}</code></pre>
+    </div>
+    <div class="step">
+      <h2>2. Keep actions behind the tools boundary</h2>
+      <p class="muted">Calls through this dispatcher become action records:</p>
+      <pre class="code"><code>{task_contract}</code></pre>
+      <div class="warning">Direct calls such as <code>pyautogui.click()</code>
+      or native desktop APIs bypass this boundary and are not automatically
+      recorded.</div>
+    </div>
+    <div class="step">
+      <h2>3. Watch the run here</h2>
+      <p class="muted">Start the control center separately, then run your own
+      Agent. It reads the same local trace directory and updates Latest run and
+      the report links.</p>
+      <pre class="code"><code>{dashboard_command}</code></pre>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>What you get</h2>
+    <ul>
+      <li>One report for each Agent run.</li>
+      <li>Action arguments, timing, status, and optional screenshots.</li>
+      <li>Final task verification and a clear failure result.</li>
+    </ul>
+    <a class="back" href="/">← Back to home</a>
+  </section>
+</main>
+</body>
+</html>
+"""
 
 
 def render_setup_page(

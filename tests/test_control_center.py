@@ -14,6 +14,7 @@ from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.control_center import (
     _create_server,
     render_control_center,
+    render_connect_page,
     render_setup_page,
     render_start_page,
 )
@@ -138,6 +139,8 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
             report_html = response.read().decode("utf-8")
         with urlopen(f"{base_url}/setup.html") as response:
             setup_html = response.read().decode("utf-8")
+        with urlopen(f"{base_url}/connect.html") as response:
+            connect_html = response.read().decode("utf-8")
         with urlopen(f"{base_url}/start.html") as response:
             start_html = response.read().decode("utf-8")
     finally:
@@ -147,6 +150,10 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
 
     assert 'href="demo/report.html"' in control_center
     assert 'target="_blank" rel="noopener noreferrer"' in control_center
+    assert "Run Browser Use task" in control_center
+    assert "Connect your agent" in control_center
+    assert "All reports ↗" in control_center
+    assert 'href="connect.html"' in control_center
     assert report_html == "<html>local report</html>"
     assert "Setup &amp; health" in setup_html
     assert "Local checks only" in setup_html
@@ -164,6 +171,24 @@ def test_control_center_serves_report_from_same_local_app(tmp_path: Path) -> Non
     assert start_html.count('href="/"') == 1
     assert 'href="setup.html"' not in start_html
     assert 'href="index.html"' not in start_html
+    assert "Connect your agent" in connect_html
+    assert "observe_agent" in connect_html
+    assert "observed_agent.run(user_request)" in connect_html
+    assert "pyautogui.click" in connect_html
+    assert "GOOGLE_API_KEY" not in connect_html
+
+
+def test_connect_page_explains_custom_agent_boundary(tmp_path: Path) -> None:
+    html = render_connect_page(tmp_path)
+
+    assert "Connect your agent" in html
+    assert "Your Agent still runs in its own CLI" in html
+    assert "raw_agent.tools" in html
+    assert 'tools_attribute=\"tools\"' in html
+    assert "uv run agent-devtools dashboard --root trace --open" in html
+    assert "Direct calls such as" in html
+    assert str(tmp_path.resolve()) not in html
+    assert "API_KEY" not in html
 
 
 def test_start_page_is_local_only_and_does_not_show_secrets(
@@ -241,7 +266,7 @@ def test_start_route_launches_only_the_fixed_browser_use_cli(
     assert launched["stdin"] is subprocess.DEVNULL
     assert launched["shell"] is False
     assert launched["cwd"] == str(Path.cwd())
-    assert "Start a task" in dashboard
+    assert "Run Browser Use task" in dashboard
     assert "Open example.test" not in dashboard
 
 
