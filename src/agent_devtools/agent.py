@@ -13,6 +13,7 @@ from agent_devtools.async_tool_recorder import (
     RecordedAsyncTools,
     record_async_tools,
 )
+from agent_devtools.connection import ConnectionReporter
 from agent_devtools.events import ActionEventCollector
 from agent_devtools.failure import record_agent_run_failure
 from agent_devtools.final_state import FinalStateObservation
@@ -92,6 +93,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         self.event_collector = event_collector
         self.tools_attribute = tools_attribute
         self.last_trace: RecordedTools[ToolT] | None = None
+        self._connection: ConnectionReporter | None = None
         self._active = False
 
     @property
@@ -112,6 +114,7 @@ class ObservedAgent(Generic[AgentT, ToolT]):
         if self._active:
             raise RuntimeError("an observed agent run is already active")
 
+        self._ensure_connection()
         self._active = True
         try:
             trace = record_tools(
@@ -173,7 +176,18 @@ class ObservedAgent(Generic[AgentT, ToolT]):
                     record_agent_run_failure(trace.session, error)
                     raise
         finally:
+            if self._connection is not None:
+                self._connection.heartbeat()
             self._active = False
+
+    def _ensure_connection(self) -> None:
+        if self._connection is None:
+            self._connection = ConnectionReporter(
+                self.output_root,
+                observer_kind="generic-agent",
+            )
+        else:
+            self._connection.heartbeat()
 
     def assert_last_task_passed(self) -> None:
         if self.last_trace is None:
@@ -226,6 +240,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         self.event_collector = event_collector
         self.tools_attribute = tools_attribute
         self.last_trace: RecordedAsyncTools[ToolT] | None = None
+        self._connection: ConnectionReporter | None = None
         self._active = False
 
     @property
@@ -246,6 +261,7 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
         if self._active:
             raise RuntimeError("an observed agent run is already active")
 
+        self._ensure_connection()
         self._active = True
         try:
             trace = record_async_tools(
@@ -305,7 +321,18 @@ class ObservedAsyncAgent(Generic[AgentT, ToolT]):
                     record_agent_run_failure(trace.session, error)
                     raise
         finally:
+            if self._connection is not None:
+                self._connection.heartbeat()
             self._active = False
+
+    def _ensure_connection(self) -> None:
+        if self._connection is None:
+            self._connection = ConnectionReporter(
+                self.output_root,
+                observer_kind="generic-agent",
+            )
+        else:
+            self._connection.heartbeat()
 
     def assert_last_task_passed(self) -> None:
         if self.last_trace is None:

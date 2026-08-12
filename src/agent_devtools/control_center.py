@@ -16,6 +16,11 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.connection import (
+    ConnectionState,
+    ConnectionStatus,
+    read_connection_state,
+)
 from agent_devtools.run_index import _discover_entries, write_run_index
 from agent_devtools.run_state import RunState, RunStateStatus, read_run_state
 
@@ -30,6 +35,7 @@ _STATUS_LABELS = {
     RunStateStatus.ERRORED: "Errored",
 }
 _STALE_RUN_AFTER = timedelta(minutes=2)
+_STALE_CONNECTION_AFTER = timedelta(minutes=2)
 _RECENT_RUN_LIMIT = 5
 _MAX_LAUNCH_BODY_BYTES = 16 * 1024
 _MAX_TASK_LENGTH = 2_000
@@ -47,6 +53,12 @@ _INDEX_STATUS_LABELS = {
 class _StateLocation:
     root: Path
     state: RunState
+
+
+@dataclass(frozen=True)
+class _ConnectionLocation:
+    root: Path
+    state: ConnectionState
 
 
 @dataclass(frozen=True)
@@ -71,6 +83,11 @@ def render_control_center(
     location, state_error = _discover_state(output_root)
     state = location.state if location is not None else None
     state_root = location.root if location is not None else None
+    connection_location, connection_error = _discover_connection(output_root)
+    connection_state = (
+        connection_location.state if connection_location is not None else None
+    )
+    connection_live = _is_connection_live(connection_state, current_time)
     report_href = _report_href(output_root, state_root, state)
     try:
         _write_report_indexes(output_root, state_root)
@@ -82,9 +99,10 @@ def render_control_center(
         refresh = ""
     else:
         is_stale = _is_stale(state, current_time)
-        refresh = '<meta http-equiv="refresh" content="2">' if (
-            state.status is RunStateStatus.TRACKING
-        ) else ""
+        refresh = ""
+
+    if (state is not None and state.status is RunStateStatus.TRACKING) or connection_live:
+        refresh = '<meta http-equiv="refresh" content="2">'
 
     index_href = _index_href(output_root, state_root)
     recent_runs = _render_recent_runs(
@@ -137,6 +155,29 @@ def render_control_center(
     </div>
   </section>
 """
+    if connection_state is None:
+        connection_label = "Not connected"
+        connection_class = "not_connected"
+        connection_detail = (
+            "Wrap your agent once, then run it with this trace folder."
+            if connection_error is None
+            else "Connection status is unavailable."
+        )
+    elif connection_live:
+        connection_label = "Connected"
+        connection_class = "connected"
+        connection_detail = "Your observer is writing to this trace folder."
+    else:
+        connection_label = "Not connected"
+        connection_class = "not_connected"
+        connection_detail = "No live observer is connected to this trace folder."
+    connection_html = f"""\
+  <div class="connection-row" aria-live="polite">
+    <span class="connection-name">Agent connection</span>
+    <span class="pill {connection_class}">{connection_label}</span>
+    <span class="muted">{connection_detail}</span>
+  </div>
+"""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -163,6 +204,8 @@ def render_control_center(
     .pill {{ border-radius: 999px; display: inline-block; font-size: .85rem;
       font-weight: 800; padding: 7px 11px; }}
     .tracking {{ background: #dbeafe; color: #1d4ed8; }}
+    .connected {{ background: #dcfce7; color: #166534; }}
+    .not_connected {{ background: #fef3c7; color: #92400e; }}
     .stale {{ background: #fef3c7; color: #92400e; }}
     .passed {{ background: #dcfce7; color: #166534; }}
     .failed, .errored {{ background: #fee2e2; color: #991b1b; }}
@@ -173,6 +216,11 @@ def render_control_center(
       grid-template-columns: auto minmax(0, 1fr) auto; margin-top: 10px; }}
     .latest-task {{ font-weight: 700; overflow-wrap: anywhere; }}
     .home-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }}
+    .connection-row {{ align-items: center; border-top: 1px solid #e2e8f0;
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px;
+      padding-top: 16px; }}
+    .connection-name {{ font-size: .82rem; font-weight: 800;
+      letter-spacing: .03em; text-transform: uppercase; }}
     .button {{ border-radius: 10px; display: inline-block; font-weight: 750;
       padding: 10px 14px; text-decoration: none; }}
     .primary, .secondary {{ background: #fff; border: 1px solid #1459b8;
@@ -208,6 +256,7 @@ def render_control_center(
       {setup_link}
       {index_link}
     </div>
+    {connection_html}
   </section>
   {latest_html}
   <section class="panel">
@@ -525,6 +574,70 @@ def _discover_state(root: Path) -> tuple[_StateLocation | None, str | None]:
     return None, None
 
 
+def _discover_connection(
+    root: Path,
+) -> tuple[_ConnectionLocation | None, str | None]:
+    """Find the newest observer connection directly below ``root`` or one level down."""
+
+    candidates = [root / "connection-state.json"]
+    candidates.extend(sorted(root.glob("*/connection-state.json")))
+    locations: list[_ConnectionLocation] = []
+    errors: list[str] = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            locations.append(
+                _ConnectionLocation(path.parent, read_connection_state(path))
+            )
+        except (OSError, TypeError, ValueError) as error:
+            errors.append(type(error).__name__)
+
+    if locations:
+        locations.sort(
+            key=lambda location: (
+                location.state.updated_at,
+                location.root.as_posix(),
+            ),
+            reverse=True,
+        )
+        return locations[0], None
+    if errors:
+        return None, f"Connection status is unavailable ({errors[0]})."
+    return None, None
+
+
+def _is_connection_live(
+    state: ConnectionState | None,
+    now: datetime,
+) -> bool:
+    if state is None or state.status is not ConnectionStatus.CONNECTED:
+        return False
+    if state.process_id is not None:
+        process_alive = _process_is_alive(state.process_id)
+        if process_alive is not None:
+            return process_alive
+    try:
+        age = now.astimezone(UTC) - state.updated_at.astimezone(UTC)
+    except (TypeError, ValueError):
+        return False
+    return age < _STALE_CONNECTION_AFTER
+
+
+def _process_is_alive(process_id: int) -> bool | None:
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        # WSL and Windows use different process namespaces.  Fall back to the
+        # heartbeat timestamp instead of treating a foreign PID as dead.
+        return None
+    return True
+
+
 def _write_report_indexes(root: Path, state_root: Path | None) -> None:
     roots = {root}
     if state_root is not None:
@@ -722,7 +835,8 @@ print(observed_agent.last_report_path)""",
       <h2>3. Watch the run here</h2>
       <p class="muted">Start the control center separately, then run your own
       Agent. It reads the same local trace directory and updates Latest run and
-      the report links.</p>
+      the report links. After the first run, the home page also shows whether
+      this observer is connected.</p>
       <pre class="code"><code>{dashboard_command}</code></pre>
     </div>
   </section>

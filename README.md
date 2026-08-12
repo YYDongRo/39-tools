@@ -108,6 +108,12 @@ an agent is tracking; reports open in a separate browser tab. Use `--root PATH`
 for another trace workspace and `--config PATH` for a different TOML file. The
 dashboard does not upload traces and stops with `Ctrl+C`.
 
+When a wrapped agent starts its first run, the home page also shows **Agent
+connection: Connected**. This is a local heartbeat file shared by the observer
+and dashboard; it confirms the observer is writing to the selected trace folder,
+not that every native desktop call is automatically captured. A stopped or
+stale observer is shown as **Not connected**.
+
 The Start page accepts a task and keeps `runs`, `max_steps`, and the visible
 browser option under **Advanced settings**. It is enabled only when the
 dashboard is bound to `127.0.0.1` (the default).

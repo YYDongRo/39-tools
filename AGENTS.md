@@ -90,6 +90,9 @@ package.
 - Versioned JSON persistence uses safe relative paths and atomic writes.
 - Static action and session HTML reports show screenshots, compact state,
   action checks, task checks, and bounded browser/runtime evidence.
+- The local control center reads a versioned observer heartbeat and shows
+  whether a wrapped Browser Use or compatible agent is connected to the
+  selected trace folder; this is not universal desktop interception.
 - Failure categories cover explicit timeout, operation, verification, and
   unknown signals. Prefer evidence over inferred explanations.
 

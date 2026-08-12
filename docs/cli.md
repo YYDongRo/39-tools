@@ -257,6 +257,12 @@ a shell command, and is disabled when the server is bound to a non-loopback
 interface. For your own compatible Agent, use **Connect your agent**; the
 Agent continues to receive tasks from your own CLI or app.
 
+After a wrapped Agent begins its first run, the home page shows **Agent
+connection: Connected**. This is a local heartbeat between the observer and the
+selected trace folder, not a network service or a promise to intercept direct
+desktop calls. If the observer exits or its heartbeat becomes stale, the page
+shows **Not connected**.
+
 ### Export a diagnostic bundle
 
 Add `--export-bundle` when you want one offline zip containing the completed

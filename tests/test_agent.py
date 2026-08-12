@@ -11,6 +11,7 @@ from agent_devtools import (
     observe_agent,
     observe_async_agent,
 )
+from agent_devtools.connection import ConnectionStatus, read_connection_state
 from agent_devtools.run_state import RunStateStatus
 
 
@@ -171,6 +172,9 @@ def test_observed_agent_publishes_tracking_and_final_state(
     assert final_state.last_action_type == "click"
     assert final_state.report_path is not None
     assert final_state.report_path.name == "report.html"
+    connection = read_connection_state(trace_root / "connection-state.json")
+    assert connection.status is ConnectionStatus.CONNECTED
+    assert connection.observer_kind == "generic-agent"
 
 
 def test_observed_agent_binds_and_restores_internal_tools(
@@ -261,6 +265,10 @@ def test_observed_async_agent_reads_task_and_records_async_actions(
         state = read_run_state(tmp_path / "trace" / "run-state.json")
         assert state.status is RunStateStatus.UNVERIFIED
         assert state.action_count == 1
+        connection = read_connection_state(
+            tmp_path / "trace" / "connection-state.json"
+        )
+        assert connection.status is ConnectionStatus.CONNECTED
 
     asyncio.run(run())
 

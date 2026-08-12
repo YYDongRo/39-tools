@@ -14,6 +14,7 @@ from agent_devtools import (
     read_run_state,
 )
 from agent_devtools.browser_use import observe_browser_use_agent
+from agent_devtools.connection import ConnectionStatus, read_connection_state
 from agent_devtools.run_state import RunStateStatus
 
 
@@ -205,6 +206,9 @@ def test_observer_records_navigation_with_one_setup_call(
         assert state.last_action_type == "navigate"
         assert state.report_path is not None
         assert state.report_path.name == "report.html"
+        connection = read_connection_state(tmp_path / "connection-state.json")
+        assert connection.status is ConnectionStatus.CONNECTED
+        assert connection.observer_kind == "browser-use"
 
     asyncio.run(run())
 

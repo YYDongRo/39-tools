@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from agent_devtools.action import ActionRecord, ActionStatus
 from agent_devtools.config import AgentDevToolsConfig
+from agent_devtools.connection import ConnectionReporter
 from agent_devtools.diagnostics import RunIssueCode
 from agent_devtools.failure import FailureCategory, record_agent_run_failure
 from agent_devtools.report import format_session_summary, write_session_html
@@ -596,6 +597,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
         self._open_report = config_settings.open_report
         self.last_trace: _BrowserUseRecorder | None = None
         self._active_trace: _BrowserUseRecorder | None = None
+        self._connection: ConnectionReporter | None = None
         self._active = False
         self._existing_step_callback = existing_callback
 
@@ -722,6 +724,7 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
                 raise TypeError("Browser Use agent run method must be async")
             return await result
 
+        self._ensure_connection()
         user_step_end = kwargs.pop("on_step_end", None)
         if user_step_end is not None and not callable(user_step_end):
             raise TypeError("on_step_end must be callable or None")
@@ -793,6 +796,17 @@ class ObservedBrowserUseAgent(Generic[AgentT]):
                 print(format_session_summary(trace.session, trace.report_path))
             self._active_trace = None
             self._active = False
+            if self._connection is not None:
+                self._connection.heartbeat()
+
+    def _ensure_connection(self) -> None:
+        if self._connection is None:
+            self._connection = ConnectionReporter(
+                self.output_root,
+                observer_kind="browser-use",
+            )
+        else:
+            self._connection.heartbeat()
 
     def _create_trace_directory(self) -> Path:
         return _new_trace_directory(self.output_root)

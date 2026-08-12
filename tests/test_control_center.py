@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Thread
@@ -11,6 +12,11 @@ from urllib.request import Request, urlopen
 import pytest
 
 from agent_devtools.action import ActionRecord, ActionStatus
+from agent_devtools.connection import (
+    ConnectionState,
+    ConnectionStatus,
+    write_connection_state,
+)
 from agent_devtools.control_center import (
     _create_server,
     render_control_center,
@@ -78,6 +84,51 @@ def test_control_center_shows_tracking_state_and_auto_refresh(tmp_path: Path) ->
     assert "Actions" not in html
     assert "possibly interrupted" not in html
     assert str(tmp_path.resolve()) not in html
+
+
+def test_control_center_shows_live_agent_connection(tmp_path: Path) -> None:
+    write_connection_state(
+        ConnectionState(
+            status=ConnectionStatus.CONNECTED,
+            updated_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
+            connection_id="connection-1",
+            observer_kind="generic-agent",
+            process_id=os.getpid(),
+        ),
+        tmp_path / "connection-state.json",
+    )
+
+    html = render_control_center(
+        tmp_path,
+        now=datetime(2026, 8, 9, 12, 0, 10, tzinfo=UTC),
+    )
+
+    assert "Agent connection" in html
+    assert "Connected" in html
+    assert "Your observer is writing to this trace folder." in html
+    assert 'http-equiv="refresh" content="2"' in html
+
+
+def test_control_center_marks_disconnected_observer(tmp_path: Path) -> None:
+    write_connection_state(
+        ConnectionState(
+            status=ConnectionStatus.DISCONNECTED,
+            updated_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
+            connection_id="connection-1",
+            observer_kind="generic-agent",
+            process_id=999_999_999,
+        ),
+        tmp_path / "connection-state.json",
+    )
+
+    html = render_control_center(
+        tmp_path,
+        now=datetime(2026, 8, 9, 12, 0, 10, tzinfo=UTC),
+    )
+
+    assert "Agent connection" in html
+    assert "Not connected" in html
+    assert "No live observer is connected to this trace folder." in html
 
 
 def test_control_center_warns_when_tracking_state_is_stale(tmp_path: Path) -> None:
@@ -187,6 +238,7 @@ def test_connect_page_explains_custom_agent_boundary(tmp_path: Path) -> None:
     assert 'tools_attribute=\"tools\"' in html
     assert "uv run agent-devtools dashboard --root trace --open" in html
     assert "Direct calls such as" in html
+    assert "home page also shows whether" in html
     assert str(tmp_path.resolve()) not in html
     assert "API_KEY" not in html
 
