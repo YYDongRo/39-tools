@@ -1,6 +1,6 @@
 [project]
 name = "39-tools"
-version = "0.2.0a1"
+version = "0.2.0a2"
 description = "Action-level visual debugging and task verification for Browser Use and Playwright agents"
 readme = "README.md"
 license = "MIT"
